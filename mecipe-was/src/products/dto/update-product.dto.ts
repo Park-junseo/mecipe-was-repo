@@ -1,7 +1,13 @@
-import { IsArray, IsBoolean, IsNumber, IsOptional, IsString } from "class-validator";
-import { Prisma } from "prisma/basic";
-import { CreateProductImageDto } from "./create-product.dto";
-import { Transform } from "class-transformer";
+import {
+  IsArray,
+  IsBoolean,
+  IsNumber,
+  IsOptional,
+  IsString,
+} from 'class-validator';
+import { Prisma } from 'prisma/basic';
+import { CreateProductImageDto } from './create-product.dto';
+import { Transform } from 'class-transformer';
 
 export class UpdateProductDto implements Partial<Prisma.ProductUpdateInput> {
   @IsOptional()
@@ -43,14 +49,16 @@ export class UpdateProductDto implements Partial<Prisma.ProductUpdateInput> {
   @IsOptional()
   @IsNumber()
   categoryId?: number;
-  
+
   @IsOptional()
   @IsArray()
   productImages?: CreateProductImageDto[];
 
   @IsOptional()
   @IsArray()
-  @Transform(({ value }) => Array.isArray(value) ? value.map(v => parseInt(v)) : value)
+  @Transform(({ value }) =>
+    Array.isArray(value) ? value.map((v) => parseInt(v)) : value,
+  )
   @IsNumber({}, { each: true })
   disabledImageIds?: number[];
 

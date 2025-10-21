@@ -99,4 +99,3 @@ export const PrismaServiceMock = {
   $connect: jest.fn(),
   $disconnect: jest.fn(),
 };
-

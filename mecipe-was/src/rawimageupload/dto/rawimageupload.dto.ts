@@ -1,4 +1,4 @@
-export type RawImageDescriptionData= {
-    url: string;
-    thumbnailUrl?: string;
-}
+export type RawImageDescriptionData = {
+  url: string;
+  thumbnailUrl?: string;
+};

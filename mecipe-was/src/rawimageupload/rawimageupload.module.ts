@@ -12,6 +12,6 @@ import { getStorageVariant } from 'src/util/multer';
   ],
   controllers: [RawimageuploadController],
   providers: [RawimageuploadService],
-  exports:[RawimageuploadService]
+  exports: [RawimageuploadService],
 })
-export class RawimageuploadModule { }
+export class RawimageuploadModule {}

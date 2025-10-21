@@ -6,53 +6,56 @@ import { getAppDirectory } from 'src/util/getAppDirectory';
 
 @Injectable()
 export class RawimageuploadService {
+  uploadImage(
+    images: Express.Multer.File[] | undefined,
+    thumbnails: Express.Multer.File[] | undefined,
+  ) {
+    if (!images) throw new ForbiddenException('Error: Not Found Images');
 
-    uploadImage(
-        images: Express.Multer.File[] | undefined,
-        thumbnails: Express.Multer.File[] | undefined,
+    if (
+      thumbnails &&
+      thumbnails.length > 0 &&
+      thumbnails.length !== images.length
     ) {
-        if (!images) throw new ForbiddenException("Error: Not Found Images")
+      throw new ForbiddenException(
+        'Error: Thumbnail is provided, but not enough images',
+      );
+    }
 
-        if (thumbnails && thumbnails.length > 0 && thumbnails.length !== images.length) {
-            throw new ForbiddenException("Error: Thumbnail is provided, but not enough images")
+    const result: RawImageDescriptionData[] = [];
+
+    for (let i = 0; i < images.length; i++) {
+      result.push({
+        url: images[i].path,
+        thumbnailUrl: thumbnails ? thumbnails[i].path : undefined,
+      });
+    }
+
+    return result;
+  }
+
+  async deletImageByUrl(url: string) {
+    console.log('deletImageByUrl', join(getAppDirectory(), url));
+    if (url) rmSync(join(getAppDirectory(), url));
+    return true;
+  }
+
+  async deletImageByUrlList(urlList: string[]) {
+    if (urlList)
+      urlList.forEach((url) => {
+        if (url) {
+          console.log('deletImageByUrlList', join(getAppDirectory(), url));
+          rmSync(join(getAppDirectory(), url));
         }
+      });
+    return true;
+  }
 
-        let result: RawImageDescriptionData[] = [];
+  async validUploadUrl(url: string) {
+    const valid = existsSync(join(getAppDirectory(), url));
 
-        for (let i = 0; i < images.length; i++) {
-            result.push({
-                url: images[i].path,
-                thumbnailUrl: thumbnails ? thumbnails[i].path : undefined
-            })
-        }
+    if (!valid) throw new ForbiddenException('Error: Invalid Image: ' + url);
 
-        return result
-
-    }
-
-    async deletImageByUrl(url: string) {
-
-        console.log("deletImageByUrl", join(getAppDirectory(), url));
-        if (url) rmSync(join(getAppDirectory(), url));
-        return true;
-    }
-
-    async deletImageByUrlList(urlList: string[]) {
-
-        if (urlList) urlList.forEach(url => {
-            if (url) {
-                console.log("deletImageByUrlList", join(getAppDirectory(), url));
-                rmSync(join(getAppDirectory(), url))
-            }
-        });
-        return true;
-    }
-
-    async validUploadUrl(url: string) {
-        const valid = existsSync(join(getAppDirectory(), url));
-
-        if (!valid) throw new ForbiddenException("Error: Invalid Image: " + url);
-
-        return valid;
-    }
+    return valid;
+  }
 }

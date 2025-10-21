@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateMetaViewerInfoDto } from './dto/create-meta-viewer-info.dto';
 import { UpdateMetaViewerInfoDto } from './dto/update-meta-viewer-info.dto';
 import { CreateMetaViewerMapDto } from './dto/create-meta-viewer-map.dto';
@@ -18,7 +22,7 @@ export class MetaViewerInfosService {
   async createMetaViewerInfo(createDto: CreateMetaViewerInfoDto) {
     // CafeInfo 존재 확인
     const cafeInfo = await this.prisma.cafeInfo.findUnique({
-      where: { id: createDto.cafeInfoId }
+      where: { id: createDto.cafeInfoId },
     });
 
     if (!cafeInfo) {
@@ -27,7 +31,7 @@ export class MetaViewerInfosService {
 
     // code 중복 확인
     const existingInfo = await this.prisma.metaViewerInfo.findUnique({
-      where: { code: createDto.code }
+      where: { code: createDto.code },
     });
 
     if (existingInfo) {
@@ -43,9 +47,9 @@ export class MetaViewerInfosService {
           isDisable: createDto.isDisable ?? false,
           worldData: createDto.worldData,
           CafeInfo: {
-            connect: { id: createDto.cafeInfoId }
-          }
-        }
+            connect: { id: createDto.cafeInfoId },
+          },
+        },
       });
 
       // 2. RenderMap 생성
@@ -58,9 +62,9 @@ export class MetaViewerInfosService {
           version: createDto.activeRenderMap.version ?? 0,
           contentKey: createDto.activeRenderMap.contentKey,
           MetaViewerInfo: {
-            connect: { id: metaViewerInfo.id }
-          }
-        }
+            connect: { id: metaViewerInfo.id },
+          },
+        },
       });
 
       // 3. ColliderMap 생성
@@ -72,24 +76,24 @@ export class MetaViewerInfosService {
           isDraco: createDto.activeColliderMap.isDraco,
           version: createDto.activeColliderMap.version ?? 0,
           MetaViewerInfo: {
-            connect: { id: metaViewerInfo.id }
-          }
-        }
+            connect: { id: metaViewerInfo.id },
+          },
+        },
       });
 
       // 4. ActiveMap 생성
       await tx.metaViewerActiveMap.create({
         data: {
           MetaViewerInfo: {
-            connect: { id: metaViewerInfo.id }
+            connect: { id: metaViewerInfo.id },
           },
           ActiveRenderMap: {
-            connect: { id: renderMap.id }
+            connect: { id: renderMap.id },
           },
           ActiveColliderMap: {
-            connect: { id: colliderMap.id }
-          }
-        }
+            connect: { id: colliderMap.id },
+          },
+        },
       });
 
       // 5. 전체 데이터 조회 후 반환
@@ -101,17 +105,17 @@ export class MetaViewerInfosService {
           ActiveMaps: {
             include: {
               ActiveRenderMap: true,
-              ActiveColliderMap: true
-            }
-          }
-        }
+              ActiveColliderMap: true,
+            },
+          },
+        },
       });
     });
   }
 
   async updateMetaViewerInfo(id: number, updateDto: UpdateMetaViewerInfoDto) {
     const metaViewerInfo = await this.prisma.metaViewerInfo.findUnique({
-      where: { id }
+      where: { id },
     });
 
     if (!metaViewerInfo) {
@@ -121,7 +125,7 @@ export class MetaViewerInfosService {
     // code 중복 확인 (자기 자신 제외)
     if (updateDto.code) {
       const existingInfo = await this.prisma.metaViewerInfo.findUnique({
-        where: { code: updateDto.code }
+        where: { code: updateDto.code },
       });
 
       if (existingInfo && existingInfo.id !== id) {
@@ -132,7 +136,7 @@ export class MetaViewerInfosService {
     // cafeInfoId 변경 시 존재 확인
     if (updateDto.cafeInfoId) {
       const cafeInfo = await this.prisma.cafeInfo.findUnique({
-        where: { id: updateDto.cafeInfoId }
+        where: { id: updateDto.cafeInfoId },
       });
 
       if (!cafeInfo) {
@@ -142,10 +146,12 @@ export class MetaViewerInfosService {
 
     // 업데이트 데이터 구성
     const updateData: Prisma.MetaViewerInfoUpdateInput = {};
-    
+
     if (updateDto.code !== undefined) updateData.code = updateDto.code;
-    if (updateDto.isDisable !== undefined) updateData.isDisable = updateDto.isDisable;
-    if (updateDto.worldData !== undefined) updateData.worldData = updateDto.worldData;
+    if (updateDto.isDisable !== undefined)
+      updateData.isDisable = updateDto.isDisable;
+    if (updateDto.worldData !== undefined)
+      updateData.worldData = updateDto.worldData;
     if (updateDto.cafeInfoId !== undefined) {
       updateData.CafeInfo = { connect: { id: updateDto.cafeInfoId } };
     }
@@ -158,10 +164,10 @@ export class MetaViewerInfosService {
         ActiveMaps: {
           include: {
             ActiveRenderMap: true,
-            ActiveColliderMap: true
-          }
-        }
-      }
+            ActiveColliderMap: true,
+          },
+        },
+      },
     });
   }
 
@@ -187,21 +193,24 @@ export class MetaViewerInfosService {
 
     const total = await this.prisma.metaViewerInfo.count({ where });
 
-    const metaViewerInfos = total > 0 ? await this.prisma.metaViewerInfo.findMany({
-      where,
-      skip,
-      take: limit,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        CafeInfo: true,
-        ActiveMaps: {
-          include: {
-            ActiveRenderMap: true,
-            ActiveColliderMap: true
-          }
-        }
-      }
-    }) : [];
+    const metaViewerInfos =
+      total > 0
+        ? await this.prisma.metaViewerInfo.findMany({
+            where,
+            skip,
+            take: limit,
+            orderBy: { createdAt: 'desc' },
+            include: {
+              CafeInfo: true,
+              ActiveMaps: {
+                include: {
+                  ActiveRenderMap: true,
+                  ActiveColliderMap: true,
+                },
+              },
+            },
+          })
+        : [];
 
     return {
       metaViewerInfos,
@@ -209,8 +218,8 @@ export class MetaViewerInfosService {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit)
-      }
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 
@@ -222,10 +231,10 @@ export class MetaViewerInfosService {
         ActiveMaps: {
           include: {
             ActiveRenderMap: true,
-            ActiveColliderMap: true
-          }
-        }
-      }
+            ActiveColliderMap: true,
+          },
+        },
+      },
     });
 
     if (!metaViewerInfo) {
@@ -243,10 +252,10 @@ export class MetaViewerInfosService {
         ActiveMaps: {
           include: {
             ActiveRenderMap: true,
-            ActiveColliderMap: true
-          }
-        }
-      }
+            ActiveColliderMap: true,
+          },
+        },
+      },
     });
 
     if (!metaViewerInfo) {
@@ -269,8 +278,8 @@ export class MetaViewerInfosService {
     const metaViewerInfo = await this.prisma.metaViewerInfo.findUnique({
       where: { id },
       include: {
-        ActiveMaps: true
-      }
+        ActiveMaps: true,
+      },
     });
 
     if (!metaViewerInfo) {
@@ -281,12 +290,12 @@ export class MetaViewerInfosService {
       // ActiveMaps가 있으면 먼저 삭제
       if (metaViewerInfo.ActiveMaps) {
         await tx.metaViewerActiveMap.delete({
-          where: { metaViewerInfoId: id }
+          where: { metaViewerInfoId: id },
         });
       }
 
       await tx.metaViewerInfo.delete({
-        where: { id }
+        where: { id },
       });
 
       return { message: 'MetaViewerInfo deleted successfully' };
@@ -295,10 +304,13 @@ export class MetaViewerInfosService {
 
   // ========== MetaViewerMap 관련 ==========
 
-  async createMetaViewerMap(metaViewerInfoId: number, createDto: CreateMetaViewerMapDto) {
+  async createMetaViewerMap(
+    metaViewerInfoId: number,
+    createDto: CreateMetaViewerMapDto,
+  ) {
     // MetaViewerInfo 존재 확인
     const metaViewerInfo = await this.prisma.metaViewerInfo.findUnique({
-      where: { id: metaViewerInfoId }
+      where: { id: metaViewerInfoId },
     });
 
     if (!metaViewerInfo) {
@@ -314,9 +326,9 @@ export class MetaViewerInfosService {
         version: createDto.version ?? 0,
         contentKey: createDto.contentKey,
         MetaViewerInfo: {
-          connect: { id: metaViewerInfoId }
-        }
-      }
+          connect: { id: metaViewerInfoId },
+        },
+      },
     });
   }
 
@@ -325,8 +337,8 @@ export class MetaViewerInfosService {
       where: { id: mapId },
       include: {
         ActiveRenderFor: true,
-        ActiveColliderFor: true
-      }
+        ActiveColliderFor: true,
+      },
     });
 
     if (!map) {
@@ -336,19 +348,29 @@ export class MetaViewerInfosService {
     // type 변경 시 ActiveMap 참조 확인
     if (updateDto.type && updateDto.type !== map.type) {
       // RENDER로 변경하려는데 ActiveColliderFor가 있는 경우
-      if (updateDto.type === MetaMapType.RENDER && map.ActiveColliderFor.length > 0) {
-        throw new BadRequestException('Cannot change type to RENDER: map is used as active collider map');
+      if (
+        updateDto.type === MetaMapType.RENDER &&
+        map.ActiveColliderFor.length > 0
+      ) {
+        throw new BadRequestException(
+          'Cannot change type to RENDER: map is used as active collider map',
+        );
       }
 
       // COLLIDER로 변경하려는데 ActiveRenderFor가 있는 경우
-      if (updateDto.type === MetaMapType.COLLIDER && map.ActiveRenderFor.length > 0) {
-        throw new BadRequestException('Cannot change type to COLLIDER: map is used as active render map');
+      if (
+        updateDto.type === MetaMapType.COLLIDER &&
+        map.ActiveRenderFor.length > 0
+      ) {
+        throw new BadRequestException(
+          'Cannot change type to COLLIDER: map is used as active render map',
+        );
       }
     }
 
     return this.prisma.metaViewerMap.update({
       where: { id: mapId },
-      data: updateDto
+      data: updateDto,
     });
   }
 
@@ -357,8 +379,8 @@ export class MetaViewerInfosService {
       where: { id: mapId },
       include: {
         ActiveRenderFor: true,
-        ActiveColliderFor: true
-      }
+        ActiveColliderFor: true,
+      },
     });
 
     if (!map) {
@@ -367,11 +389,13 @@ export class MetaViewerInfosService {
 
     // ActiveMap에서 사용 중이면 삭제 불가
     if (map.ActiveRenderFor.length > 0 || map.ActiveColliderFor.length > 0) {
-      throw new BadRequestException('Cannot delete map: it is referenced by active maps');
+      throw new BadRequestException(
+        'Cannot delete map: it is referenced by active maps',
+      );
     }
 
     await this.prisma.metaViewerMap.delete({
-      where: { id: mapId }
+      where: { id: mapId },
     });
 
     return { message: 'MetaViewerMap deleted successfully' };
@@ -380,7 +404,7 @@ export class MetaViewerInfosService {
   async findAllMaps(metaViewerInfoId: number) {
     // MetaViewerInfo 존재 확인
     const metaViewerInfo = await this.prisma.metaViewerInfo.findUnique({
-      where: { id: metaViewerInfoId }
+      where: { id: metaViewerInfoId },
     });
 
     if (!metaViewerInfo) {
@@ -389,7 +413,7 @@ export class MetaViewerInfosService {
 
     // 모든 맵 반환 (추후 필터링 가능)
     return this.prisma.metaViewerMap.findMany({
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
   }
 
@@ -400,8 +424,8 @@ export class MetaViewerInfosService {
     const metaViewerInfo = await this.prisma.metaViewerInfo.findUnique({
       where: { id: createDto.metaViewerInfoId },
       include: {
-        ActiveMaps: true
-      }
+        ActiveMaps: true,
+      },
     });
 
     if (!metaViewerInfo) {
@@ -410,12 +434,14 @@ export class MetaViewerInfosService {
 
     // 이미 ActiveMap이 존재하면 에러
     if (metaViewerInfo.ActiveMaps) {
-      throw new BadRequestException('ActiveMap already exists for this MetaViewerInfo');
+      throw new BadRequestException(
+        'ActiveMap already exists for this MetaViewerInfo',
+      );
     }
 
     // ActiveRenderMap 확인 (RENDER 타입이어야 함)
     const renderMap = await this.prisma.metaViewerMap.findUnique({
-      where: { id: createDto.activeRenderMapId }
+      where: { id: createDto.activeRenderMapId },
     });
 
     if (!renderMap) {
@@ -428,7 +454,7 @@ export class MetaViewerInfosService {
 
     // ActiveColliderMap 확인 (COLLIDER 타입이어야 함)
     const colliderMap = await this.prisma.metaViewerMap.findUnique({
-      where: { id: createDto.activeColliderMapId }
+      where: { id: createDto.activeColliderMapId },
     });
 
     if (!colliderMap) {
@@ -436,32 +462,37 @@ export class MetaViewerInfosService {
     }
 
     if (colliderMap.type !== MetaMapType.COLLIDER) {
-      throw new BadRequestException('activeColliderMap must be of type COLLIDER');
+      throw new BadRequestException(
+        'activeColliderMap must be of type COLLIDER',
+      );
     }
 
     return this.prisma.metaViewerActiveMap.create({
       data: {
         MetaViewerInfo: {
-          connect: { id: createDto.metaViewerInfoId }
+          connect: { id: createDto.metaViewerInfoId },
         },
         ActiveRenderMap: {
-          connect: { id: createDto.activeRenderMapId }
+          connect: { id: createDto.activeRenderMapId },
         },
         ActiveColliderMap: {
-          connect: { id: createDto.activeColliderMapId }
-        }
+          connect: { id: createDto.activeColliderMapId },
+        },
       },
       include: {
         MetaViewerInfo: true,
         ActiveRenderMap: true,
-        ActiveColliderMap: true
-      }
+        ActiveColliderMap: true,
+      },
     });
   }
 
-  async updateMetaViewerActiveMap(activeMapId: number, updateDto: UpdateMetaViewerActiveMapDto) {
+  async updateMetaViewerActiveMap(
+    activeMapId: number,
+    updateDto: UpdateMetaViewerActiveMapDto,
+  ) {
     const activeMap = await this.prisma.metaViewerActiveMap.findUnique({
-      where: { id: activeMapId }
+      where: { id: activeMapId },
     });
 
     if (!activeMap) {
@@ -471,7 +502,7 @@ export class MetaViewerInfosService {
     // activeRenderMapId 변경 시 타입 확인
     if (updateDto.activeRenderMapId) {
       const renderMap = await this.prisma.metaViewerMap.findUnique({
-        where: { id: updateDto.activeRenderMapId }
+        where: { id: updateDto.activeRenderMapId },
       });
 
       if (!renderMap) {
@@ -486,7 +517,7 @@ export class MetaViewerInfosService {
     // activeColliderMapId 변경 시 타입 확인
     if (updateDto.activeColliderMapId) {
       const colliderMap = await this.prisma.metaViewerMap.findUnique({
-        where: { id: updateDto.activeColliderMapId }
+        where: { id: updateDto.activeColliderMapId },
       });
 
       if (!colliderMap) {
@@ -494,7 +525,9 @@ export class MetaViewerInfosService {
       }
 
       if (colliderMap.type !== MetaMapType.COLLIDER) {
-        throw new BadRequestException('activeColliderMap must be of type COLLIDER');
+        throw new BadRequestException(
+          'activeColliderMap must be of type COLLIDER',
+        );
       }
     }
 
@@ -504,14 +537,14 @@ export class MetaViewerInfosService {
       include: {
         MetaViewerInfo: true,
         ActiveRenderMap: true,
-        ActiveColliderMap: true
-      }
+        ActiveColliderMap: true,
+      },
     });
   }
 
   async removeMetaViewerActiveMap(activeMapId: number) {
     const activeMap = await this.prisma.metaViewerActiveMap.findUnique({
-      where: { id: activeMapId }
+      where: { id: activeMapId },
     });
 
     if (!activeMap) {
@@ -519,7 +552,7 @@ export class MetaViewerInfosService {
     }
 
     await this.prisma.metaViewerActiveMap.delete({
-      where: { id: activeMapId }
+      where: { id: activeMapId },
     });
 
     return { message: 'MetaViewerActiveMap deleted successfully' };
@@ -528,22 +561,22 @@ export class MetaViewerInfosService {
   async findAllMetaViewerCodes() {
     return this.prisma.metaViewerInfo.findMany({
       where: { isDisable: false },
-      select: { code: true }
+      select: { code: true },
     });
   }
 
-  async findOneMetaViewerInfoByCode(code: string, isDisable: boolean = false) {
+  async findOneMetaViewerInfoByCode(code: string, isDisable = false) {
     return this.prisma.metaViewerInfo.findFirst({
       where: { code, isDisable },
-      include: { 
-        CafeInfo: true, 
+      include: {
+        CafeInfo: true,
         ActiveMaps: {
           include: {
             ActiveRenderMap: true,
-            ActiveColliderMap: true
-          }
-        }
-      }
+            ActiveColliderMap: true,
+          },
+        },
+      },
     });
   }
 }

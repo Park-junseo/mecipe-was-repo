@@ -4,11 +4,9 @@ import { ProductcategoriesController } from './productcategories.controller';
 import { PrismaService } from 'src/global/prisma.service';
 
 @Module({
-  imports: [
-    PrismaService,
-  ],
+  imports: [PrismaService],
   controllers: [ProductcategoriesController],
   providers: [ProductcategoriesService],
-  exports: [ProductcategoriesService]
+  exports: [ProductcategoriesService],
 })
 export class ProductcategoriesModule {}

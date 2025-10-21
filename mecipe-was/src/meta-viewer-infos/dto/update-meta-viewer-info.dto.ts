@@ -1,21 +1,27 @@
-import { IsBoolean, IsInt, IsObject, IsOptional, IsString } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsObject,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdateMetaViewerInfoDto {
-    @IsString()
-    @IsOptional()
-    code: string;
-  
-    @IsInt()
-    @Type(() => Number)
-    @IsOptional()
-    cafeInfoId: number;
+  @IsString()
+  @IsOptional()
+  code: string;
 
-    @IsObject()
-    @IsOptional()
-    worldData: Record<string, any>;
+  @IsInt()
+  @Type(() => Number)
+  @IsOptional()
+  cafeInfoId: number;
 
-    @IsBoolean()
-    @IsOptional()
-    isDisable: boolean;
-  }
+  @IsObject()
+  @IsOptional()
+  worldData: Record<string, any>;
+
+  @IsBoolean()
+  @IsOptional()
+  isDisable: boolean;
+}

@@ -12,4 +12,3 @@ export class UpdateMetaViewerActiveMapDto {
   @IsOptional()
   activeColliderMapId?: number;
 }
-

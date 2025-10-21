@@ -9,11 +9,17 @@ export type CreateBoardReplyDto = Prisma.BoardReplyCreateInput;
 export type UpdateBoardReplyDto = Prisma.BoardReplyUpdateInput;
 
 // 방법 2: Pick을 사용하여 필요한 필드만 선택
-export type CreateBoardSimpleDto = Pick<Prisma.BoardCreateInput, 'title' | 'content' | 'boardType'> & {
+export type CreateBoardSimpleDto = Pick<
+  Prisma.BoardCreateInput,
+  'title' | 'content' | 'boardType'
+> & {
   cafeInfoIds?: number[];
 };
 
 // 방법 3: Omit을 사용하여 불필요한 필드 제거
-export type CreateBoardWithoutIdDto = Omit<Prisma.BoardCreateInput, 'id' | 'createdAt'> & {
+export type CreateBoardWithoutIdDto = Omit<
+  Prisma.BoardCreateInput,
+  'id' | 'createdAt'
+> & {
   cafeInfoIds?: number[];
 };

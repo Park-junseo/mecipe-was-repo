@@ -9,13 +9,13 @@ import { MessageCacheService } from './services/message-cache.service';
 
 @Module({
   providers: [
-    MetaVeiwersGateway, 
-    MetaVeiwersService, 
-    RoomManagerService, 
+    MetaVeiwersGateway,
+    MetaVeiwersService,
+    RoomManagerService,
     RoomDataQueueService,
     BroadcastSchedulerService,
     SocketLogger,
     MessageCacheService,
-  ]
+  ],
 })
 export class MetaVeiwersModule {}

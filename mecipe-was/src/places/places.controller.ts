@@ -1,24 +1,46 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
 import { PlacesService } from './places.service';
-import { CreateCafeInfoDto, CreateUcheckedCafeInfoDto } from './dto/create-place.dto';
+import {
+  CreateCafeInfoDto,
+  CreateUcheckedCafeInfoDto,
+} from './dto/create-place.dto';
 import { UpdateCafeInoDto } from './dto/update-place.dto';
 import { AdminAuthGuard } from 'src/auth/jwt.guard.admin';
 import { Public } from 'src/util/decorators';
 
 @Controller('places')
 export class PlacesController {
-  constructor(private readonly placesService: PlacesService) { }
+  constructor(private readonly placesService: PlacesService) {}
 
   @Patch('admin/update/:id')
   @UseGuards(AdminAuthGuard)
-  updatePlaceByAdmin(@Param('id') id: string, @Body() updateDto: UpdateCafeInoDto) {
+  updatePlaceByAdmin(
+    @Param('id') id: string,
+    @Body() updateDto: UpdateCafeInoDto,
+  ) {
     return this.placesService.updatePlaceByAdmin(+id, updateDto);
   }
 
   @Patch('admin/disable/:id')
   @UseGuards(AdminAuthGuard)
-  updateDisablePlaceByAdmin(@Param('id') id: string, @Query('isDisable') isDisable: string) {
-    return this.placesService.updateDisablePlaceByAdmin(+id, isDisable === 'true');
+  updateDisablePlaceByAdmin(
+    @Param('id') id: string,
+    @Query('isDisable') isDisable: string,
+  ) {
+    return this.placesService.updateDisablePlaceByAdmin(
+      +id,
+      isDisable === 'true',
+    );
   }
 
   @Delete('admin/delete/:id')
@@ -30,13 +52,13 @@ export class PlacesController {
   @Post('admin/create')
   @UseGuards(AdminAuthGuard)
   createPlaceByAdmin(@Body() createDto: CreateUcheckedCafeInfoDto) {
-    const { regionCategoryId, ...dto } = createDto
+    const { regionCategoryId, ...dto } = createDto;
     return this.placesService.createPlaceByAdmin(dto, regionCategoryId);
   }
 
   @Get('admin/:id')
   @UseGuards(AdminAuthGuard)
-  findPlaceByAdmin(@Param('id') id: string,) {
+  findPlaceByAdmin(@Param('id') id: string) {
     return this.placesService.findPlaceByAdmin(+id);
   }
 
@@ -57,7 +79,7 @@ export class PlacesController {
       searchType,
       searchText,
       regionCategoryId ? +regionCategoryId : undefined,
-      isDisable === 'true' ? true : false
+      isDisable === 'true' ? true : false,
     );
   }
 
@@ -73,7 +95,7 @@ export class PlacesController {
       skip ? +skip : undefined,
       take ? +take : undefined,
       searchText,
-      regionCategoryId ? +regionCategoryId : undefined
+      regionCategoryId ? +regionCategoryId : undefined,
     );
   }
 
@@ -85,8 +107,7 @@ export class PlacesController {
 
   @Get(':id')
   @Public()
-  findOnePlace(@Param('id') id: string,) {
+  findOnePlace(@Param('id') id: string) {
     return this.placesService.findOnePlace(+id);
   }
-
 }

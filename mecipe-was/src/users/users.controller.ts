@@ -1,4 +1,16 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Logger, Request, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  Logger,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -63,7 +75,7 @@ export class UsersController {
 
   @Public()
   @Get('checkLogin/:id')
-  findUserTypeWithNoLogin (@Param('id') id: string) {
+  findUserTypeWithNoLogin(@Param('id') id: string) {
     return this.usersService.findUserTypeWithNoLogin(+id);
   }
 

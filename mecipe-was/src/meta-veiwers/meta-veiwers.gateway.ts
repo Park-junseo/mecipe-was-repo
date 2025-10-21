@@ -1,4 +1,9 @@
-import { ConnectedSocket, MessageBody, SubscribeMessage, WebSocketGateway } from '@nestjs/websockets';
+import {
+  ConnectedSocket,
+  MessageBody,
+  SubscribeMessage,
+  WebSocketGateway,
+} from '@nestjs/websockets';
 import { MetaVeiwersService } from './meta-veiwers.service';
 import { Server, Socket } from 'socket.io';
 import { ClientToServerListenerType } from './interface/socket-event-type';
@@ -10,9 +15,7 @@ import { ClientToServerListenerType } from './interface/socket-event-type';
   path: '/meta-viewers',
 })
 export class MetaVeiwersGateway {
-  constructor(
-    private readonly metaVeiwersService: MetaVeiwersService
-  ) { }
+  constructor(private readonly metaVeiwersService: MetaVeiwersService) {}
 
   afterInit(server: Server) {
     this.metaVeiwersService.afterInit(server);
@@ -99,5 +102,4 @@ export class MetaVeiwersGateway {
   ) {
     return this.metaVeiwersService.sendToRoom(data, client);
   }
-
 }

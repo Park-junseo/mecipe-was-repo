@@ -1,5 +1,5 @@
-import { ClientMessage } from "./broadcast-data-type";
+import { ClientMessage } from './broadcast-data-type';
 
 export interface RoomDataQueue {
-    [roomId: string]: Array<ClientMessage>;
+  [roomId: string]: Array<ClientMessage>;
 }

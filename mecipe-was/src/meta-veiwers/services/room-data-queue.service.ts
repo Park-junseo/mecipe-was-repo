@@ -1,7 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
-  RoomDataQueue,
-} from '../interface/socket-data-queue';
+import { RoomDataQueue } from '../interface/socket-data-queue';
 import { ClientMessage } from '../interface/broadcast-data-type';
 
 @Injectable()
@@ -18,7 +16,6 @@ export class RoomDataQueueService {
     if (!this.roomQueues[roomId]) {
       this.roomQueues[roomId] = [];
     }
-
 
     this.roomQueues[roomId].push(data);
 

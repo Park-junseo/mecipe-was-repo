@@ -5,6 +5,6 @@ import { PrismaService } from 'src/global/prisma.service';
 
 @Module({
   controllers: [MetaViewerInfosController],
-  providers: [MetaViewerInfosService, PrismaService]
+  providers: [MetaViewerInfosService, PrismaService],
 })
 export class MetaViewerInfosModule {}

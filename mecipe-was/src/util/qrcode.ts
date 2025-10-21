@@ -1,6 +1,8 @@
 import * as QRCode from 'qrcode';
 
-export async function generateQrMatrix(text: string): Promise<{ size: number; base64Data: string }> {
+export async function generateQrMatrix(
+  text: string,
+): Promise<{ size: number; base64Data: string }> {
   const qrData = await QRCode.create(text, { errorCorrectionLevel: 'M' });
 
   const modules = qrData.modules;

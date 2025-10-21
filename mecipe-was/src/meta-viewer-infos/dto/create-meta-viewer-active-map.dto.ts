@@ -14,4 +14,3 @@ export class CreateMetaViewerActiveMapDto {
   @Type(() => Number)
   activeColliderMapId: number;
 }
-

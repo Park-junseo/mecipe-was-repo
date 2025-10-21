@@ -21,7 +21,6 @@ export class AuthService {
     if (userDto.loginType === 'ADMIN') {
       throw new ForbiddenException('어드민 가입은 불가');
     } else if (userDto && userDto.loginType !== 'LOCAL') {
-
     } else if (userDto.loginId && userDto.loginPw) {
       const isDup = await this.usersService.findByLocal(
         userDto.loginType,
@@ -52,9 +51,7 @@ export class AuthService {
 
     if (!(loginType in LoginType)) {
       throw new BadRequestException('잘못된 로그인 타입');
-    }
-
-    else if (loginId && loginPw) {
+    } else if (loginId && loginPw) {
       user = await this.usersService.findByLocal(loginType, loginId, loginPw);
     }
 

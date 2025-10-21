@@ -1,12 +1,20 @@
-import { IsString, IsOptional, IsEnum, IsDateString, IsArray, IsNumber, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsDateString,
+  IsArray,
+  IsNumber,
+  IsBoolean,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 import { Prisma } from 'prisma/basic';
 
 export enum BoardType {
   BTALK = 'BTALK',
-  BINFORM = 'BINFORM', 
+  BINFORM = 'BINFORM',
   BQUESTION = 'BQUESTION',
-  BEVENT = 'BEVENT'
+  BEVENT = 'BEVENT',
 }
 
 // Prisma 타입을 기반으로 DTO 정의
@@ -40,7 +48,9 @@ export class CreateBoardDto implements Partial<Prisma.BoardCreateInput> {
 
   @IsOptional()
   @IsArray()
-  @Transform(({ value }) => Array.isArray(value) ? value.map(v => parseInt(v)) : value)
+  @Transform(({ value }) =>
+    Array.isArray(value) ? value.map((v) => parseInt(v)) : value,
+  )
   @IsNumber({}, { each: true })
   cafeInfoIds?: number[];
 
@@ -49,7 +59,9 @@ export class CreateBoardDto implements Partial<Prisma.BoardCreateInput> {
   boardImages?: CreateBoardImageDto[];
 }
 
-export class CreateBoardImageDto implements Partial<Prisma.BoardImageCreateInput> {
+export class CreateBoardImageDto
+  implements Partial<Prisma.BoardImageCreateInput>
+{
   @IsString()
   url: string;
 
@@ -73,7 +85,9 @@ export class CreateBoardImageDto implements Partial<Prisma.BoardImageCreateInput
   isThumb?: boolean;
 }
 
-export class CreateBoardReplyDto implements Partial<Prisma.BoardReplyCreateInput> {
+export class CreateBoardReplyDto
+  implements Partial<Prisma.BoardReplyCreateInput>
+{
   @IsString()
   content: string;
 

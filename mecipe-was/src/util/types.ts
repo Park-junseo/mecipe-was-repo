@@ -1,7 +1,7 @@
 export type Override<TYPE, SUBJECT> = Omit<TYPE, keyof SUBJECT> & SUBJECT;
 
 type PrimitiveKeys<TYPE> = {
-  [P in keyof TYPE]: TYPE[P] extends object ? never : P;
+  [P in keyof TYPE]: TYPE[P] extends Record<string, unknown> ? never : P;
 }[keyof TYPE];
 export type PrimitiveOnly<TYPE> = Pick<TYPE, PrimitiveKeys<TYPE>>;
 

@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { CreateCouponDataDto, CreateCouponDto } from './dto/create-coupon.dto';
 import { UpdateCouponDto } from './dto/update-coupon.dto';
 import { PrismaService } from 'src/global/prisma.service';
@@ -9,8 +14,7 @@ import e from 'express';
 
 @Injectable()
 export class CouponsService {
-
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * 16자리 시리얼 넘버를 생성하는 함수
@@ -22,9 +26,8 @@ export class CouponsService {
     const maxAttempts = 30; // 더 많은 시도 횟수
 
     while (attempts < maxAttempts) {
-      const serialNumber = Array.from(
-        { length: 16 },
-        () => characters.charAt(Math.floor(Math.random() * characters.length))
+      const serialNumber = Array.from({ length: 16 }, () =>
+        characters.charAt(Math.floor(Math.random() * characters.length)),
       ).join('');
 
       // // CafeCoupon에서 중복 확인
@@ -41,7 +44,7 @@ export class CouponsService {
       // CafeCouponQRCode에서 중복 확인
       const existingQRCode = await this.prisma.cafeCouponQRCode.findUnique({
         where: { serialNumber },
-        select: { serialNumber: true }
+        select: { serialNumber: true },
       });
 
       if (existingQRCode) {
@@ -53,13 +56,30 @@ export class CouponsService {
       return serialNumber;
     }
 
-    throw new Error('Failed to generate unique serial number after maximum attempts');
+    throw new Error(
+      'Failed to generate unique serial number after maximum attempts',
+    );
   }
 
-  async createRawCoupon(name: string, content: string, startDay: Date, endDay: Date, groupCode: string, memberId: string, nickname: string, userType: ProxyUserType, eventDescription: string, duplicate: boolean, force: boolean) {
-
+  async createRawCoupon(
+    name: string,
+    content: string,
+    startDay: Date,
+    endDay: Date,
+    groupCode: string,
+    memberId: string,
+    nickname: string,
+    userType: ProxyUserType,
+    eventDescription: string,
+    duplicate: boolean,
+    force: boolean,
+  ) {
     if (!duplicate) {
-      const coupons = await this.findRawByCouponByGroupCodeWithUserId(groupCode, memberId, userType as ProxyUserType);
+      const coupons = await this.findRawByCouponByGroupCodeWithUserId(
+        groupCode,
+        memberId,
+        userType as ProxyUserType,
+      );
 
       if (coupons.length > 0 && !force) {
         throw new ConflictException('Coupon already exists');
@@ -68,8 +88,8 @@ export class CouponsService {
 
     const group = await this.prisma.cafeCouponGroup.findUnique({
       where: {
-        code: groupCode
-      }
+        code: groupCode,
+      },
     });
 
     if (!group) {
@@ -78,7 +98,6 @@ export class CouponsService {
 
     // 강제 생성 시, 체크 건너뛰기
     if (!force) {
-
       // 비활성화 체크
       if (group.isDisable) {
         throw new BadRequestException('Coupon group is disabled');
@@ -115,9 +134,9 @@ export class CouponsService {
           where: {
             proxyUserUnique: {
               memberId: memberId,
-              proxyUserType: userType as ProxyUserType
-            }
-          }
+              proxyUserType: userType as ProxyUserType,
+            },
+          },
         });
 
         if (!user) {
@@ -127,8 +146,8 @@ export class CouponsService {
               name: nickname,
               token: memberId,
               memberId,
-              proxyUserType: userType as ProxyUserType
-            }
+              proxyUserType: userType as ProxyUserType,
+            },
           });
         }
 
@@ -148,29 +167,29 @@ export class CouponsService {
             endDay: endDay ?? group.endDay,
             ProxyUser: {
               connect: {
-                id: user.id
-              }
+                id: user.id,
+              },
             },
             CafeCouponGroup: {
               connect: {
-                id: group.id
-              }
-            }
+                id: group.id,
+              },
+            },
           },
           include: {
             CafeCouponGroup: {
               select: {
                 code: true,
-              }
-            }
-          }
+              },
+            },
+          },
         });
 
         // 관리자 Actor
         const actor = await tx.user.findFirst({
           where: {
-            userType: 'ADMIN'
-          }
+            userType: 'ADMIN',
+          },
         });
 
         if (!actor) {
@@ -182,43 +201,71 @@ export class CouponsService {
           data: {
             CafeCoupon: {
               connect: {
-                id: coupon.id
-              }
+                id: coupon.id,
+              },
             },
             eventType: 'CREATED',
             description: eventDescription ?? '쿠폰 생성',
             Actor: {
               connect: {
-                id: actor.id
-              }
+                id: actor.id,
+              },
             },
             statusBefore: null,
-            statusAfter: 'ACTIVE'
-          }
+            statusAfter: 'ACTIVE',
+          },
         });
 
         return coupon;
-      })
+      });
     } catch (error) {
       throw error;
     }
   }
 
   async createCoupon(payload: string, signature: string) {
-
     // 접근 인증 우선
-    if (!verifySignedMessage({ payload: payload, signature: signature }, process.env.COUPON_SECRET)) {
+    if (
+      !verifySignedMessage(
+        { payload: payload, signature: signature },
+        process.env.COUPON_SECRET,
+      )
+    ) {
       throw new UnauthorizedException('Invalid signature');
     }
 
-    const { name, content, startDay, endDay, groupCode, memberId, nickname, userType, eventDescription, duplicate, force } = JSON.parse(payload);
+    const {
+      name,
+      content,
+      startDay,
+      endDay,
+      groupCode,
+      memberId,
+      nickname,
+      userType,
+      eventDescription,
+      duplicate,
+      force,
+    } = JSON.parse(payload);
 
     if (!groupCode || !memberId || !nickname || !userType) {
       throw new BadRequestException('Invalid payload');
     }
 
     try {
-      const coupon = await this.createRawCoupon(name ?? null, content ?? null, startDay, endDay ?? null, groupCode, memberId, nickname, userType as ProxyUserType, eventDescription ?? null, duplicate ?? null, force ?? false);
+      const coupon = await this.createRawCoupon(
+        name ?? null,
+        content ?? null,
+        startDay,
+        endDay ?? null,
+        groupCode,
+        memberId,
+        nickname,
+        userType as ProxyUserType,
+        eventDescription ?? null,
+        duplicate ?? null,
+        force ?? false,
+      );
       return coupon;
     } catch (error) {
       throw error;
@@ -227,7 +274,12 @@ export class CouponsService {
 
   async createCouponQRCode(payload: string, signature: string) {
     // 접근 인증 우선
-    if (!verifySignedMessage({ payload: payload, signature: signature }, process.env.COUPON_SECRET)) {
+    if (
+      !verifySignedMessage(
+        { payload: payload, signature: signature },
+        process.env.COUPON_SECRET,
+      )
+    ) {
       throw new UnauthorizedException('Invalid signature');
     }
 
@@ -239,8 +291,8 @@ export class CouponsService {
 
     const coupon = await this.prisma.cafeCoupon.findUnique({
       where: {
-        serialNumber: serialNumber
-      }
+        serialNumber: serialNumber,
+      },
     });
 
     if (!coupon) {
@@ -254,7 +306,7 @@ export class CouponsService {
     // 기존 쿠폰 QR코드 체크
     const existingQRCode = await this.prisma.cafeCouponQRCode.findUnique({
       where: {
-        serialNumber: coupon.serialNumber
+        serialNumber: coupon.serialNumber,
       },
       include: {
         CafeCoupon: {
@@ -269,11 +321,11 @@ export class CouponsService {
                 code: true,
                 issuanceEndDay: true,
                 issuanceStartDay: true,
-              }
-            }
-          }
-        }
-      }
+              },
+            },
+          },
+        },
+      },
     });
 
     if (existingQRCode) {
@@ -289,8 +341,8 @@ export class CouponsService {
         base64Data,
         CafeCoupon: {
           connect: {
-            id: coupon.id
-          }
+            id: coupon.id,
+          },
         },
       },
       include: {
@@ -306,11 +358,11 @@ export class CouponsService {
                 code: true,
                 issuanceEndDay: true,
                 issuanceStartDay: true,
-              }
-            }
-          }
-        }
-      }
+              },
+            },
+          },
+        },
+      },
     });
 
     return qrCode;
@@ -319,35 +371,40 @@ export class CouponsService {
   findCoupon(id: number) {
     return this.prisma.cafeCoupon.findUnique({
       where: {
-        id: id
-      }
-    })
+        id: id,
+      },
+    });
   }
 
-  findRawByCouponByGroupCodeWithUserId(couponGroupCode: string, memberId: string, userType: ProxyUserType) {
+  findRawByCouponByGroupCodeWithUserId(
+    couponGroupCode: string,
+    memberId: string,
+    userType: ProxyUserType,
+  ) {
     return this.prisma.cafeCoupon.findMany({
       where: {
         ProxyUser: {
           memberId,
-          proxyUserType: userType as ProxyUserType
+          proxyUserType: userType as ProxyUserType,
         },
         CafeCouponGroup: {
-          code: couponGroupCode
-        }
+          code: couponGroupCode,
+        },
       },
       include: {
         CafeCouponGroup: {
           select: {
             code: true,
-          }
-        }
-      }
-    })
+          },
+        },
+      },
+    });
   }
 
   findByCouponByGroupCodeWithUserId(payload: string, signature: string) {
-
-    if (!verifySignedMessage({ payload, signature }, process.env.COUPON_SECRET)) {
+    if (
+      !verifySignedMessage({ payload, signature }, process.env.COUPON_SECRET)
+    ) {
       throw new UnauthorizedException('Invalid signature');
     }
 
@@ -361,11 +418,20 @@ export class CouponsService {
       throw new BadRequestException('Invalid userType');
     }
 
-    return this.findRawByCouponByGroupCodeWithUserId(groupCode, memberId, userType as ProxyUserType);
+    return this.findRawByCouponByGroupCodeWithUserId(
+      groupCode,
+      memberId,
+      userType as ProxyUserType,
+    );
   }
 
-  async useCoupon(payload: string, signature: string): Promise<CafeCouponHistory & { CafeCoupon: CafeCoupon }> {
-    if (!verifySignedMessage({ payload, signature }, process.env.COUPON_SECRET)) {
+  async useCoupon(
+    payload: string,
+    signature: string,
+  ): Promise<CafeCouponHistory & { CafeCoupon: CafeCoupon }> {
+    if (
+      !verifySignedMessage({ payload, signature }, process.env.COUPON_SECRET)
+    ) {
       throw new UnauthorizedException('Invalid signature');
     }
 
@@ -377,31 +443,31 @@ export class CouponsService {
 
     const coupon = await this.prisma.cafeCoupon.findUnique({
       where: {
-        serialNumber: serialNumber
-      }
+        serialNumber: serialNumber,
+      },
     });
 
     if (!coupon) {
       throw new BadRequestException('Invalid serialNumber');
     }
 
-    const beforeStatusCouponHistory = await this.prisma.cafeCouponHistory.findFirst({
-      where: {
-        CafeCoupon: { id: coupon.id },
-        eventType: 'CREATED'
-      }
-    });
+    const beforeStatusCouponHistory =
+      await this.prisma.cafeCouponHistory.findFirst({
+        where: {
+          CafeCoupon: { id: coupon.id },
+          eventType: 'CREATED',
+        },
+      });
 
     if (!beforeStatusCouponHistory) {
       throw new BadRequestException('Coupon history not found');
     }
 
     if (coupon.endDay < new Date()) {
-
       const actor = await this.prisma.user.findFirst({
         where: {
-          userType: 'ADMIN'
-        }
+          userType: 'ADMIN',
+        },
       });
 
       if (!actor) {
@@ -410,27 +476,27 @@ export class CouponsService {
 
       await this.prisma.cafeCoupon.update({
         where: { id: coupon.id },
-        data: { isDisable: true }
+        data: { isDisable: true },
       });
 
       await this.prisma.cafeCouponHistory.create({
         data: {
           CafeCoupon: {
-            connect: { id: coupon.id }
+            connect: { id: coupon.id },
           },
           eventType: 'EXPIRED',
           description: '쿠폰 만료',
           Actor: {
-            connect: { id: actor.id }
+            connect: { id: actor.id },
           },
           statusBefore: beforeStatusCouponHistory.statusAfter,
-          statusAfter: 'EXPIRED'
+          statusAfter: 'EXPIRED',
         },
       });
 
       await this.prisma.cafeCouponQRCode.update({
         where: { serialNumber: coupon.serialNumber },
-        data: { isDisable: true }
+        data: { isDisable: true },
       });
 
       throw new BadRequestException('Coupon expired');
@@ -445,7 +511,7 @@ export class CouponsService {
     }
 
     const actor = await this.prisma.user.findUnique({
-      where: { id: actorId }
+      where: { id: actorId },
     });
 
     if (!actor) {
@@ -454,33 +520,33 @@ export class CouponsService {
 
     const updatedCoupon = await this.prisma.cafeCoupon.update({
       where: { id: coupon.id },
-      data: { isDisable: true }
+      data: { isDisable: true },
     });
     // 쿠폰 히스토리 생성
     const couponHistory = await this.prisma.cafeCouponHistory.create({
       data: {
         CafeCoupon: {
-          connect: { id: coupon.id }
+          connect: { id: coupon.id },
         },
         eventType: 'USED',
         description: eventDescription ?? '쿠폰 사용',
         Actor: {
-          connect: { id: actor.id }
+          connect: { id: actor.id },
         },
         statusBefore: beforeStatusCouponHistory.statusAfter,
-        statusAfter: 'USED'
-      }
+        statusAfter: 'USED',
+      },
     });
 
     await this.prisma.cafeCouponQRCode.update({
       where: { serialNumber: coupon.serialNumber },
-      data: { isDisable: true }
+      data: { isDisable: true },
     });
 
     return {
       ...couponHistory,
-      CafeCoupon: updatedCoupon
-    }
+      CafeCoupon: updatedCoupon,
+    };
   }
 
   async testQr(text: string) {
@@ -488,10 +554,7 @@ export class CouponsService {
 
     return {
       size,
-      base64Data
-    }
+      base64Data,
+    };
   }
-
 }
-
-

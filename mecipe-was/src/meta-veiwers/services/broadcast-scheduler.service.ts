@@ -19,9 +19,7 @@ export class BroadcastSchedulerService implements OnModuleDestroy {
     startTime: Date.now(),
   };
 
-  constructor(
-    private readonly queueService: RoomDataQueueService,
-  ) {}
+  constructor(private readonly queueService: RoomDataQueueService) {}
 
   /**
    * Socket.IO 서버 설정
@@ -134,12 +132,19 @@ export class BroadcastSchedulerService implements OnModuleDestroy {
         };
 
         // 특정 방에만 브로드캐스트
-        this.server!.to(roomId).emit(ServerToClientListenerType.ROOM_BROADCAST, broadcastData);
+        this.server!.to(roomId).emit(
+          ServerToClientListenerType.ROOM_BROADCAST,
+          broadcastData,
+        );
 
         totalDataSent += queuedData.length;
 
         this.logger.debug(
-          `Broadcast to room ${roomId}: ${queuedData.length} data items, [${queuedData.map((data) => data.clientId).join(', ')}]`,
+          `Broadcast to room ${roomId}: ${
+            queuedData.length
+          } data items, [${queuedData
+            .map((data) => data.clientId)
+            .join(', ')}]`,
         );
       }
     });

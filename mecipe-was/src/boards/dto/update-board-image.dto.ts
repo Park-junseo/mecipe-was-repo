@@ -2,7 +2,9 @@ import { IsString, IsNumber, IsOptional, IsBoolean } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { Prisma } from 'prisma/basic';
 
-export class UpdateBoardImageDto implements Partial<Prisma.BoardImageUpdateInput> {
+export class UpdateBoardImageDto
+  implements Partial<Prisma.BoardImageUpdateInput>
+{
   @IsOptional()
   @IsString()
   url?: string;

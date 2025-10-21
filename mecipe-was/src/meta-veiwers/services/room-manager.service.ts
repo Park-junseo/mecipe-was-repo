@@ -16,7 +16,7 @@ export class RoomManagerService {
   private rooms = new Map<string, Set<string>>(); // roomId -> Set of socketIds
   private clientRooms = new Map<string, string>(); // socketId -> roomId
   private roomInfo = new Map<string, RoomInfo>(); // roomId -> RoomInfo
-  private clientInfo = new Map<string, {roomId: string, joinAt: string}>(); // socketId -> {roomId, joinAt}
+  private clientInfo = new Map<string, { roomId: string; joinAt: string }>(); // socketId -> {roomId, joinAt}
 
   /**
    * 클라이언트를 방에 입장시킴
@@ -28,7 +28,7 @@ export class RoomManagerService {
     success: boolean;
     clientId: string;
     roomId: string;
-    clientsInRoom: {socketId: string, joinAt: string}[];
+    clientsInRoom: { socketId: string; joinAt: string }[];
     message: string;
   } {
     // 기존 방에서 제거
@@ -53,7 +53,7 @@ export class RoomManagerService {
     // 클라이언트 추가
     this.rooms.get(roomId)!.add(client.id);
     this.clientRooms.set(client.id, roomId);
-    this.clientInfo.set(client.id, {roomId: roomId, joinAt: joinAt});
+    this.clientInfo.set(client.id, { roomId: roomId, joinAt: joinAt });
 
     // 방 정보 업데이트
     const info = this.roomInfo.get(roomId)!;
@@ -74,10 +74,12 @@ export class RoomManagerService {
       success: true,
       clientId: client.id,
       roomId: roomId,
-      clientsInRoom: Array.from(this.rooms.get(roomId) || []).map((socketId) => ({
-        socketId: socketId,
-        joinAt: this.clientInfo.get(socketId)!.joinAt,
-      })),
+      clientsInRoom: Array.from(this.rooms.get(roomId) || []).map(
+        (socketId) => ({
+          socketId: socketId,
+          joinAt: this.clientInfo.get(socketId)!.joinAt,
+        }),
+      ),
       message: `Room '${roomId}' joined.`,
     };
   }
@@ -206,7 +208,9 @@ export class RoomManagerService {
    */
   handleClientDisconnect(client: Socket): string {
     const currentRoom = this.removeClientFromRoom(client);
-    this.logger.log(`Client ${client.id} disconnected and removed from rooms: ${currentRoom}`);
+    this.logger.log(
+      `Client ${client.id} disconnected and removed from rooms: ${currentRoom}`,
+    );
 
     return currentRoom;
   }
@@ -218,13 +222,14 @@ export class RoomManagerService {
     const currentRoom = this.clientRooms.get(socket.id);
 
     if (currentRoom) {
-
       // 방에 있는 다른 클라이언트들에게 알림
-      socket.to(currentRoom).emit(ServerToClientListenerType.USER_DISCONNECTED, {
-        socketId: socket.id,
-        roomId: currentRoom,
-        timestamp: new Date().toISOString(),
-      });
+      socket
+        .to(currentRoom)
+        .emit(ServerToClientListenerType.USER_DISCONNECTED, {
+          socketId: socket.id,
+          roomId: currentRoom,
+          timestamp: new Date().toISOString(),
+        });
       // 내부 데이터 정리
       const roomClients = this.rooms.get(currentRoom);
       if (roomClients) {

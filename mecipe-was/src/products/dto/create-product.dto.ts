@@ -1,6 +1,12 @@
-import { Transform } from "class-transformer";
-import { IsArray, IsBoolean, IsNumber, IsOptional, IsString } from "class-validator";
-import { Prisma } from "prisma/basic";
+import { Transform } from 'class-transformer';
+import {
+  IsArray,
+  IsBoolean,
+  IsNumber,
+  IsOptional,
+  IsString,
+} from 'class-validator';
+import { Prisma } from 'prisma/basic';
 
 export class CreateProductDto implements Partial<Prisma.ProductCreateInput> {
   @IsString()
@@ -55,7 +61,9 @@ export class CreateProductDto implements Partial<Prisma.ProductCreateInput> {
   isSignature?: boolean;
 }
 
-export class CreateProductImageDto implements Partial<Prisma.ProductImageCreateInput> {
+export class CreateProductImageDto
+  implements Partial<Prisma.ProductImageCreateInput>
+{
   @IsString()
   url: string;
 

@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+} from '@nestjs/common';
 import { ExamplesService } from './examples.service';
 import { CreateExampleDto } from './dto/create-example.dto';
 import { UpdateExampleDto } from './dto/update-example.dto';
@@ -14,7 +22,7 @@ export class ExamplesController {
   }
 
   @Public()
-  @Get("test")
+  @Get('test')
   get_test() {
     return this.examplesService.get_test();
   }

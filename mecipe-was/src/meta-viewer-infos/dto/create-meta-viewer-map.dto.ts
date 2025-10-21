@@ -1,4 +1,11 @@
-import { IsEnum, IsString, IsInt, IsOptional, IsBoolean, IsNumber } from 'class-validator';
+import {
+  IsEnum,
+  IsString,
+  IsInt,
+  IsOptional,
+  IsBoolean,
+  IsNumber,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { MetaMapType } from 'prisma/basic';
 
@@ -26,4 +33,3 @@ export class CreateMetaViewerMapDto {
   @IsOptional()
   version?: number;
 }
-

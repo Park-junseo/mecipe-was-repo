@@ -1,4 +1,13 @@
-import { Controller, Post, Get, Body, Param, BadGatewayException, UseGuards, Req } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  BadGatewayException,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
 import { Request } from 'express';
 import { AppService } from './app.service';
 import { Public } from './util/decorators';
@@ -41,15 +50,14 @@ export class AppController {
 
   @Public()
   @Get('testpw/:password')
-  testPassword(
-    @Param('password') password
-  ):string {
-    if(process.env.NODE_ENV !== 'development') throw new BadGatewayException("접근 불가");
+  testPassword(@Param('password') password): string {
+    if (process.env.NODE_ENV !== 'development')
+      throw new BadGatewayException('접근 불가');
 
     return crypto
-    .createHmac('sha512', loginCryptoConstants.secret)
-    .update(password)
-    .digest('base64');
+      .createHmac('sha512', loginCryptoConstants.secret)
+      .update(password)
+      .digest('base64');
   }
 
   @Public()

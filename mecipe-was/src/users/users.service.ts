@@ -383,7 +383,7 @@ export class UsersService {
       where.OR = [
         {
           nickname: { contains: searchText },
-        }
+        },
       ];
     } else if (searchType === '아이디') {
       where.loginId = { contains: searchText };
@@ -480,14 +480,13 @@ export class UsersService {
     });
   }
 
-  async findUserTypeWithNoLogin(id:number) {
+  async findUserTypeWithNoLogin(id: number) {
     const user = await this.prisma.user.findFirst({
-      where:{
-        id
-      }
+      where: {
+        id,
+      },
     });
 
-    return {userType:user?.userType || 'NoLogin'};
+    return { userType: user?.userType || 'NoLogin' };
   }
-
 }

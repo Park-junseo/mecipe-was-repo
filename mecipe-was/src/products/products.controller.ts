@@ -1,4 +1,17 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Request, UsePipes, ValidationPipe, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+  Request,
+  UsePipes,
+  ValidationPipe,
+  UseGuards,
+} from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -15,11 +28,13 @@ interface RequestWithUser extends Request {
 }
 
 @Controller('products')
-@UsePipes(new ValidationPipe({
-  whitelist: true,
-  forbidNonWhitelisted: true,
-  transform: true,
-}))
+@UsePipes(
+  new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+  }),
+)
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
@@ -37,13 +52,23 @@ export class ProductsController {
 
   @Public()
   @Get('cafe-info-code/:cafeInfoCode')
-  findProductDatabaseByCafeInfoCode(@Param('cafeInfoCode') cafeInfoCode: string, @Query('limit') limit?: string) {
-    return this.productsService.findProductDatabaseByCafeInfoCode(cafeInfoCode, limit ? +limit : undefined);
+  findProductDatabaseByCafeInfoCode(
+    @Param('cafeInfoCode') cafeInfoCode: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.productsService.findProductDatabaseByCafeInfoCode(
+      cafeInfoCode,
+      limit ? +limit : undefined,
+    );
   }
 
   @Get('admin')
-  findAdminAllProducts(@Query() searchDto: SearchProductDto, @Request() req: RequestWithUser) {
-    const isAdmin = req.user?.userType === 'ADMIN' || req.user?.userType === 'MANAGER';
+  findAdminAllProducts(
+    @Query() searchDto: SearchProductDto,
+    @Request() req: RequestWithUser,
+  ) {
+    const isAdmin =
+      req.user?.userType === 'ADMIN' || req.user?.userType === 'MANAGER';
     return this.productsService.findAllProductsBySearch(searchDto, isAdmin);
   }
 

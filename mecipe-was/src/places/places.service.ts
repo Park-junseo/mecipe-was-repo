@@ -7,47 +7,50 @@ import { RawimageuploadService } from 'src/rawimageupload/rawimageupload.service
 
 @Injectable()
 export class PlacesService {
-
   constructor(
     private prisma: PrismaService,
-    private readonly imageuploadService: RawimageuploadService
-  ) { }
+    private readonly imageuploadService: RawimageuploadService,
+  ) {}
 
   /* s:admin */
 
-  async createPlaceByAdmin(createPlaceDto: CreateCafeInfoDto, regionCategoryId: number) {
-
-    const category = await this.prisma.regionCategory.findUnique({ where: { id: regionCategoryId } });
+  async createPlaceByAdmin(
+    createPlaceDto: CreateCafeInfoDto,
+    regionCategoryId: number,
+  ) {
+    const category = await this.prisma.regionCategory.findUnique({
+      where: { id: regionCategoryId },
+    });
 
     if (!category) throw new ForbiddenException('지역 카테고리 오류');
 
     return this.prisma.cafeInfo.create({
       data: {
         ...createPlaceDto,
-        regionCategoryId
+        regionCategoryId,
       },
       include: {
         CafeVirtualLinks: {
           include: {
-            CafeVirtualLinkThumbnailImage: true
-          }
+            CafeVirtualLinkThumbnailImage: true,
+          },
         },
         CafeVirtualImages: {
           orderBy: {
             priority: 'asc',
-          }
+          },
         },
         CafeRealImages: {
           orderBy: {
             priority: 'asc',
-          }
+          },
         },
         CafeThumbnailImages: {
           orderBy: {
             priority: 'asc',
-          }
-        }
-      }
+          },
+        },
+      },
     });
   }
 
@@ -68,7 +71,7 @@ export class PlacesService {
     regionCategoryId?: number,
     isDisable = false,
   ) {
-    let where: Prisma.CafeInfoWhereInput = {};
+    const where: Prisma.CafeInfoWhereInput = {};
 
     if (searchType === '이름') {
       where.name = { contains: searchText };
@@ -82,8 +85,8 @@ export class PlacesService {
 
     if (regionCategoryId) {
       where.regionCategoryId = {
-        in: await this.getDescendantCategoryIds(regionCategoryId)
-      }
+        in: await this.getDescendantCategoryIds(regionCategoryId),
+      };
     }
 
     where.isDisable = isDisable;
@@ -96,16 +99,16 @@ export class PlacesService {
     const result =
       count > 0
         ? await this.prisma.cafeInfo.findMany({
-          where: where,
-          skip: (skip - 1) * take,
-          take: take,
-          orderBy: {
-            id: 'desc',
-          },
-          include: {
-            RegionCategory: true
-          }
-        })
+            where: where,
+            skip: (skip - 1) * take,
+            take: take,
+            orderBy: {
+              id: 'desc',
+            },
+            include: {
+              RegionCategory: true,
+            },
+          })
         : [];
 
     return { count: count, data: result };
@@ -119,28 +122,27 @@ export class PlacesService {
       include: {
         CafeVirtualLinks: {
           include: {
-            CafeVirtualLinkThumbnailImage: true
-          }
+            CafeVirtualLinkThumbnailImage: true,
+          },
         },
         CafeVirtualImages: {
           orderBy: {
             priority: 'asc',
-          }
+          },
         },
         CafeRealImages: {
           orderBy: {
             priority: 'asc',
-          }
+          },
         },
         CafeThumbnailImages: {
           orderBy: {
             priority: 'asc',
-          }
-        }
-      }
+          },
+        },
+      },
     });
   }
-
 
   updateDisablePlaceByAdmin(id: number, isDisable: boolean) {
     return this.prisma.cafeInfo.update({
@@ -148,8 +150,8 @@ export class PlacesService {
         id,
       },
       data: {
-        isDisable
-      }
+        isDisable,
+      },
     });
   }
 
@@ -158,34 +160,34 @@ export class PlacesService {
   async getDescendantCategoryIds(cafegoryId: number): Promise<number[]> {
     const descendatns = await this.prisma.closureRegionCategory.findMany({
       where: {
-        ancestor: cafegoryId
+        ancestor: cafegoryId,
       },
       select: {
         descendant: true,
-        depth: true
+        depth: true,
       },
       orderBy: {
-        depth: 'desc'
-      }
+        depth: 'desc',
+      },
     });
 
-    return descendatns.map(rel => rel.descendant)
+    return descendatns.map((rel) => rel.descendant);
   }
   async getAncestorCategoryIds(cafegoryId: number): Promise<number[]> {
     const ancestor = await this.prisma.closureRegionCategory.findMany({
       where: {
-        descendant: cafegoryId
+        descendant: cafegoryId,
       },
       select: {
         ancestor: true,
-        depth: true
+        depth: true,
       },
       orderBy: {
-        depth: 'desc'
-      }
+        depth: 'desc',
+      },
     });
 
-    return ancestor.map(rel => rel.ancestor)
+    return ancestor.map((rel) => rel.ancestor);
   }
 
   async findAllPlacesBySearch(
@@ -194,25 +196,27 @@ export class PlacesService {
     searchText: string,
     regionCategoryId?: number,
   ) {
-    let where: Prisma.CafeInfoWhereInput = {};
+    const where: Prisma.CafeInfoWhereInput = {};
 
     if (regionCategoryId) {
       where.regionCategoryId = {
-        in: await this.getDescendantCategoryIds(regionCategoryId)
-      }
+        in: await this.getDescendantCategoryIds(regionCategoryId),
+      };
     }
 
     if (searchText.trim().length > 0) {
       const words = searchText.trim().split(' ');
-      where.OR = [...words.map(word => ({
-        name: { contains: word.trim() },
-      })),
-      ...words.map(word => ({
-        address: { contains: word.trim() },
-      }))];
+      where.OR = [
+        ...words.map((word) => ({
+          name: { contains: word.trim() },
+        })),
+        ...words.map((word) => ({
+          address: { contains: word.trim() },
+        })),
+      ];
     }
 
-    console.log("findAllPlacesBySearch", where);
+    console.log('findAllPlacesBySearch', where);
 
     const count = await this.prisma.cafeInfo.count({
       where: {
@@ -222,24 +226,24 @@ export class PlacesService {
     const result =
       count > 0
         ? await this.prisma.cafeInfo.findMany({
-          where: where,
-          skip: skip,
-          take: take,
-          orderBy: {
-            id: 'desc',
-          },
-          include: {
-            CafeThumbnailImages: {
-              where: {
-                isDisable: false
-              },
-              take: 3,
-              orderBy: {
-                priority: 'asc',
-              }
+            where: where,
+            skip: skip,
+            take: take,
+            orderBy: {
+              id: 'desc',
             },
-          }
-        })
+            include: {
+              CafeThumbnailImages: {
+                where: {
+                  isDisable: false,
+                },
+                take: 3,
+                orderBy: {
+                  priority: 'asc',
+                },
+              },
+            },
+          })
         : [];
 
     return { count: count, data: result };
@@ -249,155 +253,166 @@ export class PlacesService {
     return this.prisma.cafeInfo.findFirst({
       where: {
         id: id,
-        isDisable: false
+        isDisable: false,
       },
       include: {
         CafeVirtualImages: {
           where: {
-            isDisable: false
+            isDisable: false,
           },
           orderBy: {
             priority: 'asc',
-          }
+          },
         },
         CafeRealImages: {
           where: {
-            isDisable: false
+            isDisable: false,
           },
           orderBy: {
             priority: 'asc',
-          }
+          },
         },
         CafeVirtualLinks: {
           include: {
-            CafeVirtualLinkThumbnailImage: true
+            CafeVirtualLinkThumbnailImage: true,
           },
           where: {
             isDisable: false,
-          }
+          },
         },
         CafeThumbnailImages: {
           where: {
-            isDisable: false
+            isDisable: false,
           },
           orderBy: {
             priority: 'asc',
-          }
-        }
-      }
-    })
+          },
+        },
+      },
+    });
   }
 
   async deletePlaceByAdmin(id: number) {
     const virtualImages = await this.prisma.cafeVirtualImage.findMany({
       where: {
-        cafeInfoId: id
+        cafeInfoId: id,
       },
       select: {
-        url: true
-      }
+        url: true,
+      },
     });
     if (virtualImages.length > 0) {
-      await this.imageuploadService.deletImageByUrlList(virtualImages.map(image => image.url));
+      await this.imageuploadService.deletImageByUrlList(
+        virtualImages.map((image) => image.url),
+      );
       await this.prisma.cafeVirtualImage.deleteMany({
         where: {
-          cafeInfoId: id
-        }
+          cafeInfoId: id,
+        },
       });
     }
 
     const realImages = await this.prisma.cafeRealImage.findMany({
       where: {
-        cafeInfoId: id
+        cafeInfoId: id,
       },
       select: {
-        url: true
-      }
+        url: true,
+      },
     });
     if (realImages.length > 0) {
-      await this.imageuploadService.deletImageByUrlList(realImages.map(image => image.url));
+      await this.imageuploadService.deletImageByUrlList(
+        realImages.map((image) => image.url),
+      );
       await this.prisma.cafeRealImage.deleteMany({
         where: {
-          cafeInfoId: id
+          cafeInfoId: id,
         },
       });
     }
 
     const thumbnail = await this.prisma.cafeThumbnailImage.findMany({
       where: {
-        cafeInfoId: id
+        cafeInfoId: id,
       },
       select: {
         url: true,
-        thumbnailUrl: true
-      }
+        thumbnailUrl: true,
+      },
     });
     if (thumbnail.length > 0) {
-      await this.imageuploadService.deletImageByUrlList(thumbnail.map(image => image.url));
-      await this.imageuploadService.deletImageByUrlList(thumbnail.map(image => image.thumbnailUrl));
+      await this.imageuploadService.deletImageByUrlList(
+        thumbnail.map((image) => image.url),
+      );
+      await this.imageuploadService.deletImageByUrlList(
+        thumbnail.map((image) => image.thumbnailUrl),
+      );
       await this.prisma.cafeThumbnailImage.deleteMany({
         where: {
-          cafeInfoId: id
+          cafeInfoId: id,
         },
       });
     }
 
     const virtualLinks = await this.prisma.cafeVirtualLink.findMany({
       where: {
-        cafeInfoId: id
+        cafeInfoId: id,
       },
       select: {
         id: true,
         CafeVirtualLinkThumbnailImage: {
           select: {
-            url: true
-          }
-        }
+            url: true,
+          },
+        },
       },
       // include: {
       //   CafeVirtualLinkThumbnailImage: true
       // }
     });
     if (virtualLinks.length > 0) {
-      this.imageuploadService.deletImageByUrl(virtualLinks[0].CafeVirtualLinkThumbnailImage.url);
+      this.imageuploadService.deletImageByUrl(
+        virtualLinks[0].CafeVirtualLinkThumbnailImage.url,
+      );
       await this.prisma.cafeVirtualLinkThumbnailImage.deleteMany({
         where: {
           cafeVirtualLinkId: {
-            in: virtualLinks.map(link => link.id)
-          }
-        }
-      })
+            in: virtualLinks.map((link) => link.id),
+          },
+        },
+      });
       await this.prisma.cafeVirtualLink.deleteMany({
         where: {
-          cafeInfoId: id
-        }
+          cafeInfoId: id,
+        },
       });
     }
 
     return this.prisma.cafeInfo.delete({
       where: {
-        id
-      }
-    })
+        id,
+      },
+    });
   }
 
   async findPlaceIds() {
     const count = await this.prisma.cafeInfo.count({
       where: {
-        isDisable: false
-      }
+        isDisable: false,
+      },
     });
 
     if (count === 0) return [];
 
-    return this.prisma.cafeInfo.findMany({
-      where: {
-        isDisable: false
-      },
-      select: {
-        id: true
-      }
-    }) ?? []
+    return (
+      this.prisma.cafeInfo.findMany({
+        where: {
+          isDisable: false,
+        },
+        select: {
+          id: true,
+        },
+      }) ?? []
+    );
   }
-
 }

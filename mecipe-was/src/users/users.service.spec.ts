@@ -5,7 +5,7 @@ import { PrismaServiceMock } from 'src/global/prisma.service.mock';
 
 /**
  * 예시: 복잡한 비즈니스 로직이 있는 경우에만 작성하는 테스트
- * 
+ *
  * 단순 CRUD는 E2E 테스트로 검증하고,
  * 복잡한 계산 로직, 인증/인가, 데이터 변환 등만 단위 테스트로 작성합니다.
  */
@@ -46,4 +46,3 @@ describe('UsersService - Complex Business Logic', () => {
 
   // 실제로 복잡한 로직이 없다면 이 파일도 삭제하면 됩니다!
 });
-

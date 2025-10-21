@@ -7,6 +7,6 @@ export class AppService {
   }
 
   getAuthToken() {
-    return {authToken: true};
+    return { authToken: true };
   }
 }

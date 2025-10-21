@@ -4,7 +4,7 @@ import { AdminAuthGuard } from 'src/auth/jwt.guard.admin';
 
 @Controller('imageupload')
 export class ImageuploadController {
-  constructor(private readonly imageuploadService: ImageuploadService) { }
+  constructor(private readonly imageuploadService: ImageuploadService) {}
 
   @Get('direct')
   @UseGuards(AdminAuthGuard)

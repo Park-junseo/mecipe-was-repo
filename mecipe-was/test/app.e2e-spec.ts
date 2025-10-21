@@ -30,14 +30,12 @@ describe('API E2E Tests', () => {
 
   describe('Authentication', () => {
     it('/login (POST) - should handle login request', async () => {
-      const response = await request(app.getHttpServer())
-        .post('/login')
-        .send({
-          loginType: 'LOCAL',
-          loginId: 'test@example.com',
-          loginPw: 'password123'
-        });
-      
+      const response = await request(app.getHttpServer()).post('/login').send({
+        loginType: 'LOCAL',
+        loginId: 'test@example.com',
+        loginPw: 'password123',
+      });
+
       // 응답 구조 검증 (실패해도 OK - 실제 유저 없음)
       expect([200, 400, 401, 403]).toContain(response.status);
     });

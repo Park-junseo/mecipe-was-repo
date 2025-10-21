@@ -30,4 +30,3 @@ export class SearchMetaViewerInfoDto {
   @IsOptional()
   searchType?: 'code' | 'cafeInfoId';
 }
-

@@ -1,7 +1,7 @@
 import { Prisma } from 'prisma/basic';
 
 // 기본 Board 타입 (관계 없음)
-export type BoardBasic = Prisma.BoardGetPayload<{}>;
+export type BoardBasic = Prisma.BoardGetPayload<Record<string, never>>;
 
 // User만 포함된 Board 타입
 export type BoardWithUser = Prisma.BoardGetPayload<{
@@ -46,7 +46,7 @@ export type Board = Prisma.BoardGetPayload<{
   };
 }>;
 
-export type BoardImage = Prisma.BoardImageGetPayload<{}>;
+export type BoardImage = Prisma.BoardImageGetPayload<Record<string, never>>;
 export type BoardReply = Prisma.BoardReplyGetPayload<{
   include: {
     User: {

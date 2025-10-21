@@ -4,31 +4,30 @@ import { IsInt, IsOptional } from 'class-validator';
 import { MetaMapType } from 'prisma/basic';
 
 export class UpdateMetaViewerMapDto {
-    @IsEnum(MetaMapType)
-    @IsOptional()
-    type: MetaMapType;
-  
-    @IsString()
-    @IsOptional()
-    url: string;
-  
-    @IsInt()
-    @Type(() => Number)
-    @IsOptional()
-    size: number;
-  
-    @IsBoolean()
-    @Type(() => Boolean)
-    @IsOptional()
-    isDraco: boolean;
+  @IsEnum(MetaMapType)
+  @IsOptional()
+  type: MetaMapType;
 
-    @IsString()
-    @IsOptional()
-    contentKey?: string;
-  
-    @IsNumber()
-    @Type(() => Number)
-    @IsOptional()
-    version?: number;
-  }
-  
+  @IsString()
+  @IsOptional()
+  url: string;
+
+  @IsInt()
+  @Type(() => Number)
+  @IsOptional()
+  size: number;
+
+  @IsBoolean()
+  @Type(() => Boolean)
+  @IsOptional()
+  isDraco: boolean;
+
+  @IsString()
+  @IsOptional()
+  contentKey?: string;
+
+  @IsNumber()
+  @Type(() => Number)
+  @IsOptional()
+  version?: number;
+}

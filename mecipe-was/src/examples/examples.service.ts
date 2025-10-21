@@ -9,6 +9,6 @@ export class ExamplesService {
   }
 
   get_test() {
-    return {text:`Test Server`};
+    return { text: `Test Server` };
   }
 }

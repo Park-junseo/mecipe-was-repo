@@ -9,7 +9,7 @@ import {
   Query,
   UseGuards,
   UsePipes,
-  ValidationPipe
+  ValidationPipe,
 } from '@nestjs/common';
 import { MetaViewerInfosService } from './meta-viewer-infos.service';
 import { CreateMetaViewerInfoDto } from './dto/create-meta-viewer-info.dto';
@@ -24,13 +24,17 @@ import { Public } from 'src/util/decorators';
 import { RequireBuildApiKey } from 'src/auth/api-key.decorator';
 
 @Controller('meta-viewer-infos')
-@UsePipes(new ValidationPipe({
-  whitelist: true,
-  forbidNonWhitelisted: true,
-  transform: true,
-}))
+@UsePipes(
+  new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+  }),
+)
 export class MetaViewerInfosController {
-  constructor(private readonly metaViewerInfosService: MetaViewerInfosService) { }
+  constructor(
+    private readonly metaViewerInfosService: MetaViewerInfosService,
+  ) {}
 
   // ========== 어드민 페이지용 - MetaViewerMap 관련 ==========
 
@@ -38,16 +42,19 @@ export class MetaViewerInfosController {
   @UseGuards(AdminAuthGuard)
   createMetaViewerMap(
     @Param('metaViewerInfoId') metaViewerInfoId: string,
-    @Body() createDto: CreateMetaViewerMapDto
+    @Body() createDto: CreateMetaViewerMapDto,
   ) {
-    return this.metaViewerInfosService.createMetaViewerMap(+metaViewerInfoId, createDto);
+    return this.metaViewerInfosService.createMetaViewerMap(
+      +metaViewerInfoId,
+      createDto,
+    );
   }
 
   @Patch('admin/maps/:mapId')
   @UseGuards(AdminAuthGuard)
   updateMetaViewerMap(
     @Param('mapId') mapId: string,
-    @Body() updateDto: UpdateMetaViewerMapDto
+    @Body() updateDto: UpdateMetaViewerMapDto,
   ) {
     return this.metaViewerInfosService.updateMetaViewerMap(+mapId, updateDto);
   }
@@ -76,9 +83,12 @@ export class MetaViewerInfosController {
   @UseGuards(AdminAuthGuard)
   updateMetaViewerActiveMap(
     @Param('activeMapId') activeMapId: string,
-    @Body() updateDto: UpdateMetaViewerActiveMapDto
+    @Body() updateDto: UpdateMetaViewerActiveMapDto,
   ) {
-    return this.metaViewerInfosService.updateMetaViewerActiveMap(+activeMapId, updateDto);
+    return this.metaViewerInfosService.updateMetaViewerActiveMap(
+      +activeMapId,
+      updateDto,
+    );
   }
 
   @Delete('admin/active-maps/:activeMapId')
@@ -99,7 +109,7 @@ export class MetaViewerInfosController {
   @UseGuards(AdminAuthGuard)
   updateMetaViewerInfo(
     @Param('id') id: string,
-    @Body() updateDto: UpdateMetaViewerInfoDto
+    @Body() updateDto: UpdateMetaViewerInfoDto,
   ) {
     return this.metaViewerInfosService.updateMetaViewerInfo(+id, updateDto);
   }

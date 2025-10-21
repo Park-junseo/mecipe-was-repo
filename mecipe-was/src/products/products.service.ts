@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { PrismaService } from 'src/global/prisma.service';
@@ -17,15 +22,19 @@ type ProductCategoryInfo = Prisma.ProductCategoryGetPayload<{
 
 @Injectable()
 export class ProductsService {
-
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   async createProduct(createProductDto: CreateProductDto) {
-
-    const { productImages, cafeInfoId, productRedirectUrlArray, categoryId, ...productData } = createProductDto;
+    const {
+      productImages,
+      cafeInfoId,
+      productRedirectUrlArray,
+      categoryId,
+      ...productData
+    } = createProductDto;
 
     const cafeInfo = await this.prisma.cafeInfo.findUnique({
-      where: { id: cafeInfoId }
+      where: { id: cafeInfoId },
     });
 
     if (!cafeInfo) {
@@ -33,7 +42,7 @@ export class ProductsService {
     }
 
     const category = await this.prisma.productCategory.findUnique({
-      where: { id: categoryId }
+      where: { id: categoryId },
     });
 
     if (!category) {
@@ -44,23 +53,24 @@ export class ProductsService {
       const product = await tx.product.create({
         data: {
           ...productData,
-          productRedirectUrl: productRedirectUrlArray ? JSON.stringify(productRedirectUrlArray) : null,
+          productRedirectUrl: productRedirectUrlArray
+            ? JSON.stringify(productRedirectUrlArray)
+            : null,
           ProductCategory: {
-            connect: { id: categoryId }
+            connect: { id: categoryId },
           },
           CafeInfo: {
-            connect: { id: cafeInfoId }
-          }
-        }
+            connect: { id: cafeInfoId },
+          },
+        },
       });
 
       if (productImages && productImages.length > 0) {
-
         await tx.productImage.createMany({
-          data: productImages.map(image => ({
+          data: productImages.map((image) => ({
             ...image,
-            productId: product.id
-          }))
+            productId: product.id,
+          })),
         });
       }
 
@@ -68,19 +78,19 @@ export class ProductsService {
         where: { id: product.id },
         include: {
           ProductImages: true,
-        }
-      })
+        },
+      });
       return createdProduct;
     });
   }
 
-  async findAllProductsBySearch(searchDto: SearchProductDto, isAdmin: boolean = false) {
+  async findAllProductsBySearch(searchDto: SearchProductDto, isAdmin = false) {
     const { page: pageParam, limit: limitParam, ...searchParams } = searchDto;
     const page = pageParam ?? 1;
     const limit = limitParam ?? 10;
     const skip = (page - 1) * limit;
 
-    console.log("searchDto", searchDto);
+    console.log('searchDto', searchDto);
 
     const where: Prisma.ProductWhereInput = {};
 
@@ -90,45 +100,57 @@ export class ProductsService {
 
     if (searchParams.categoryId) {
       where.categoryId = {
-        in: await this.getDescendantCategoryIds(searchParams.categoryId)
-      }
+        in: await this.getDescendantCategoryIds(searchParams.categoryId),
+      };
     }
 
     if (searchParams.searchText) {
       switch (searchParams.searchType) {
         case 'name':
-          where.name = { contains: searchParams.searchText, mode: 'insensitive' };
+          where.name = {
+            contains: searchParams.searchText,
+            mode: 'insensitive',
+          };
           break;
         case 'code':
-          where.code = { contains: searchParams.searchText, mode: 'insensitive' };
+          where.code = {
+            contains: searchParams.searchText,
+            mode: 'insensitive',
+          };
           break;
         default:
-          where.name = { contains: searchParams.searchText, mode: 'insensitive' };
+          where.name = {
+            contains: searchParams.searchText,
+            mode: 'insensitive',
+          };
       }
     }
 
     if (!isAdmin) {
       where.isDisable = false;
     } else {
-      where.isDisable = searchParams.isDisable?? false;
+      where.isDisable = searchParams.isDisable ?? false;
     }
 
     const total = await this.prisma.product.count({ where });
 
-    const products = total > 0 ? await this.prisma.product.findMany({
-      where,
-      skip,
-      take: limit,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        ProductImages: {
-          where: {
-            isThumb: true
-          }
-        },
-        ProductCategory: true,
-      }
-    }) : [];
+    const products =
+      total > 0
+        ? await this.prisma.product.findMany({
+            where,
+            skip,
+            take: limit,
+            orderBy: { createdAt: 'desc' },
+            include: {
+              ProductImages: {
+                where: {
+                  isThumb: true,
+                },
+              },
+              ProductCategory: true,
+            },
+          })
+        : [];
 
     return {
       products,
@@ -137,28 +159,28 @@ export class ProductsService {
         limit,
         total,
         totalPages: Math.ceil(total / limit),
-      }
+      },
     };
   }
 
   async getDescendantCategoryIds(categoryId: number): Promise<number[]> {
     const descendatns = await this.prisma.closureRegionCategory.findMany({
       where: {
-        ancestor: categoryId
+        ancestor: categoryId,
       },
       select: {
         descendant: true,
-        depth: true
+        depth: true,
       },
       orderBy: {
-        depth: 'desc'
-      }
+        depth: 'desc',
+      },
     });
 
-    return descendatns.map(rel => rel.descendant)
+    return descendatns.map((rel) => rel.descendant);
   }
 
-  findOne(id: number, isAdmin: boolean = false) {
+  findOne(id: number, isAdmin = false) {
     const where: Prisma.ProductWhereInput = { id };
 
     if (!isAdmin) {
@@ -171,24 +193,36 @@ export class ProductsService {
         ProductImages: true,
         CafeInfo: true,
         ProductCategory: true,
-      }
+      },
     });
   }
 
-  async update(id: number, updateProductDto: UpdateProductDto, isAdmin: boolean = false) {
+  async update(
+    id: number,
+    updateProductDto: UpdateProductDto,
+    isAdmin = false,
+  ) {
     const product = await this.findOne(id, isAdmin);
 
     if (!product) {
       throw new NotFoundException('Product not found');
     }
 
-    const { productImages, disabledImageIds, productRedirectUrlArray, isThumbImageId, ...productData } = updateProductDto;
+    const {
+      productImages,
+      disabledImageIds,
+      productRedirectUrlArray,
+      isThumbImageId,
+      ...productData
+    } = updateProductDto;
 
     return this.prisma.$transaction(async (tx) => {
-
-      let updateData: Prisma.ProductUpdateInput = {...productData};
+      const updateData: Prisma.ProductUpdateInput = { ...productData };
       if (productRedirectUrlArray) {
-        updateData.productRedirectUrl = productRedirectUrlArray.length > 0 ? JSON.stringify(productRedirectUrlArray) : null;
+        updateData.productRedirectUrl =
+          productRedirectUrlArray.length > 0
+            ? JSON.stringify(productRedirectUrlArray)
+            : null;
       }
 
       // Board 수정
@@ -206,7 +240,6 @@ export class ProductsService {
 
       // BoardImage 업데이트
       if (productImages !== undefined) {
-
         // 새로운 BoardImage들 생성
         if (productImages && productImages.length > 0) {
           await tx.productImage.createMany({
@@ -218,7 +251,7 @@ export class ProductsService {
           });
         }
 
-        if (productImages.some(image => image.isThumb)) {
+        if (productImages.some((image) => image.isThumb)) {
           await tx.productImage.updateMany({
             where: { productId: id, isThumb: true },
             data: { isThumb: false },
@@ -227,7 +260,6 @@ export class ProductsService {
       }
 
       if (isThumbImageId) {
-
         const tagetImage = await tx.productImage.findFirst({
           where: { id: isThumbImageId, productId: id },
         });
@@ -250,14 +282,14 @@ export class ProductsService {
           ProductImages: true,
           CafeInfo: true,
           ProductCategory: true,
-        }
-      })
+        },
+      });
 
       return updatedProduct;
     });
   }
 
-  async remove(id: number, isAdmin: boolean = false) {
+  async remove(id: number, isAdmin = false) {
     const product = await this.findOne(id, isAdmin);
 
     if (!product) {
@@ -276,30 +308,32 @@ export class ProductsService {
     });
   }
 
-  findByCafeInfo(cafeInfoId: number, isAdmin: boolean = false) {
-    return this.findAllProductsBySearch({
-      cafeInfoId,
-    },isAdmin);
+  findByCafeInfo(cafeInfoId: number, isAdmin = false) {
+    return this.findAllProductsBySearch(
+      {
+        cafeInfoId,
+      },
+      isAdmin,
+    );
   }
 
   async findDuplicateProductCode(code: string) {
     const count = await this.prisma.product.count({
       where: {
-        code: code
-      }
+        code: code,
+      },
     });
 
     return count > 0;
   }
 
-  async findProductDatabaseByCafeInfoCode(cafeInfoCode: string, limit: number = 50) {
-
+  async findProductDatabaseByCafeInfoCode(cafeInfoCode: string, limit = 50) {
     if (!cafeInfoCode) {
       throw new BadRequestException('Invalid payload');
     }
 
     const cafeInfo = await this.prisma.cafeInfo.findUnique({
-      where: { code: cafeInfoCode }
+      where: { code: cafeInfoCode },
     });
 
     if (!cafeInfo) {
@@ -311,89 +345,96 @@ export class ProductsService {
       limit: limit,
     });
 
-    const categories = new Set(products.products.map(product => product.ProductCategory.id));
+    const categories = new Set(
+      products.products.map((product) => product.ProductCategory.id),
+    );
 
     // 카테고리 계층 구조 트리 구성
     const closure = await this.prisma.closureProductCategory.findMany({
       where: {
-        descendant: { in: Array.from(categories) }
+        descendant: { in: Array.from(categories) },
       },
       orderBy: {
-        depth: 'asc'
-      }
+        depth: 'asc',
+      },
     });
 
-    closure.forEach(rel => {
+    closure.forEach((rel) => {
       categories.add(rel.ancestor);
     });
 
     // 카테고리 정보 조회
     const categoryInfos = await this.prisma.productCategory.findMany({
       where: {
-        id: { in: Array.from(categories) }
+        id: { in: Array.from(categories) },
       },
       select: {
         id: true,
         name: true,
         code: true,
-        description: true
-      }
+        description: true,
+      },
     });
 
     // 트리 구조 구성
-    const categoryTree = this.buildCategoryTree(Array.from(categories), closure, categoryInfos);
+    const categoryTree = this.buildCategoryTree(
+      Array.from(categories),
+      closure,
+      categoryInfos,
+    );
 
     return { ...products, categoryTree };
   }
 
   private buildCategoryTree(
-    categoryIds: number[], 
-    closure: Prisma.ClosureProductCategoryGetPayload<{}>[], 
-    categoryInfos: ProductCategoryInfo[]
+    categoryIds: number[],
+    closure: Prisma.ClosureProductCategoryGetPayload<Record<string, never>>[],
+    categoryInfos: ProductCategoryInfo[],
   ): CategoryTree[] {
-
-    console.log("categoryIds", categoryIds);
-    console.log("closure", closure);
-    console.log("categoryInfos", categoryInfos);
+    console.log('categoryIds', categoryIds);
+    console.log('closure', closure);
+    console.log('categoryInfos', categoryInfos);
 
     const categoryMap = new Map<number, CategoryTree>();
     const rootCategories: CategoryTree[] = [];
 
     // 카테고리 정보를 Map으로 구성
-    categoryInfos.forEach(category => {
+    categoryInfos.forEach((category) => {
       categoryMap.set(category.id, {
         ...category,
         children: [],
-        descendantIds: []
+        descendantIds: [],
       });
     });
 
     // Closure 테이블을 기반으로 트리 구조 구성
-    closure.forEach(relation => {
+    closure.forEach((relation) => {
       const parent = categoryMap.get(relation.ancestor);
       const child = categoryMap.get(relation.descendant);
-      if (relation.depth === 1) { // 직계 부모-자식 관계
+      if (relation.depth === 1) {
+        // 직계 부모-자식 관계
         if (parent && child && parent.id !== child.id) {
           parent.children.push(child);
         }
       }
 
-      if(parent && child && !parent.descendantIds.includes(child.id)) {
+      if (parent && child && !parent.descendantIds.includes(child.id)) {
         parent.descendantIds.push(child.id);
       }
     });
 
     // 루트 카테고리들 찾기 (다른 카테고리의 자식이 아닌 것들)
-    categoryIds.forEach(id => {
+    categoryIds.forEach((id) => {
       const category = categoryMap.get(id);
-      if (category && !closure.some(rel => 
-        rel.descendant === id && rel.depth > 0
-      )) {
+      if (
+        category &&
+        !closure.some((rel) => rel.descendant === id && rel.depth > 0)
+      ) {
         rootCategories.push(category);
       }
     });
 
-    rootCategories.forEach(category => {
+    rootCategories.forEach((category) => {
       category.descendantIds.push(category.id);
     });
 

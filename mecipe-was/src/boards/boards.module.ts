@@ -6,6 +6,6 @@ import { PrismaService } from 'src/global/prisma.service';
 @Module({
   imports: [],
   controllers: [BoardsController],
-  providers: [BoardsService]
+  providers: [BoardsService],
 })
 export class BoardsModule {}

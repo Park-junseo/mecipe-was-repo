@@ -24,11 +24,11 @@ export const getStorage = (dest: string) =>
       callback(
         null,
         file.fieldname +
-        '-' +
-        Date.now() +
-        '-' +
-        randomBytes(2).toString('hex') +
-        getExtension(file.mimetype),
+          '-' +
+          Date.now() +
+          '-' +
+          randomBytes(2).toString('hex') +
+          getExtension(file.mimetype),
       );
     },
   });
@@ -37,9 +37,13 @@ export const getStorageVariant = () =>
   multer.diskStorage({
     destination: function (req, file, callback) {
       try {
-        const category = typeof req.query?.category === 'string' ? req.query.category : 'image';
+        const category =
+          typeof req.query?.category === 'string'
+            ? req.query.category
+            : 'image';
         const base = `./media/${category}`;
-        const dest = file.fieldname === 'thumbnail' ? `${base}/thumbnail` : base;
+        const dest =
+          file.fieldname === 'thumbnail' ? `${base}/thumbnail` : base;
 
         if (!existsSync(dest)) {
           mkdirSync(dest, { recursive: true });
@@ -50,17 +54,16 @@ export const getStorageVariant = () =>
         console.error('Error in destination:', err);
         callback(err, '');
       }
-    }
-    ,
+    },
     filename: function (req, file, callback) {
       callback(
         null,
         file.fieldname +
-        '-' +
-        Date.now() +
-        '-' +
-        randomBytes(2).toString('hex') +
-        getExtension(file.mimetype),
+          '-' +
+          Date.now() +
+          '-' +
+          randomBytes(2).toString('hex') +
+          getExtension(file.mimetype),
       );
     },
   });

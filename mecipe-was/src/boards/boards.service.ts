@@ -1,5 +1,13 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { CreateBoardDto, CreateBoardImageDto, CreateBoardReplyDto } from './dto/create-board.dto';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+import {
+  CreateBoardDto,
+  CreateBoardImageDto,
+  CreateBoardReplyDto,
+} from './dto/create-board.dto';
 import { UpdateBoardDto } from './dto/update-board.dto';
 import { UpdateBoardImageDto } from './dto/update-board-image.dto';
 import { UpdateBoardReplyDto } from './dto/update-board-reply.dto';
@@ -9,7 +17,7 @@ import { BoardType } from './dto/create-board.dto';
 
 @Injectable()
 export class BoardsService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(private readonly prisma: PrismaService) {}
 
   // Board 생성
   async createBoard(createBoardDto: CreateBoardDto, userId: number) {
@@ -21,7 +29,9 @@ export class BoardsService {
         data: {
           ...boardData,
           userId: userId,
-          startDay: boardData.startDay ? new Date(boardData.startDay) : new Date(),
+          startDay: boardData.startDay
+            ? new Date(boardData.startDay)
+            : new Date(),
           endDay: boardData.endDay ? new Date(boardData.endDay) : null,
         },
         include: {
@@ -38,7 +48,7 @@ export class BoardsService {
       // BoardImage 생성
       if (boardImages && boardImages.length > 0) {
         // isThumb이 true인 경우, 기존 썸네일 이미지들을 false로 변경
-        const hasThumb = boardImages.some(img => img.isThumb);
+        const hasThumb = boardImages.some((img) => img.isThumb);
         if (hasThumb) {
           // 이미 생성된 BoardImage가 있다면 isThumb을 false로 설정
           // (아직 없으므로 이 부분은 실행되지 않음)
@@ -58,7 +68,7 @@ export class BoardsService {
       // CafeInfo 연결
       if (cafeInfoIds && cafeInfoIds.length > 0) {
         await tx.cafeBoard.createMany({
-          data: cafeInfoIds.map(cafeInfoId => ({
+          data: cafeInfoIds.map((cafeInfoId) => ({
             boardId: board.id,
             cafeInfoId: cafeInfoId,
           })),
@@ -91,11 +101,11 @@ export class BoardsService {
   }
 
   // Board 조회 (검색 및 페이징)
-  async findAll(searchDto: SearchBoardDto, isAdmin: boolean = false) {
+  async findAll(searchDto: SearchBoardDto, isAdmin = false) {
     const { page = 1, limit = 10, ...searchParams } = searchDto;
     const skip = (page - 1) * limit;
 
-    console.log("findAll", searchParams);
+    console.log('findAll', searchParams);
 
     // 검색 조건 구성
     const where: any = {};
@@ -145,49 +155,52 @@ export class BoardsService {
       } else {
         // CafeInfoId가 1 이하인 경우, 모든 CafeInfo에 연결된 Board 조회
         where.CafeBoards = {
-          some: {}  // 빈 객체로 모든 CafeBoard 존재 여부만 확인
+          some: {}, // 빈 객체로 모든 CafeBoard 존재 여부만 확인
         };
       }
     }
 
     const total = await this.prisma.board.count({ where });
 
-    const boards = total > 0 ? await this.prisma.board.findMany({
-      where,
-      skip,
-      take: limit,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        User: {
-          select: {
-            id: true,
-            username: true,
-            nickname: true,
-          },
-        },
-        BoardImages: {
-          orderBy: { isThumb: 'desc' },
-          take: 1,
-        },
-        // BoardReplies: {
-        //   where: { isDisable: false },
-        //   include: {
-        //     User: {
-        //       select: {
-        //         id: true,
-        //         username: true,
-        //         nickname: true,
-        //       },
-        //     },
-        //   },
-        // },
-        CafeBoards: {
-          include: {
-            CafeInfo: true,
-          },
-        },
-      },
-    }) : [];
+    const boards =
+      total > 0
+        ? await this.prisma.board.findMany({
+            where,
+            skip,
+            take: limit,
+            orderBy: { createdAt: 'desc' },
+            include: {
+              User: {
+                select: {
+                  id: true,
+                  username: true,
+                  nickname: true,
+                },
+              },
+              BoardImages: {
+                orderBy: { isThumb: 'desc' },
+                take: 1,
+              },
+              // BoardReplies: {
+              //   where: { isDisable: false },
+              //   include: {
+              //     User: {
+              //       select: {
+              //         id: true,
+              //         username: true,
+              //         nickname: true,
+              //       },
+              //     },
+              //   },
+              // },
+              CafeBoards: {
+                include: {
+                  CafeInfo: true,
+                },
+              },
+            },
+          })
+        : [];
 
     return {
       boards: boards,
@@ -201,7 +214,7 @@ export class BoardsService {
   }
 
   // Board 상세 조회
-  async findOne(id: number, isAdmin: boolean = false) {
+  async findOne(id: number, isAdmin = false) {
     const where: any = { id };
 
     if (!isAdmin) {
@@ -253,22 +266,29 @@ export class BoardsService {
       where: { id: { in: searchDto.imageIds } },
       select: { id: true, url: true, thumbnailUrl: true },
     });
-    const imageUrls = images.map(image => image.url);
-    const thumbnailUrls = images.map(image => image.thumbnailUrl);
+    const imageUrls = images.map((image) => image.url);
+    const thumbnailUrls = images.map((image) => image.thumbnailUrl);
     return [...imageUrls, ...thumbnailUrls];
   }
 
   // Board 수정
-  async update(id: number, updateBoardDto: UpdateBoardDto, userId: number, isAdmin: boolean = false) {
+  async update(
+    id: number,
+    updateBoardDto: UpdateBoardDto,
+    userId: number,
+    isAdmin = false,
+  ) {
     const board = await this.findOne(id, isAdmin);
 
     // 작성자나 어드민만 수정 가능
     if (board.userId !== userId && !isAdmin) {
-      throw new BadRequestException('Only the author or admin can update this board');
+      throw new BadRequestException(
+        'Only the author or admin can update this board',
+      );
     }
 
-    const { cafeInfoIds, boardImages, disabledImageIds, ...boardData } = updateBoardDto;
-
+    const { cafeInfoIds, boardImages, disabledImageIds, ...boardData } =
+      updateBoardDto;
 
     return this.prisma.$transaction(async (tx) => {
       // Board 수정
@@ -276,7 +296,9 @@ export class BoardsService {
         where: { id },
         data: {
           ...boardData,
-          startDay: boardData.startDay ? new Date(boardData.startDay) : undefined,
+          startDay: boardData.startDay
+            ? new Date(boardData.startDay)
+            : undefined,
           endDay: boardData.endDay ? new Date(boardData.endDay) : undefined,
         },
         include: {
@@ -299,7 +321,6 @@ export class BoardsService {
 
       // BoardImage 업데이트
       if (boardImages !== undefined) {
-
         // 새로운 BoardImage들 생성
         if (boardImages && boardImages.length > 0) {
           await tx.boardImage.createMany({
@@ -307,7 +328,8 @@ export class BoardsService {
               ...image,
               boardId: id,
               // 첫 번째 이미지를 썸네일로 설정 (isThumb이 지정되지 않은 경우)
-              isThumb: image.isThumb !== undefined ? image.isThumb : index === 0,
+              isThumb:
+                image.isThumb !== undefined ? image.isThumb : index === 0,
             })),
           });
         }
@@ -316,18 +338,23 @@ export class BoardsService {
       // CafeInfo 연결 업데이트
       if (cafeInfoIds !== undefined) {
         if (cafeInfoIds.length === 0) {
-
           // 기존 연결 삭제
           await tx.cafeBoard.deleteMany({
             where: { boardId: id },
           });
-
         } else {
           // 추가 연결 생성 리스트
-          const addCafeInfoIds = cafeInfoIds.filter(cafeInfoId => !board.CafeBoards.some(cafeBoard => cafeBoard.cafeInfoId === cafeInfoId));
+          const addCafeInfoIds = cafeInfoIds.filter(
+            (cafeInfoId) =>
+              !board.CafeBoards.some(
+                (cafeBoard) => cafeBoard.cafeInfoId === cafeInfoId,
+              ),
+          );
 
           // 제거 연결 생성 리스트
-          const removeCafeInfoIds = board.CafeBoards.filter(cafeBoard => !cafeInfoIds.includes(cafeBoard.cafeInfoId)).map(cafeBoard => cafeBoard.cafeInfoId);
+          const removeCafeInfoIds = board.CafeBoards.filter(
+            (cafeBoard) => !cafeInfoIds.includes(cafeBoard.cafeInfoId),
+          ).map((cafeBoard) => cafeBoard.cafeInfoId);
 
           // 기존 연결 삭제
           await tx.cafeBoard.deleteMany({
@@ -337,28 +364,28 @@ export class BoardsService {
           // 새로운 연결 생성
           if (addCafeInfoIds && addCafeInfoIds.length > 0) {
             await tx.cafeBoard.createMany({
-              data: addCafeInfoIds.map(cafeInfoId => ({
+              data: addCafeInfoIds.map((cafeInfoId) => ({
                 boardId: id,
                 cafeInfoId: cafeInfoId,
               })),
             });
           }
-
         }
       }
-
 
       return updatedBoard;
     });
   }
 
   // Board 삭제
-  async remove(id: number, userId: number, isAdmin: boolean = false) {
+  async remove(id: number, userId: number, isAdmin = false) {
     const board = await this.findOne(id, isAdmin);
 
     // 작성자나 어드민만 삭제 가능
     if (board.userId !== userId && !isAdmin) {
-      throw new BadRequestException('Only the author or admin can delete this board');
+      throw new BadRequestException(
+        'Only the author or admin can delete this board',
+      );
     }
 
     // 관련 데이터 삭제
@@ -373,11 +400,17 @@ export class BoardsService {
   }
 
   // BoardImage 생성
-  async createBoardImage(boardId: number, createBoardImageDto: CreateBoardImageDto, userId: number) {
+  async createBoardImage(
+    boardId: number,
+    createBoardImageDto: CreateBoardImageDto,
+    userId: number,
+  ) {
     // Board 존재 확인 및 권한 확인
     const board = await this.findOne(boardId);
     if (board.userId !== userId) {
-      throw new BadRequestException('Only the author can add images to this board');
+      throw new BadRequestException(
+        'Only the author can add images to this board',
+      );
     }
 
     // isThumb이 true인 경우, 기존 썸네일 이미지들을 false로 변경
@@ -397,7 +430,11 @@ export class BoardsService {
   }
 
   // BoardImage 수정
-  async updateBoardImage(id: number, updateBoardImageDto: UpdateBoardImageDto, userId: number) {
+  async updateBoardImage(
+    id: number,
+    updateBoardImageDto: UpdateBoardImageDto,
+    userId: number,
+  ) {
     const boardImage = await this.prisma.boardImage.findUnique({
       where: { id },
       include: { Board: true },
@@ -408,7 +445,9 @@ export class BoardsService {
     }
 
     if (boardImage.Board.userId !== userId) {
-      throw new BadRequestException('Only the author can update images in this board');
+      throw new BadRequestException(
+        'Only the author can update images in this board',
+      );
     }
 
     // isThumb이 true로 변경되는 경우, 기존 썸네일 이미지들을 false로 변경
@@ -437,7 +476,9 @@ export class BoardsService {
     }
 
     if (boardImage.Board.userId !== userId) {
-      throw new BadRequestException('Only the author can delete images from this board');
+      throw new BadRequestException(
+        'Only the author can delete images from this board',
+      );
     }
 
     await this.prisma.boardImage.delete({ where: { id } });
@@ -445,7 +486,11 @@ export class BoardsService {
   }
 
   // BoardReply 생성
-  async createBoardReply(boardId: number, createBoardReplyDto: CreateBoardReplyDto, userId: number) {
+  async createBoardReply(
+    boardId: number,
+    createBoardReplyDto: CreateBoardReplyDto,
+    userId: number,
+  ) {
     // Board 존재 확인 및 댓글 작성 가능 여부 확인
     const board = await this.findOne(boardId);
     if (!board.isReplyAvaliable) {
@@ -471,7 +516,11 @@ export class BoardsService {
   }
 
   // BoardReply 수정
-  async updateBoardReply(id: number, updateBoardReplyDto: UpdateBoardReplyDto, userId: number) {
+  async updateBoardReply(
+    id: number,
+    updateBoardReplyDto: UpdateBoardReplyDto,
+    userId: number,
+  ) {
     const boardReply = await this.prisma.boardReply.findUnique({
       where: { id },
     });
@@ -521,7 +570,11 @@ export class BoardsService {
   }
 
   // CafeInfo로 Board 검색
-  async findByCafeInfo(cafeInfoId: number, searchDto: SearchBoardDto, isAdmin: boolean = false) {
+  async findByCafeInfo(
+    cafeInfoId: number,
+    searchDto: SearchBoardDto,
+    isAdmin = false,
+  ) {
     const searchParams = { ...searchDto, cafeInfoId };
     return this.findAll(searchParams, isAdmin);
   }

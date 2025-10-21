@@ -1,4 +1,9 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
 export const API_KEY_HEADER = 'x-api-key';
@@ -34,4 +39,3 @@ export class ApiKeyGuard implements CanActivate {
     return true;
   }
 }
-
