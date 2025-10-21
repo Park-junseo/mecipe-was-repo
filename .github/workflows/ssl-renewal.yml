@@ -1,0 +1,53 @@
+name: SSL Certificate Renewal Check
+
+# SSL 인증서 갱신 확인 워크플로우
+# Let's Encrypt 인증서는 90일마다 갱신이 필요하며,
+# Certbot은 자동으로 갱신하지만, 이 워크플로우로 상태를 확인할 수 있습니다.
+
+on:
+  # 매주 월요일 오전 9시(UTC)에 실행
+  schedule:
+    - cron: '0 9 * * 1'
+  
+  # 수동 실행 가능
+  workflow_dispatch:
+
+jobs:
+  check-ssl:
+    name: Check SSL Certificate Status
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check SSL certificate expiry
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script: |
+            cd /app/mecipe-was
+            
+            # SSL 인증서 만료일 확인
+            echo "Checking SSL certificate expiry..."
+            docker compose run --rm certbot certificates
+            
+            # 갱신 테스트 (실제로 갱신하지 않음)
+            echo "Testing certificate renewal..."
+            docker compose run --rm certbot renew --dry-run
+            
+            # 결과 출력
+            if [ $? -eq 0 ]; then
+              echo "✅ SSL certificate is valid and renewal test passed"
+            else
+              echo "❌ SSL certificate renewal test failed"
+              exit 1
+            fi
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "SSL certificate check or renewal test failed!"
+          echo "Please check the server manually."
+          # 여기에 Slack, Discord, 이메일 알림 등을 추가할 수 있습니다.
+

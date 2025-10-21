@@ -1,0 +1,35 @@
+version: '3.8'
+
+# 로컬 PostgreSQL을 Docker로 실행하고 싶을 때 사용하는 설정 파일
+# 사용법: docker compose -f docker-compose.yml -f docker-compose.with-db.yml up -d
+
+services:
+  # NestJS 애플리케이션 (depends_on 추가)
+  app:
+    depends_on:
+      - db
+
+  # PostgreSQL 데이터베이스 (로컬 Docker)
+  db:
+    image: postgres:15-alpine
+    container_name: mecipe-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-mecipe_db}
+      - POSTGRES_USER=${POSTGRES_USER:-mecipe_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mecipe_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
+

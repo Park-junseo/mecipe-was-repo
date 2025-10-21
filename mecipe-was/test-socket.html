@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socket.IO 연결 테스트</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.connecting {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Consolas', monospace;
+            font-size: 13px;
+        }
+        .log-item {
+            padding: 5px;
+            margin: 3px 0;
+            border-left: 3px solid #007bff;
+            padding-left: 10px;
+        }
+        .log-item.success {
+            border-left-color: #28a745;
+            color: #155724;
+        }
+        .log-item.error {
+            border-left-color: #dc3545;
+            color: #721c24;
+        }
+        .log-item.info {
+            border-left-color: #17a2b8;
+            color: #0c5460;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        input {
+            padding: 8px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 Socket.IO 연결 테스트</h1>
+        <p>Meta Viewers WebSocket Gateway 테스트 페이지</p>
+        
+        <div id="status" class="status disconnected">
+            ❌ 연결되지 않음
+        </div>
+
+        <div class="controls">
+            <button onclick="connectSocket()">연결하기</button>
+            <button onclick="disconnectSocket()">연결 끊기</button>
+            <button onclick="clearLog()">로그 지우기</button>
+        </div>
+
+        <div class="controls">
+            <input type="text" id="roomId" placeholder="Room ID (예: room1)" value="room1">
+            <button onclick="joinRoom()">방 입장</button>
+            <button onclick="leaveRoom()">방 나가기</button>
+            <button onclick="getRoomInfo()">방 정보</button>
+            <button onclick="getRoomList()">방 목록</button>
+        </div>
+
+        <div class="controls">
+            <input type="text" id="message" placeholder="메시지 입력" style="flex: 1; min-width: 200px;">
+            <button onclick="sendToRoom()">방에 메시지 전송</button>
+        </div>
+
+        <h3>📋 로그</h3>
+        <div id="log" class="log">
+            <div class="log-item info">준비됨. '연결하기' 버튼을 클릭하세요.</div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script>
+        let socket = null;
+
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('log');
+            const item = document.createElement('div');
+            item.className = `log-item ${type}`;
+            const time = new Date().toLocaleTimeString('ko-KR');
+            item.textContent = `[${time}] ${message}`;
+            log.appendChild(item);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function updateStatus(status, message) {
+            const statusEl = document.getElementById('status');
+            statusEl.className = `status ${status}`;
+            statusEl.textContent = message;
+        }
+
+        function connectSocket() {
+            if (socket && socket.connected) {
+                addLog('이미 연결되어 있습니다.', 'info');
+                return;
+            }
+
+            addLog('연결 시도 중...', 'info');
+            updateStatus('connecting', '🔄 연결 중...');
+
+            socket = io('http://localhost:4100', {
+                path: '/meta-veiwers',
+                transports: ['websocket', 'polling']
+            });
+
+            // 연결 성공
+            socket.on('connect', () => {
+                addLog(`✅ 연결 성공! Socket ID: ${socket.id}`, 'success');
+                updateStatus('connected', `✅ 연결됨 (ID: ${socket.id})`);
+            });
+
+            // 연결 끊김
+            socket.on('disconnect', (reason) => {
+                addLog(`❌ 연결 끊김: ${reason}`, 'error');
+                updateStatus('disconnected', '❌ 연결되지 않음');
+            });
+
+            // 연결 에러
+            socket.on('connect_error', (error) => {
+                addLog(`❌ 연결 에러: ${error.message}`, 'error');
+                updateStatus('disconnected', '❌ 연결 실패');
+            });
+
+            // 방 브로드캐스트 수신
+            socket.on('roomBroadcast', (data) => {
+                addLog(`📢 방 브로드캐스트: ${JSON.stringify(data)}`, 'info');
+            });
+
+            // 사용자 입장 알림
+            socket.on('userJoined', (data) => {
+                addLog(`👋 사용자 입장: ${JSON.stringify(data)}`, 'success');
+            });
+
+            // 사용자 퇴장 알림
+            socket.on('userLeft', (data) => {
+                addLog(`👋 사용자 퇴장: ${JSON.stringify(data)}`, 'info');
+            });
+
+            // 방 메시지 수신
+            socket.on('roomMessage', (data) => {
+                addLog(`💬 방 메시지: ${JSON.stringify(data)}`, 'success');
+            });
+        }
+
+        function disconnectSocket() {
+            if (socket) {
+                socket.disconnect();
+                addLog('연결을 끊었습니다.', 'info');
+            }
+        }
+
+        function joinRoom() {
+            if (!socket || !socket.connected) {
+                addLog('먼저 소켓을 연결하세요!', 'error');
+                return;
+            }
+
+            const roomId = document.getElementById('roomId').value || 'room1';
+            addLog(`방 입장 요청: ${roomId}`, 'info');
+            
+            socket.emit('joinRoom', { roomId }, (response) => {
+                addLog(`방 입장 응답: ${JSON.stringify(response)}`, 'success');
+            });
+        }
+
+        function leaveRoom() {
+            if (!socket || !socket.connected) {
+                addLog('먼저 소켓을 연결하세요!', 'error');
+                return;
+            }
+
+            const roomId = document.getElementById('roomId').value || 'room1';
+            addLog(`방 나가기 요청: ${roomId}`, 'info');
+            
+            socket.emit('leaveRoom', { roomId }, (response) => {
+                addLog(`방 나가기 응답: ${JSON.stringify(response)}`, 'success');
+            });
+        }
+
+        function getRoomInfo() {
+            if (!socket || !socket.connected) {
+                addLog('먼저 소켓을 연결하세요!', 'error');
+                return;
+            }
+
+            addLog('방 정보 요청', 'info');
+            socket.emit('getRoomInfo', {}, (response) => {
+                addLog(`방 정보: ${JSON.stringify(response, null, 2)}`, 'success');
+            });
+        }
+
+        function getRoomList() {
+            if (!socket || !socket.connected) {
+                addLog('먼저 소켓을 연결하세요!', 'error');
+                return;
+            }
+
+            addLog('방 목록 요청', 'info');
+            socket.emit('getRoomList', {}, (response) => {
+                addLog(`방 목록: ${JSON.stringify(response, null, 2)}`, 'success');
+            });
+        }
+
+        function sendToRoom() {
+            if (!socket || !socket.connected) {
+                addLog('먼저 소켓을 연결하세요!', 'error');
+                return;
+            }
+
+            const message = document.getElementById('message').value;
+            if (!message) {
+                addLog('메시지를 입력하세요!', 'error');
+                return;
+            }
+
+            addLog(`메시지 전송: ${message}`, 'info');
+            socket.emit('sendToRoom', { message }, (response) => {
+                addLog(`전송 응답: ${JSON.stringify(response)}`, 'success');
+                document.getElementById('message').value = '';
+            });
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '<div class="log-item info">로그가 지워졌습니다.</div>';
+        }
+
+        // 엔터키로 메시지 전송
+        document.getElementById('message').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendToRoom();
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+
