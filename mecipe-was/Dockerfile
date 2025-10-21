@@ -8,7 +8,9 @@ RUN apt-get update -y && \
     rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
-RUN npm ci
+
+# npm ci 실행 (타임아웃 설정 및 로깅 개선)
+RUN npm ci --prefer-offline --no-audit --progress=true
 
 COPY . .
 

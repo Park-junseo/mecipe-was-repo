@@ -40,7 +40,7 @@ jobs:
       working-directory: ./mecipe-was
       run: npm run build
 
-  # 📦 2. Docker 이미지 빌드 및 푸시 (선택사항)
+  # 📦 2. Docker 이미지 빌드 및 푸시 (GitHub 서버에서 빌드 - 네트워크 빠름!)
   build_and_push_docker:
     needs: test
     runs-on: ubuntu-latest
@@ -69,6 +69,8 @@ jobs:
           ${{ secrets.DOCKER_USERNAME }}/mecipe-api-server:${{ github.sha }}
         cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/mecipe-api-server:latest
         cache-to: type=inline
+        build-args: |
+          BUILDKIT_INLINE_CACHE=1
 
     - name: Build and push Nginx image
       uses: docker/build-push-action@v5
@@ -98,6 +100,9 @@ jobs:
       run: |
         echo "Creating .env file..."
         cat > .env << 'EOF'
+        # Docker
+        DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+        
         # Application
         NODE_ENV=production
         PORT=${{ secrets.PORT || 4000 }}
@@ -126,10 +131,10 @@ jobs:
         EOF
         chmod 600 .env
 
-    - name: Pull latest images
+    - name: Pull latest images from Docker Hub
       run: |
-        echo "Pulling latest Docker images..."
-        docker compose pull
+        echo "Pulling latest Docker images from Docker Hub..."
+        docker compose pull || echo "Pull failed, will build locally as fallback"
 
     - name: Deploy with Docker Compose
       run: |
@@ -138,7 +143,8 @@ jobs:
         # Stop and remove old containers
         docker compose down
         
-        # Start new containers
+        # Start new containers (use pulled images)
+        echo "Starting containers..."
         docker compose up -d
         
         # Wait for services to be healthy

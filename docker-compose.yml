@@ -3,9 +3,12 @@ version: '3.8'
 services:
   # NestJS 애플리케이션
   app:
+    image: ${DOCKER_USERNAME:-local}/mecipe-api-server:latest
     build:
       context: ./mecipe-was
       dockerfile: Dockerfile
+      args:
+        - BUILDKIT_INLINE_CACHE=1
     container_name: mecipe-app
     restart: unless-stopped
     ports:
@@ -44,6 +47,7 @@ services:
 
   # Nginx 리버스 프록시
   nginx:
+    image: ${DOCKER_USERNAME:-local}/mecipe-nginx:latest
     build:
       context: ./nginx
       dockerfile: Dockerfile
