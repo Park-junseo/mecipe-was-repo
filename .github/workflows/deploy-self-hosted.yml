@@ -89,8 +89,22 @@ jobs:
       run: |
         echo "Cleaning up workspace..."
         sudo chown -R $USER:$USER $GITHUB_WORKSPACE || true
+        
+        # certbot 디렉토리 백업 (SSL 인증서 보존)
+        if [ -d "$GITHUB_WORKSPACE/certbot" ]; then
+          echo "Backing up SSL certificates..."
+          sudo mv $GITHUB_WORKSPACE/certbot /tmp/certbot-backup || true
+        fi
+        
+        # 기존 파일 삭제
         sudo rm -rf $GITHUB_WORKSPACE/* || true
         sudo rm -rf $GITHUB_WORKSPACE/.* 2>/dev/null || true
+        
+        # certbot 복원
+        if [ -d "/tmp/certbot-backup" ]; then
+          echo "Restoring SSL certificates..."
+          sudo mv /tmp/certbot-backup $GITHUB_WORKSPACE/certbot || true
+        fi
     
     - name: Checkout code
       uses: actions/checkout@v3
@@ -144,6 +158,9 @@ jobs:
     - name: Deploy with Docker Compose
       run: |
         echo "--- Starting deployment ---"
+        
+        # certbot 디렉토리 생성 (없으면)
+        mkdir -p certbot/conf certbot/www
         
         # Stop and remove old containers
         docker compose down
