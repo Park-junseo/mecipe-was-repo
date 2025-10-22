@@ -7,9 +7,10 @@ services:
       dockerfile: Dockerfile
     container_name: mecipe-app
     restart: unless-stopped
-    ports:
-      - "${PORT:-4000}:${PORT:-4000}"
-      - "${SOCKET_PORT:-4100}:${SOCKET_PORT:-4100}"
+    # 포트를 외부에 노출하지 않음 (보안)
+    expose:
+      - "${PORT:-4000}"
+      - "${SOCKET_PORT:-4100}"
     environment:
       # Application
       - NODE_ENV=${NODE_ENV:-production}
