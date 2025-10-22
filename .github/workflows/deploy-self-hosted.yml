@@ -90,8 +90,10 @@ jobs:
         echo "Cleaning up workspace..."
         sudo chown -R $USER:$USER $GITHUB_WORKSPACE || true
         
-        # 기존 파일 삭제 (certbot 제외)
-        sudo find $GITHUB_WORKSPACE -mindepth 1 -maxdepth 1 ! -name 'certbot' -exec rm -rf {} + || true
+        # certbot 데이터는 Docker named volume에 저장되므로 유지됨
+        # workspace만 정리
+        sudo rm -rf $GITHUB_WORKSPACE/* || true
+        sudo rm -rf $GITHUB_WORKSPACE/.* 2>/dev/null || true
     
     - name: Checkout code
       uses: actions/checkout@v3
@@ -142,32 +144,64 @@ jobs:
         echo "Pulling latest Docker images from Docker Hub..."
         docker compose pull || echo "Pull failed, will build locally as fallback"
 
-    - name: Prepare SSL directory
+    - name: Setup SSL certificate (if needed)
       run: |
-        # certbot 디렉토리 생성 및 권한 설정
-        mkdir -p certbot/conf certbot/www
-        sudo chown -R $USER:$USER certbot/ || true
+        echo "Checking SSL certificate status..."
         
-        # SSL 인증서 상태 확인
-        if [ -f "certbot/conf/live/api.mecipe.com/fullchain.pem" ]; then
-          echo "✅ SSL certificate found"
-          sudo ls -la certbot/conf/live/api.mecipe.com/
+        # certbot 컨테이너를 통해 인증서 확인
+        if docker compose run --rm certbot certificates 2>&1 | grep -q "api.mecipe.com"; then
+          echo "✅ SSL certificate already exists"
         else
-          echo "⚠️ SSL certificate not found - will use HTTP-only mode"
-          echo "💡 Run this on server to enable HTTPS:"
-          echo "   docker compose stop nginx && docker run --rm -it -v \$(pwd)/certbot/conf:/etc/letsencrypt -v \$(pwd)/certbot/www:/var/www/certbot -p 80:80 certbot/certbot certonly --standalone --email newinderstudio@gmail.com --agree-tos --no-eff-email -d api.mecipe.com && docker compose start nginx"
+          echo "⚠️ SSL certificate not found - attempting to issue..."
+          
+          # DNS 확인
+          echo "Checking DNS..."
+          if nslookup api.mecipe.com | grep -q "Address"; then
+            echo "✅ DNS is configured"
+            
+            # app과 nginx 시작 (HTTP만)
+            docker compose up -d app nginx
+            sleep 10
+            
+            # HTTP가 작동하는지 확인
+            if curl -f http://localhost/health 2>/dev/null; then
+              echo "✅ HTTP is working, attempting SSL certificate..."
+              
+              # webroot 모드로 SSL 발급
+              docker compose run --rm certbot certonly \
+                --webroot \
+                --webroot-path=/var/www/certbot \
+                --email ${{ secrets.SSL_EMAIL || 'newinderstudio@gmail.com' }} \
+                --agree-tos \
+                --no-eff-email \
+                --non-interactive \
+                -d api.mecipe.com && echo "✅ SSL certificate issued successfully!" || echo "⚠️ SSL issuance failed - will use HTTP-only mode"
+              
+              # Nginx 재시작 (HTTPS 활성화)
+              docker compose restart nginx
+            else
+              echo "⚠️ HTTP not working - skipping SSL setup"
+            fi
+          else
+            echo "⚠️ DNS not configured - skipping SSL setup"
+            echo "💡 Configure DNS first, then re-run deployment"
+          fi
         fi
     
     - name: Deploy with Docker Compose
       run: |
         echo "--- Starting deployment ---"
         
-        # Stop and remove old containers
-        docker compose down
+        # app과 nginx만 재시작 (certbot은 유지!)
+        docker compose stop app nginx
+        docker compose rm -f app nginx
         
         # Start new containers (use pulled images)
         echo "Starting containers..."
-        docker compose up -d
+        docker compose up -d app nginx
+        
+        # certbot은 이미 실행 중이면 그대로, 없으면 시작
+        docker compose up -d certbot
         
         # Wait for services to be healthy
         echo "Waiting for services to start..."
