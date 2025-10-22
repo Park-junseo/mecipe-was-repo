@@ -1,16 +1,11 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/global/prisma.service';
-// import { ImageuploadService } from 'src/imageupload/imageupload.service';
 import { UpsertCafeVirtualImageListDto } from './dto/upsert-cafevirtualimage.dto';
 import { CafeVirtualImage } from 'prisma/basic';
-import { RawimageuploadService } from 'src/rawimageupload/rawimageupload.service';
 
 @Injectable()
 export class CafevirtualimagesService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly imageuploadService: RawimageuploadService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   findAllCafeVirtualImagesByAdmin() {
     return this.prisma.cafeVirtualImage.findMany({
@@ -35,10 +30,6 @@ export class CafevirtualimagesService {
         const updatedList: CafeVirtualImage[] = [];
 
         for (let i = 0; i < createDto.length; i++) {
-          // const valid = this.imageuploadService.validUploadUrl(createDto[i].url);
-
-          // if (!valid) throw new ForbiddenException("Error: Invalid Image: " + createDto[i].url);
-
           const created = await tx.cafeVirtualImage.create({
             data: {
               ...createDto[i],
@@ -69,10 +60,6 @@ export class CafevirtualimagesService {
 
         return [...createdList, ...updatedList];
       } catch (error) {
-        this.imageuploadService.deletImageByUrlList([
-          ...createDto.map((dto) => dto.url),
-          ...updateDto.filter((dto) => dto.url).map((dto) => String(dto.url)),
-        ]);
         throw error;
       }
     });

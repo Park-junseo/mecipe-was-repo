@@ -4,17 +4,12 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/global/prisma.service';
-// import { ImageuploadService } from 'src/imageupload/imageupload.service';
 import { UpsertCafeRealImageListDto } from './dto/upsert-caferealimage.dto';
 import { CafeVirtualImage } from 'prisma/basic';
-import { RawimageuploadService } from 'src/rawimageupload/rawimageupload.service';
 
 @Injectable()
 export class CaferealimagesService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly imageuploadService: RawimageuploadService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   findAllCafeVirtualImagesByAdmin() {
     return this.prisma.cafeRealImage.findMany({
@@ -75,10 +70,6 @@ export class CaferealimagesService {
 
         return [...createdList, ...updatedList];
       } catch (error) {
-        this.imageuploadService.deletImageByUrlList([
-          ...createDto.map((dto) => dto.url),
-          ...updateDto.filter((dto) => dto.url).map((dto) => String(dto.url)),
-        ]);
         throw error;
       }
     });

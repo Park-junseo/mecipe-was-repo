@@ -1,16 +1,11 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/global/prisma.service';
 import { UpsertCafethumbnailimageListDto } from './dto/upsert-cafethumbnailimage.dto';
-// import { ImageuploadService } from 'src/imageupload/imageupload.service';
 import { CafeThumbnailImage } from 'prisma/basic';
-import { RawimageuploadService } from 'src/rawimageupload/rawimageupload.service';
 
 @Injectable()
 export class CafethumbnailimagesService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly imageuploadService: RawimageuploadService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   findAllCafeThumbnailImagesByAdmin() {
     return this.prisma.cafeThumbnailImage.findMany({
@@ -37,10 +32,6 @@ export class CafethumbnailimagesService {
         const updatedList: CafeThumbnailImage[] = [];
 
         for (let i = 0; i < createDto.length; i++) {
-          // const valid = this.imageuploadService.validUploadUrl(createDto[i].url);
-
-          // if (!valid) throw new ForbiddenException("Error: Invalid Image: " + createDto[i].url);
-
           const created = await tx.cafeThumbnailImage.create({
             data: {
               ...createDto[i],
@@ -71,14 +62,6 @@ export class CafethumbnailimagesService {
 
         return [...createdList, ...updatedList];
       } catch (error) {
-        this.imageuploadService.deletImageByUrlList([
-          ...createDto.map((dto) => dto.url),
-          ...updateDto.filter((dto) => dto.url).map((dto) => String(dto.url)),
-          ...createDto.map((dto) => dto.thumbnailUrl),
-          ...updateDto
-            .filter((dto) => dto.thumbnailUrl)
-            .map((dto) => String(dto.thumbnailUrl)),
-        ]);
         throw error;
       }
     });
