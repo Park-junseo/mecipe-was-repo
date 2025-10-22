@@ -15,10 +15,7 @@ import { CafeVirtualLink, CafeVirtualLinkThumbnailImage } from 'prisma/basic';
 
 @Injectable()
 export class CafevirtuallinksService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly imageuploadService: RawimageuploadService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async createCafeVirtualLinkByAdmin(
     cafeId: number,
@@ -56,7 +53,6 @@ export class CafevirtuallinksService {
         };
       });
     } catch (e) {
-      this.imageuploadService.deletImageByUrl(createDto.thumbnailImage.url);
       throw e;
     }
   }
@@ -107,9 +103,6 @@ export class CafevirtuallinksService {
         }
       });
     } catch (e) {
-      createListDto.create.forEach((createDto) => {
-        this.imageuploadService.deletImageByUrl(createDto.thumbnailImage.url);
-      });
 
       throw e;
     }
@@ -143,29 +136,9 @@ export class CafevirtuallinksService {
     id: number,
     updateDto: UpdateCafeVirtaulLinkThumbnailImageDto,
   ) {
-    //control access url
-    const { url, ...rest } = updateDto;
-
-    const passed = await this.prisma.cafeVirtualLinkThumbnailImage.findUnique({
-      where: { id },
-    });
-    if (!passed)
-      throw new ConflictException('Error CafeVirtualLinkThumbanilImage :' + id);
-
-    if (url && typeof url === 'string' && url != passed.url) {
-      // const valid = this.imageuploadService.validUploadUrl(url);
-      // if (!valid) throw new ConflictException("Error: Invalid Image: " + url);
-
-      const isDeleted = await this.imageuploadService.deletImageByUrl(
-        passed.url,
-      );
-      if (!isDeleted)
-        throw new ConflictException('Error Delete Image: ' + passed.url);
-    }
-
     return this.prisma.cafeVirtualLinkThumbnailImage.update({
       data: {
-        ...rest,
+        ...updateDto,
       },
       where: {
         id,
