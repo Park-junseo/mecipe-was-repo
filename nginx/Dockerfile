@@ -5,6 +5,7 @@ COPY nginx.conf /etc/nginx/nginx.conf
 
 # 템플릿 파일 복사
 COPY conf.d/default.conf.template /etc/nginx/conf.d/default.conf.template
+COPY conf.d/default-http-only.conf.template /etc/nginx/conf.d/default-http-only.conf.template
 
 # entrypoint 스크립트 복사
 COPY docker-entrypoint.sh /docker-entrypoint.sh

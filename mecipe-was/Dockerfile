@@ -37,9 +37,5 @@ COPY --from=builder /app/prisma ./prisma
 # 환경변수 설정
 ENV NODE_ENV=production
 
-# 헬스체크 추가 (선택사항)
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s \
-  CMD node -e "require('http').get('http://localhost:${PORT:-4000}/hello', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
-
 # 시작 스크립트: 마이그레이션 실행 후 앱 시작
 CMD ["sh", "-c", "npx prisma migrate deploy && npm run start:prod"]
