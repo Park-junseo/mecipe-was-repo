@@ -121,7 +121,10 @@ export class CafevirtuallinksService {
   ) {
     if (updateDto.type && typeof updateDto.type === 'string') {
       const equalTypeCount = await this.prisma.cafeVirtualLink.count({
-        where: { type: updateDto.type },
+        where: {
+          type: updateDto.type,
+          id: { not: id }, // ← 자기 자신 제외!
+        },
       });
       if (equalTypeCount > 0) {
         throw new ConflictException('Error: Duplicate Type: ' + updateDto.type);
