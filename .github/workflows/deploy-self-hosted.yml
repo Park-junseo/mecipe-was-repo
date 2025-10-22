@@ -148,9 +148,12 @@ jobs:
       run: |
         echo "Checking SSL certificate status..."
         
-        # certbot 컨테이너를 통해 인증서 확인
-        if docker compose run --rm certbot certificates 2>&1 | grep -q "api.mecipe.com"; then
+        # Docker volume에서 직접 파일 확인
+        SSL_EXISTS=$(docker run --rm -v mecipe-certbot-conf:/etc/letsencrypt alpine sh -c "test -f /etc/letsencrypt/live/api.mecipe.com/fullchain.pem && echo 'true' || echo 'false'")
+        
+        if [ "$SSL_EXISTS" = "true" ]; then
           echo "✅ SSL certificate already exists"
+          docker run --rm -v mecipe-certbot-conf:/etc/letsencrypt alpine ls -la /etc/letsencrypt/live/api.mecipe.com/
         else
           echo "⚠️ SSL certificate not found - attempting to issue..."
           
@@ -161,24 +164,30 @@ jobs:
             
             # app과 nginx 시작 (HTTP만)
             docker compose up -d app nginx
-            sleep 10
+            sleep 15
             
             # HTTP가 작동하는지 확인
             if curl -f http://localhost/health 2>/dev/null; then
               echo "✅ HTTP is working, attempting SSL certificate..."
               
-              # webroot 모드로 SSL 발급
+              # webroot 모드로 SSL 발급 (non-interactive)
               docker compose run --rm certbot certonly \
                 --webroot \
                 --webroot-path=/var/www/certbot \
-                --email ${{ secrets.SSL_EMAIL || 'newinderstudio@gmail.com' }} \
+                --email newinderstudio@gmail.com \
                 --agree-tos \
                 --no-eff-email \
                 --non-interactive \
-                -d api.mecipe.com && echo "✅ SSL certificate issued successfully!" || echo "⚠️ SSL issuance failed - will use HTTP-only mode"
+                -d api.mecipe.com
               
-              # Nginx 재시작 (HTTPS 활성화)
-              docker compose restart nginx
+              if [ $? -eq 0 ]; then
+                echo "✅ SSL certificate issued successfully!"
+                # Nginx 재시작 (HTTPS 활성화)
+                docker compose restart nginx
+                echo "✅ HTTPS enabled"
+              else
+                echo "⚠️ SSL issuance failed - continuing with HTTP-only mode"
+              fi
             else
               echo "⚠️ HTTP not working - skipping SSL setup"
             fi
