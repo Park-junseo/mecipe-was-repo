@@ -149,17 +149,17 @@ jobs:
         echo "Checking SSL certificate status..."
         
         # Docker volume에서 직접 파일 확인
-        SSL_EXISTS=$(docker run --rm -v mecipe-certbot-conf:/etc/letsencrypt alpine sh -c "test -f /etc/letsencrypt/live/api.mecipe.com/fullchain.pem && echo 'true' || echo 'false'")
+        SSL_EXISTS=$(docker run --rm -v mecipe-certbot-conf:/etc/letsencrypt alpine sh -c "test -f /etc/letsencrypt/live/${{ secrets.DOMAIN_NAME }}/fullchain.pem && echo 'true' || echo 'false'")
         
         if [ "$SSL_EXISTS" = "true" ]; then
           echo "✅ SSL certificate already exists"
-          docker run --rm -v mecipe-certbot-conf:/etc/letsencrypt alpine ls -la /etc/letsencrypt/live/api.mecipe.com/
+          docker run --rm -v mecipe-certbot-conf:/etc/letsencrypt alpine ls -la /etc/letsencrypt/live/${{ secrets.DOMAIN_NAME }}/
         else
           echo "⚠️ SSL certificate not found - attempting to issue..."
           
           # DNS 확인
           echo "Checking DNS..."
-          if nslookup api.mecipe.com | grep -q "Address"; then
+          if nslookup ${{ secrets.DOMAIN_NAME }} | grep -q "Address"; then
             echo "✅ DNS is configured"
             
             # app과 nginx 시작 (HTTP만)
@@ -170,23 +170,30 @@ jobs:
             if curl -f http://localhost/health 2>/dev/null; then
               echo "✅ HTTP is working, attempting SSL certificate..."
               
-              # webroot 모드로 SSL 발급 (non-interactive)
-              docker compose run --rm certbot certonly \
-                --webroot \
-                --webroot-path=/var/www/certbot \
-                --email newinderstudio@gmail.com \
+              # Nginx 중지 (standalone 모드는 80 포트 필요)
+              docker compose stop nginx
+              
+              # standalone 모드로 SSL 발급
+              docker run --rm \
+                -v mecipe-certbot-conf:/etc/letsencrypt \
+                -v mecipe-certbot-www:/var/www/certbot \
+                -p 80:80 \
+                certbot/certbot certonly \
+                --standalone \
+                --email ${{ secrets.SSL_EMAIL }} \
                 --agree-tos \
                 --no-eff-email \
                 --non-interactive \
-                -d api.mecipe.com
+                -d ${{ secrets.DOMAIN_NAME }}
               
               if [ $? -eq 0 ]; then
                 echo "✅ SSL certificate issued successfully!"
-                # Nginx 재시작 (HTTPS 활성화)
-                docker compose restart nginx
+                # Nginx 시작 (HTTPS 활성화)
+                docker compose start nginx
                 echo "✅ HTTPS enabled"
               else
-                echo "⚠️ SSL issuance failed - continuing with HTTP-only mode"
+                echo "⚠️ SSL issuance failed - starting nginx in HTTP-only mode"
+                docker compose start nginx
               fi
             else
               echo "⚠️ HTTP not working - skipping SSL setup"
