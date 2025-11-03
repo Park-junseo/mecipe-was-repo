@@ -1,0 +1,130 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+"""페이징 관련 정보를 제공합니다."""
+type PageInfo {
+  """현재 페이지의 시작 커서"""
+  startCursor: String
+
+  """현재 페이지의 끝 커서"""
+  endCursor: String
+
+  """다음 페이지가 있는지 여부"""
+  hasNextPage: Boolean!
+
+  """이전 페이지가 있는지 여부"""
+  hasPreviousPage: Boolean!
+}
+
+"""지역 카테고리"""
+type RegionCategory {
+  """ID"""
+  id: Int!
+
+  """생성일"""
+  createdAt: DateTime!
+
+  """비활성화 여부"""
+  isDisable: Boolean!
+
+  """이름"""
+  name: String!
+
+  """관할 유형"""
+  govermentType: GovermentType!
+
+  """카페 정보"""
+  CafeInfos: [CafeInfo!]!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+enum GovermentType {
+  SPECIAL_CITY
+  METROPOLITAN_CITY
+  SPECIAL_SELF_GOVERNING_CITY
+  PROVINCE
+  SPECIAL_SELF_GOVERNING_PROVINCE
+  DISTRICT
+  CITY
+  COUNTY
+  TOWN
+  TOWNSHIP
+  NEIGHBORHOOD
+  PLACENAME
+}
+
+"""카페 정보"""
+type CafeInfo {
+  """ID"""
+  id: Int!
+
+  """생성일"""
+  createdAt: DateTime!
+
+  """비활성화 여부"""
+  isDisable: Boolean!
+
+  """카페 이름"""
+  name: String!
+
+  """코드"""
+  code: String!
+
+  """지역 카테고리 ID"""
+  regionCategoryId: Int!
+
+  """주소"""
+  address: String!
+
+  """방향"""
+  directions: String!
+
+  """사업자 번호"""
+  businessNumber: String!
+
+  """대표자 이름"""
+  ceoName: String!
+
+  """지역 카테고리"""
+  RegionCategory: RegionCategory
+}
+
+type CafeInfoConnectionEdge {
+  """노드 데이터"""
+  node: CafeInfo!
+
+  """이 노드에 대한 고유 커서"""
+  cursor: String!
+}
+
+type CafeInfoConnection {
+  """엣지 목록"""
+  edges: [CafeInfoConnectionEdge!]!
+
+  """페이징 정보"""
+  pageInfo: PageInfo!
+
+  """총 데이터 개수 (옵션)"""
+  totalCount: Int
+}
+
+type Query {
+  findPaginatedCafeInfos(
+    """페이지 번호 (1부터 시작). Offset 기반 페이징 시 사용."""
+    page: Int
+
+    """최대 페이지 번호. Offset 기반 페이징 시 사용."""
+    maxPage: Int = 10
+
+    """한 페이지당 아이템 개수. Offset 기반 및 Keyset 기반 공통 사용."""
+    limit: Int
+
+    """Keyset 기반 페이징 시, 이 커서 이후의 데이터를 가져옴."""
+    after: String
+  ): CafeInfoConnection!
+}

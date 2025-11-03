@@ -27,6 +27,8 @@ import { MetaVeiwersModule } from './meta-veiwers/meta-veiwers.module';
 import { MetaViewerInfosModule } from './meta-viewer-infos/meta-viewer-infos.module';
 import { ProductsModule } from './products/products.module';
 import { ProductcategoriesModule } from './productcategories/productcategories.module';
+import { GraphQLModule } from '@nestjs/graphql';
+import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 
 @Module({
   imports: [
@@ -37,6 +39,10 @@ import { ProductcategoriesModule } from './productcategories/productcategories.m
       serveStaticOptions: {
         fallthrough: false,
       },
+    }),
+    GraphQLModule.forRoot<ApolloDriverConfig>({
+      driver: ApolloDriver,
+      autoSchemaFile: join(process.cwd(), 'src/common/graphql/schema.gql'),
     }),
     GlobalModule,
     ExamplesModule,

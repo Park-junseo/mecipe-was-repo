@@ -1,0 +1,1 @@
+export type NodeLocation = { name: string, property: string }[];

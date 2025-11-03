@@ -1,16 +1,19 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, Type } from '@nestjs/common';
 import { CreateCafeInfoDto } from './dto/create-place.dto';
 import { UpdateCafeInoDto } from './dto/update-place.dto';
 import { PrismaService } from 'src/global/prisma.service';
-import { Prisma } from 'prisma/basic';
+import { CafeInfo, Prisma } from 'prisma/basic';
 import { RawimageuploadService } from 'src/rawimageupload/rawimageupload.service';
+import { PaginationArgs, findPaginationBasedCursor } from 'src/common/graphql';
+import { CafeInfoConnectionType } from './graphql/types/cafe-info-connection.type';
+import { ICafeInfo } from './entities/cafe-info.entity';
 
 @Injectable()
 export class PlacesService {
   constructor(
     private prisma: PrismaService,
     private readonly imageuploadService: RawimageuploadService,
-  ) {}
+  ) { }
 
   /* s:admin */
 
@@ -99,16 +102,16 @@ export class PlacesService {
     const result =
       count > 0
         ? await this.prisma.cafeInfo.findMany({
-            where: where,
-            skip: (skip - 1) * take,
-            take: take,
-            orderBy: {
-              id: 'desc',
-            },
-            include: {
-              RegionCategory: true,
-            },
-          })
+          where: where,
+          skip: (skip - 1) * take,
+          take: take,
+          orderBy: {
+            id: 'desc',
+          },
+          include: {
+            RegionCategory: true,
+          },
+        })
         : [];
 
     return { count: count, data: result };
@@ -226,24 +229,24 @@ export class PlacesService {
     const result =
       count > 0
         ? await this.prisma.cafeInfo.findMany({
-            where: where,
-            skip: skip,
-            take: take,
-            orderBy: {
-              id: 'desc',
-            },
-            include: {
-              CafeThumbnailImages: {
-                where: {
-                  isDisable: false,
-                },
-                take: 3,
-                orderBy: {
-                  priority: 'asc',
-                },
+          where: where,
+          skip: skip,
+          take: take,
+          orderBy: {
+            id: 'desc',
+          },
+          include: {
+            CafeThumbnailImages: {
+              where: {
+                isDisable: false,
+              },
+              take: 3,
+              orderBy: {
+                priority: 'asc',
               },
             },
-          })
+          },
+        })
         : [];
 
     return { count: count, data: result };
@@ -413,6 +416,18 @@ export class PlacesService {
           id: true,
         },
       }) ?? []
+    );
+  }
+
+  async findPaginatedCafeInfos(
+    args: PaginationArgs,
+    select?: Prisma.CafeInfoSelect,
+  ): Promise<CafeInfoConnectionType> {
+    return findPaginationBasedCursor(
+      this.prisma.cafeInfo,
+      args,
+      'id',
+      select,
     );
   }
 }
