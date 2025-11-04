@@ -39,17 +39,15 @@ function createTypeName(pattern: string, arg: string): string {
 /**
  * 타입 매핑 코드 생성
  */
-function generateTypeMapping(models: string[], prismaBaseTypePattern: string, simpleGenericArgs?: GenericArg[], extraTypeArg?: string): string {
-
+function generateTypeMapping(models: string[], typeName: string, prismaBaseTypePattern: string, options?:{simpleGenericArgs?: GenericArg[], defaultTypeArg?: string, importPaths?: string[]}): string {
+    const { simpleGenericArgs, defaultTypeArg: extraTypeArg, importPaths } = options ?? {};
     const conditions = models.map(model => {
-        let prismaType = `Prisma.${createTypeName(prismaBaseTypePattern, model)}`;
+        let prismaType = createTypeName(prismaBaseTypePattern, model);
         if (simpleGenericArgs) {
             prismaType += `<${simpleGenericArgs.map(arg => arg.typeName).join(', ')}>`;
         }
         return `\t\tTModelName extends '${model}' ? ${prismaType} :`;
     }).join('\n');
-
-    const modelName = createTypeName(prismaBaseTypePattern, 'PrismaModel');
 
     return `/**
 * ⚠️ 이 파일은 자동 생성됩니다. 직접 수정하지 마세요!
@@ -60,14 +58,15 @@ function generateTypeMapping(models: string[], prismaBaseTypePattern: string, si
 */
 
 import { Prisma } from 'prisma/basic';
+${importPaths?.join(`\n`) ?? ''}
 
 /**
- * Prisma ModelName으로부터 해당 모델의 ${modelName} 타입을 추출하는 헬퍼 타입
+ * Prisma ModelName으로부터 해당 모델의 ${typeName} 타입을 추출하는 헬퍼 타입
  * 
  * 자동 생성됨: ${new Date().toISOString()}
  * 모델 개수: ${models.length}
  */
-export type ${modelName}<TModelName extends Prisma.ModelName${(simpleGenericArgs ?? []).filter(arg => arg.isExternal).map(arg => `, ${arg.typeName}`).join('')}> = 
+export type ${typeName}<TModelName extends Prisma.ModelName${(simpleGenericArgs ?? []).filter(arg => arg.isExternal).map(arg => `, ${arg.typeName}`).join('')}> = 
 ${conditions}
         // 알 수 없는 모델에 대해서는 Record<string, any>를 반환
         ${extraTypeArg ? extraTypeArg : 'Record<string, any>'};
@@ -105,9 +104,12 @@ export function generatePrismaTypes() {
 
     console.log('📝 타입 매핑 생성 중...');
     const map = new Map<string, string>();
-    map.set('Select', generateTypeMapping(models, 'Select'));
-    map.set('Delegate', generateTypeMapping(models, 'Delegate', [{ typeName: 'TOptions', isExternal: true }], 'unknown'));
-    map.set('GetPayload', generateTypeMapping(models, 'GetPayload', [{ typeName: 'TSelect', isExternal: true }]));
+    map.set('Select', generateTypeMapping(models, 'PrismaModelSelect', 'Prisma.{model}Select'));
+    map.set('Delegate', generateTypeMapping(models, 'PrismaModelDelegate', 'Prisma.{model}Delegate', {simpleGenericArgs: [{ typeName: 'TOptions', isExternal: true }], defaultTypeArg: 'unknown'}));
+    map.set('GetPayload', generateTypeMapping(models, 'PrismaModelGetPayload', 'Prisma.{model}GetPayload', {simpleGenericArgs: [{ typeName: 'TSelect', isExternal: true }]}));
+    map.set('WhereInput', generateTypeMapping(models, 'PrismaModelWhereInput', 'Prisma.{model}WhereInput'));
+    map.set('TypeName', generateTypeMapping(models, 'PrismaModelTypeName', '"{model}"', {defaultTypeArg: 'undefined'}));
+    map.set('Type', generateTypeMapping(models, 'PrismaModelType', 'PrismaBasic.{model}', {importPaths: ['import * as PrismaBasic from \'prisma/basic\';']}));
 
     console.log(' 기존 OUTPUT_DIR 삭제 중...');
     if (fs.existsSync(OUTPUT_DIR)) {

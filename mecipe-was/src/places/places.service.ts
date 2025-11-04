@@ -2,11 +2,10 @@ import { ForbiddenException, Injectable, Type } from '@nestjs/common';
 import { CreateCafeInfoDto } from './dto/create-place.dto';
 import { UpdateCafeInoDto } from './dto/update-place.dto';
 import { PrismaService } from 'src/global/prisma.service';
-import { CafeInfo, Prisma } from 'prisma/basic';
+import { Prisma } from 'prisma/basic';
 import { RawimageuploadService } from 'src/rawimageupload/rawimageupload.service';
 import { PaginationArgs, findPaginationBasedCursor } from 'src/common/graphql';
 import { CafeInfoConnectionType } from './graphql/types/cafe-info-connection.type';
-import { ICafeInfo } from './entities/cafe-info.entity';
 import { SelectQuery } from 'src/util/models';
 
 @Injectable()
@@ -423,12 +422,14 @@ export class PlacesService {
   async findPaginatedCafeInfos(
     args: PaginationArgs,
     select?: SelectQuery,
+    where?: any,
   ): Promise<CafeInfoConnectionType> {
     return findPaginationBasedCursor(
       this.prisma.cafeInfo,
       args,
       'id',
       select,
+      where
     );
   }
 }

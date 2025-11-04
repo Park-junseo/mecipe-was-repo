@@ -29,6 +29,7 @@ import { ProductsModule } from './products/products.module';
 import { ProductcategoriesModule } from './productcategories/productcategories.module';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
+import { JSONScalar } from './common/graphql/scalars/json.scalar';
 
 @Module({
   imports: [
@@ -77,6 +78,7 @@ import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
       provide: APP_INTERCEPTOR,
       useClass: HttpBodyLoggerInterceptor,
     },
+    JSONScalar, // GraphQL JSON 스칼라 등록
     AppService,
   ],
 })

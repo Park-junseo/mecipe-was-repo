@@ -8,10 +8,11 @@
 
 import { Prisma } from 'prisma/basic';
 
+
 /**
  * Prisma ModelName으로부터 해당 모델의 PrismaModelDelegate 타입을 추출하는 헬퍼 타입
  * 
- * 자동 생성됨: 2025-11-03T11:28:03.232Z
+ * 자동 생성됨: 2025-11-04T13:12:21.391Z
  * 모델 개수: 28
  */
 export type PrismaModelDelegate<TModelName extends Prisma.ModelName, TOptions> = 

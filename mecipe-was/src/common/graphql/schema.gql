@@ -113,6 +113,9 @@ type CafeInfoConnection {
   totalCount: Int
 }
 
+"""JSON scalar type"""
+scalar JSON
+
 type Query {
   findPaginatedCafeInfos(
     """페이지 번호 (1부터 시작). Offset 기반 페이징 시 사용."""
@@ -126,5 +129,8 @@ type Query {
 
     """Keyset 기반 페이징 시, 이 커서 이후의 데이터를 가져옴."""
     after: String
+
+    """Prisma WhereInput 조건 (JSON 형태)"""
+    where: JSON
   ): CafeInfoConnection!
 }

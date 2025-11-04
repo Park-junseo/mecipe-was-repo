@@ -1,21 +1,28 @@
-import { Prisma, PrismaPromise } from "prisma/basic";
-import { BaseConnectionType } from "./base-connection.type";
+import { Prisma } from "prisma/basic";
 import { PaginationArgs } from "./pagination-args.input";
 import { PageInfo } from "./page-info.entity";
-import { PrismaModelDelegate, PrismaModelGetPayload, PrismaModelSelect } from "src/util/prisma";
+import { PrismaModelDelegate, PrismaModelGetPayload, PrismaModelSelect, PrismaModelWhereInput } from "src/util/prisma";
+import { BaseConnectionType } from "./base-connection.type";
 
 export async function findPaginationBasedCursor<TModelName extends Prisma.ModelName>(
   delegate: PrismaModelDelegate<TModelName, unknown>,
   args: PaginationArgs,
   cursorField: string = "id",
   select: PrismaModelSelect<TModelName> | undefined,
+  where: PrismaModelWhereInput<TModelName> | undefined,
 ): Promise<BaseConnectionType<PrismaModelGetPayload<TModelName, {select: PrismaModelSelect<TModelName> | undefined}>>> {
   const { page, limit, after, maxPage } = args;
   const effectiveLimit = limit || 20; // 기본 limit 값 설정 (클라이언트가 넘겨주지 않았을 경우)
 
   const maxOffsetAllowed = maxPage * effectiveLimit;
 
-  let queryOptions: any = {};
+  // where가 올바른 PrismaModelWhereInput 타입인지 확인
+  if(where) {
+  }
+
+  let queryOptions: any = {
+    where: where,
+  };
 
   let totalCount: number;
   let isOffsetBased = false;
@@ -64,7 +71,9 @@ export async function findPaginationBasedCursor<TModelName extends Prisma.ModelN
 
   // 전체 개수는 Offset 기반 페이징에서만 유의미할 수 있으며, 성능 고려 필요
   if (isOffsetBased && page === 1) { // 첫 페이지 요청 시에만 totalCount 조회 (캐싱 권장)
-    totalCount = await delegate.count.call(delegate, {});
+    totalCount = await delegate.count.call(delegate, {
+      where: where,
+    });
   } else {
     totalCount = 0; // 또는 -1 등으로 표시하여 조회하지 않음을 나타냄
     if (!isOffsetBased) { // Keyset 기반에서는 totalCount를 정확히 알 수 없음.

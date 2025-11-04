@@ -1,5 +1,6 @@
 import { ArgsType, Field, Int } from '@nestjs/graphql';
 import { Min } from 'class-validator';
+import { JSONScalar } from '../scalars/json.scalar';
 
 @ArgsType()
 export class PaginationArgs {
@@ -17,4 +18,12 @@ export class PaginationArgs {
 
   @Field(() => String, { nullable: true, description: 'Keyset 기반 페이징 시, 이 커서 이후의 데이터를 가져옴.' })
   after?: string;
+}
+
+// JSON 스칼라를 사용하기 위한 별도 클래스
+// GraphQL에서 where 조건을 받기 위해 JSON 스칼라 사용
+@ArgsType()
+export class PaginationWithWhereArgs extends PaginationArgs {
+  @Field(() => JSONScalar, { nullable: true, description: 'Prisma WhereInput 조건 (JSON 형태)' })
+  where?: any; // Prisma.CafeInfoWhereInput 등과 호환
 }
