@@ -1,13 +1,12 @@
 import { GraphQLResolveInfo } from 'graphql';
 import { FieldsByTypeName, parseResolveInfo, ResolveTree } from 'graphql-parse-resolve-info';
-import { Prisma } from 'prisma/basic'; // Prisma Client의 타입 정의 임포트
-import { PrismaModelSelect } from './generated/prisma-model-select-type';
 import { NodeLocation } from 'src/common/graphql';
+import { ModelName, SelectQuery } from '../models';
 
-function getFieldsByTypeName<TModelName extends Prisma.ModelName>(selectedFields: { [key: string]: ResolveTree }, defaultSelect: Partial<PrismaModelSelect<TModelName>> = { id: true } as any): PrismaModelSelect<TModelName> {
+function getFieldsByTypeName(selectedFields: { [key: string]: ResolveTree }, defaultSelect: SelectQuery = { id: true }): SelectQuery {
 
   // 타입 안전성을 위해 any로 시작하고, 최종 반환 시 타입 단언
-  const prismaSelect: Partial<PrismaModelSelect<TModelName>> = {
+  const prismaSelect: SelectQuery = {
     ...defaultSelect, // 기본적으로 ID 같은 필수 필드는 항상 포함
   };
 
@@ -26,7 +25,7 @@ function getFieldsByTypeName<TModelName extends Prisma.ModelName>(selectedFields
       // 해당 관계 필드의 SELECT 객체를 재귀적으로 생성합니다.
       // 여기서는 1:1, 1:N 관계를 가정하며, 필드 이름과 TypeName이 같다고 가정합니다.
       // 예를 들어, `CafeInfo` 모델의 `RegionCategory` 필드의 TypeName도 'RegionCategory'일 경우
-      const relationModelName = fieldName as Prisma.ModelName; // 관계 필드 이름이 모델 이름과 같다고 가정
+      const relationModelName = fieldName as ModelName; // 관계 필드 이름이 모델 이름과 같다고 가정
 
       // 재귀 호출로 nested select 생성
       const nestedSelect = getFieldsByTypeName(field.fieldsByTypeName[relationModelName]);
@@ -35,7 +34,7 @@ function getFieldsByTypeName<TModelName extends Prisma.ModelName>(selectedFields
       // 타입 단언이 필요하지만, 구조적으로는 올바름
       prismaSelect[fieldName] = {
         select: nestedSelect
-      } as any;
+      };
 
       // 참고: include 대신 select를 사용하는 이유
       // - select와 include는 동시에 사용할 수 없음
@@ -51,7 +50,7 @@ function getFieldsByTypeName<TModelName extends Prisma.ModelName>(selectedFields
 
   // 타입 안전성을 위해 최종 결과를 PrismaModelSelect 타입으로 캐스팅
   // 실제 런타임에서는 이미 올바른 구조를 가지고 있음
-  return prismaSelect as PrismaModelSelect<TModelName>;
+  return prismaSelect;
 }
 
 /**
@@ -73,12 +72,12 @@ function getFieldsByTypeName<TModelName extends Prisma.ModelName>(selectedFields
  * });
  * ```
  */
-export function getPrismaSelectFromInfo<TModelName extends Prisma.ModelName>(
+export function getPrismaSelectFromInfo<TModelName extends ModelName>(
   info: GraphQLResolveInfo,
   typeName: TModelName,
-  defaultSelect: Partial<PrismaModelSelect<TModelName>> = { id: true } as any,
+  defaultSelect: SelectQuery = { id: true },
   fieldLocation: NodeLocation = null
-): PrismaModelSelect<TModelName> {
+): SelectQuery {
 
   // parseResolveInfo는 ResolveTree 또는 FieldsByTypeName을 반환할 수 있음
   const parsedInfo = parseResolveInfo(info, { keepRoot: false, deep: true });
@@ -86,7 +85,7 @@ export function getPrismaSelectFromInfo<TModelName extends Prisma.ModelName>(
   // parsedInfo가 undefined이거나 null인 경우
   if (!parsedInfo) {
     // 파싱 실패 또는 info 객체에 필드 정보가 없는 경우 기본 select 반환
-    return defaultSelect as any as PrismaModelSelect<TModelName>;
+    return defaultSelect;
   }
 
   // parsedInfo가 FieldsByTypeName 형태일 수도 있음
@@ -104,8 +103,8 @@ export function getPrismaSelectFromInfo<TModelName extends Prisma.ModelName>(
 
   const selectedFields = targetFieldsByTypeName[typeName];
   if (!selectedFields) {
-    return defaultSelect as any as PrismaModelSelect<TModelName>;
+    return defaultSelect;
   }
 
-  return getFieldsByTypeName<TModelName>(selectedFields, defaultSelect);
+  return getFieldsByTypeName(selectedFields, defaultSelect);
 }

@@ -5,7 +5,7 @@ import { CafeInfoConnection, CafeInfoConnectionType, cafeInfoConnectionNodeLocat
 import { PaginationArgs } from "src/common/graphql";
 import { Public } from "src/util/decorators";
 import { GraphQLResolveInfo } from "graphql";
-import { getPrismaSelectFromInfo } from "src/util/prisma";
+import { getPrismaSelectFromInfo } from "src/util/graphql";
 
 @Resolver(() => CafeInfo)
 export class PlacesResolver {

@@ -1,14 +1,28 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 // import { PrismaClient } from 'prisma/basic';
 import * as dayjs from 'dayjs';
-import { PrismaClient } from 'prisma/basic';
+import { Prisma, PrismaClient } from 'prisma/basic';
+import { PrismaClientOptions } from 'prisma/basic/runtime';
 import { isPrimitive } from 'src/util/isPrimitive';
 
 @Injectable()
 export class PrismaService
-  extends PrismaClient
-  implements OnModuleInit, OnModuleDestroy
-{
+  extends PrismaClient<Prisma.PrismaClientOptions, Prisma.LogLevel>
+  implements OnModuleInit, OnModuleDestroy {
+
+  private readonly logger = new Logger(PrismaService.name);
+
+  constructor() {
+    super({
+      log: [
+        { emit: 'event', level: 'query' },
+        { emit: 'event', level: 'error' },
+        { emit: 'event', level: 'warn' },
+        { emit: 'event', level: 'info' },
+      ],
+    });
+  }
+
   async onModuleInit() {
     this.$use(async (params, next) => {
       const result = await next(params);
@@ -17,6 +31,20 @@ export class PrismaService
     });
 
     await this.$connect();
+
+
+    this.$on('error', ({ message }) => {
+      this.logger.error(message);
+    });
+    this.$on('warn', ({ message }) => {
+      this.logger.warn(message);
+    });
+    this.$on('info', ({ message }) => {
+      this.logger.debug(message);
+    });
+    this.$on('query', ({ query, params }) => {
+      this.logger.log(`${query}; ${params}`);
+    });
   }
 
   async onModuleDestroy() {

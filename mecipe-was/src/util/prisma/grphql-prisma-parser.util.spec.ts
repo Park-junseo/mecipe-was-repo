@@ -1,5 +1,5 @@
 import { GraphQLResolveInfo } from 'graphql';
-import { getPrismaSelectFromInfo } from './graphql-prisma-parser.util';
+import { getPrismaSelectFromInfo } from '../graphql/graphql-query-parser.util';
 import { parseResolveInfo, ResolveTree, FieldsByTypeName } from 'graphql-parse-resolve-info';
 import { NodeLocation } from 'src/common/graphql';
 import { createGraphQLResolveInfoFromQuery } from '../graphql/test-helpers/graphql-info-helper';

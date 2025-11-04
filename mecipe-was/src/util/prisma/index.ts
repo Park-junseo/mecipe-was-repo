@@ -1,2 +1,2 @@
-export * from './graphql-prisma-parser.util';
+export * from '../graphql/graphql-query-parser.util';
 export * from './generated';
