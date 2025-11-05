@@ -28,7 +28,7 @@ export class RegioncategoriesController {
     @Body() updateDto: UpdateRegioncategoryDto,
     @Query('newParentId') newParentId: string,
   ) {
-    return this.regioncategoriesService.updateRegionCategoryByAdmin(
+    return this.regioncategoriesService.updateRegionCategory(
       +id,
       updateDto,
       newParentId ? +newParentId : undefined,
@@ -41,7 +41,7 @@ export class RegioncategoriesController {
     @Param('id') id: string,
     @Query('isDisable') isDisable: string,
   ) {
-    return this.regioncategoriesService.disbleRegionCategoryByAdmin(
+    return this.regioncategoriesService.disbleRegionCategory(
       +id,
       isDisable === 'true',
     );
@@ -53,7 +53,7 @@ export class RegioncategoriesController {
     @Body() createRegioncategoryDto: CreateRegioncategoryDto,
     @Query('parentId') parentId: string,
   ) {
-    return this.regioncategoriesService.createRegionCategoryByAdmin(
+    return this.regioncategoriesService.createRegionCategory(
       createRegioncategoryDto,
       parentId ? +parentId : undefined,
     );
@@ -62,10 +62,16 @@ export class RegioncategoriesController {
   @Get('admin/child')
   @UseGuards(AdminAuthGuard)
   findChildRegionCategoriesByAdmin(@Query('parentId') parentId: string) {
-    return this.regioncategoriesService.findChildRegionCategoriesByAdmin(
+    return this.regioncategoriesService.findChildRegionCategories(
       parentId ? +parentId : undefined,
     );
   }
+
+  @Get('admin/closure')
+  findAllRegionCategoriesByAdmin() {
+    return this.regioncategoriesService.findAllRegionCategories(true);
+  }
+
 
   @Get('ancestor/:categoryId')
   @Public()
