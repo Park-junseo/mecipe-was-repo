@@ -7,6 +7,7 @@ import { RawimageuploadService } from 'src/rawimageupload/rawimageupload.service
 import { PaginationArgs, findPaginationBasedCursor } from 'src/common/graphql';
 import { CafeInfoConnectionType } from './graphql/types/cafe-info-connection.type';
 import { SelectQuery } from 'src/util/models';
+import { PrismaModelDelegate } from 'src/util/prisma';
 
 @Injectable()
 export class PlacesService {
@@ -421,8 +422,8 @@ export class PlacesService {
 
   async findPaginatedCafeInfos(
     args: PaginationArgs,
-    select?: SelectQuery,
-    where?: any,
+    select?: Prisma.CafeInfoSelect,
+    where?: Prisma.CafeInfoWhereInput,
   ): Promise<CafeInfoConnectionType> {
     return findPaginationBasedCursor(
       this.prisma.cafeInfo,

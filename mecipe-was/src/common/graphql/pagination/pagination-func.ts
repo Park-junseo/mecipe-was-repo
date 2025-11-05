@@ -4,13 +4,17 @@ import { PageInfo } from "./page-info.entity";
 import { PrismaModelDelegate, PrismaModelGetPayload, PrismaModelSelect, PrismaModelWhereInput } from "src/util/prisma";
 import { BaseConnectionType } from "./base-connection.type";
 
-export async function findPaginationBasedCursor<TModelName extends Prisma.ModelName>(
-  delegate: PrismaModelDelegate<TModelName, unknown>,
+export async function findPaginationBasedCursor<
+  TDelegate extends PrismaModelDelegate<Prisma.ModelName, U>,
+  TModelName extends Prisma.ModelName = TDelegate extends PrismaModelDelegate<infer M, any> ? M : never,
+  U extends Prisma.RejectOnNotFound | Prisma.RejectPerOperation | false | undefined = 'rejectOnNotFound' extends keyof TDelegate ? TDelegate['rejectOnNotFound'] : false
+>(
+  delegate: TDelegate,
   args: PaginationArgs,
   cursorField: string = "id",
-  select: PrismaModelSelect<TModelName> | undefined,
-  where: PrismaModelWhereInput<TModelName> | undefined,
-): Promise<BaseConnectionType<PrismaModelGetPayload<TModelName, {select: PrismaModelSelect<TModelName> | undefined}>>> {
+  select?: PrismaModelSelect<TModelName>,
+  where?: PrismaModelWhereInput<TModelName>,
+) {
   const { page, limit, after, maxPage } = args;
   const effectiveLimit = limit || 20; // 기본 limit 값 설정 (클라이언트가 넘겨주지 않았을 경우)
 
