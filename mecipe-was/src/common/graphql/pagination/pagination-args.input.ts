@@ -26,4 +26,6 @@ export class PaginationArgs {
 export class PaginationWithWhereArgs extends PaginationArgs {
   @Field(() => JSONScalar, { nullable: true, description: 'Prisma WhereInput 조건 (JSON 형태)' })
   where?: any; // Prisma.CafeInfoWhereInput 등과 호환
+  @Field(() => JSONScalar, { nullable: true, description: 'Prisma OrderBy (JSON 형태)' })
+  orderBy?: any; // Prisma.CafeInfoOrderByWithRelationInput 등과 호환
 }

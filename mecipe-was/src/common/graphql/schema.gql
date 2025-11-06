@@ -132,5 +132,8 @@ type Query {
 
     """Prisma WhereInput 조건 (JSON 형태)"""
     where: JSON
+
+    """Prisma OrderBy (JSON 형태)"""
+    orderBy: JSON
   ): CafeInfoConnection!
 }

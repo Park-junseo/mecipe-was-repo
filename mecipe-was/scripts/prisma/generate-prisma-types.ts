@@ -108,6 +108,7 @@ export function generatePrismaTypes() {
     map.set('Delegate', generateTypeMapping(models, 'PrismaModelDelegate', 'Prisma.{model}Delegate', {simpleGenericArgs: [{ typeName: 'TOptions', isExternal: true }], defaultTypeArg: 'unknown'}));
     map.set('GetPayload', generateTypeMapping(models, 'PrismaModelGetPayload', 'Prisma.{model}GetPayload', {simpleGenericArgs: [{ typeName: 'TSelect', isExternal: true }]}));
     map.set('WhereInput', generateTypeMapping(models, 'PrismaModelWhereInput', 'Prisma.{model}WhereInput'));
+    map.set('OrderByWithRelationInput', generateTypeMapping(models, 'PrismaModelOrderByWithRelationInput', 'Prisma.{model}OrderByWithRelationInput'));
     map.set('TypeName', generateTypeMapping(models, 'PrismaModelTypeName', '"{model}"', {defaultTypeArg: 'undefined'}));
     map.set('Type', generateTypeMapping(models, 'PrismaModelType', 'PrismaBasic.{model}', {importPaths: ['import * as PrismaBasic from \'prisma/basic\';']}));
 

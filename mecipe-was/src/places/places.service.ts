@@ -424,13 +424,15 @@ export class PlacesService {
     args: PaginationArgs,
     select?: Prisma.CafeInfoSelect,
     where?: Prisma.CafeInfoWhereInput,
+    orderBy?: Prisma.CafeInfoOrderByWithRelationInput,
   ): Promise<CafeInfoConnectionType> {
     return findPaginationBasedCursor(
       this.prisma.cafeInfo,
       args,
       'id',
       select,
-      where
+      where,
+      orderBy
     );
   }
 }

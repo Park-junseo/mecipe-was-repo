@@ -1,8 +1,7 @@
 import { Prisma } from "prisma/basic";
 import { PaginationArgs } from "./pagination-args.input";
 import { PageInfo } from "./page-info.entity";
-import { PrismaModelDelegate, PrismaModelGetPayload, PrismaModelSelect, PrismaModelWhereInput } from "src/util/prisma";
-import { BaseConnectionType } from "./base-connection.type";
+import { PrismaModelDelegate, PrismaModelOrderByWithRelationInput, PrismaModelSelect, PrismaModelWhereInput } from "src/util/prisma";
 
 export async function findPaginationBasedCursor<
   TDelegate extends PrismaModelDelegate<Prisma.ModelName, U>,
@@ -14,6 +13,7 @@ export async function findPaginationBasedCursor<
   cursorField: string = "id",
   select?: PrismaModelSelect<TModelName>,
   where?: PrismaModelWhereInput<TModelName>,
+  orderBy?: PrismaModelOrderByWithRelationInput<TModelName>
 ) {
   const { page, limit, after, maxPage } = args;
   const effectiveLimit = limit || 20; // 기본 limit 값 설정 (클라이언트가 넘겨주지 않았을 경우)
@@ -21,7 +21,7 @@ export async function findPaginationBasedCursor<
   const maxOffsetAllowed = maxPage * effectiveLimit;
 
   // where가 올바른 PrismaModelWhereInput 타입인지 확인
-  if(where) {
+  if (where) {
   }
 
   let queryOptions: any = {
@@ -31,20 +31,14 @@ export async function findPaginationBasedCursor<
   let totalCount: number;
   let isOffsetBased = false;
   let currentOffset = 0; // Offset 기반 페이지네이션의 현재 시작 오프셋
-
-  // 1. Offset 기반 페이징 우선 처리 (page와 limit이 제공되고, max_offset 이내인 경우)
-  if (page && page > 0 && page * effectiveLimit <= maxOffsetAllowed) {
-    isOffsetBased = true;
-    currentOffset = (page - 1) * effectiveLimit;
-    queryOptions.skip = currentOffset;
-    console.log(`Offset-based pagination: page=${page}, limit=${effectiveLimit}, skip=${currentOffset}`);
+  
+  if (page && page * effectiveLimit > maxOffsetAllowed) {
+    console.warn(`Deep offset-based pagination requested (page ${page}). Suggesting Keyset based. CurrentOffset: ${page * effectiveLimit}`);
+    // 클라이언트에게 다음 페이지부터는 after를 사용하도록 유도하는 메시지 등을 반환할 수도 있음.
   }
-  // 2. Keyset 기반 페이징 처리 (after 커서가 있거나, page가 maxOffsetAllowed 초과하는 경우)
-  else if (after || (page && page * effectiveLimit > maxOffsetAllowed)) {
-    if (page && page * effectiveLimit > maxOffsetAllowed) {
-      console.warn(`Deep offset-based pagination requested (page ${page}). Suggesting Keyset based. CurrentOffset: ${page * effectiveLimit}`);
-      // 클라이언트에게 다음 페이지부터는 after를 사용하도록 유도하는 메시지 등을 반환할 수도 있음.
-    }
+
+  // 1. Keyset 기반 페이징 처리 (after 커서가 있는 경우)
+  if (after) {
     let decodedCursor: number | undefined;
     if (after) {
       decodedCursor = parseInt(Buffer.from(after, 'base64').toString('ascii').split('_')[1]);
@@ -53,11 +47,21 @@ export async function findPaginationBasedCursor<
     if (decodedCursor) {
       queryOptions.cursor = { id: decodedCursor };
       queryOptions.skip = 1; // 커서 레코드 자신은 건너뛰기
+      if(page && page > 0) {
+        queryOptions.skip += (page - 1) * effectiveLimit;
+      }
       console.log(`Keyset-based pagination: after=${after}, decodedCursor=${decodedCursor}, limit=${effectiveLimit}`);
     } else {
       // Keyset 기반을 유도했으나 after가 없는 경우 (예: 맨 처음부터 무한 스크롤)
       console.log(`Keyset-based pagination (first fetch): limit=${effectiveLimit}`);
     }
+  }
+  // 2. Offset 기반 페이징 우선 처리 (page와 limit이 제공되고, max_offset 이내인 경우) 
+  else if (page && page > 0) {
+    isOffsetBased = true;
+    currentOffset = (page - 1) * effectiveLimit;
+    queryOptions.skip = currentOffset;
+    console.log(`Offset-based pagination: page=${page}, limit=${effectiveLimit}, skip=${currentOffset}`);
   } else {
     // page, limit, after 아무것도 없는 경우 (기본 첫 페이지)
     isOffsetBased = true; // 기본적으로 첫 페이지는 offset 0으로 처리
@@ -68,7 +72,7 @@ export async function findPaginationBasedCursor<
   // 쿼리 실행
   const items = await delegate.findMany.call(delegate, {
     take: effectiveLimit + 1, // 다음 페이지 존재 여부 확인을 위해 하나 더 가져옴
-    orderBy: { id: 'asc' }, // 커서 기반 페이징을 위해 고정된 정렬 기준 필수
+    orderBy: orderBy || { id: 'asc' }, // 커서 기반 페이징을 위해 고정된 정렬 기준 필수
     select: select,
     ...queryOptions,
   });

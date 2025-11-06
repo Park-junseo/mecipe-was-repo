@@ -19,6 +19,7 @@ export class PlacesResolver {
     ): Promise<CafeInfoConnectionType> {
       const prismaSelect = getPrismaSelectFromInfo(info, 'CafeInfo', { id: true }, cafeInfoConnectionNodeLocation);
       const where = paginationArgs.where;
-      return this.placesService.findPaginatedCafeInfos(paginationArgs, prismaSelect, where);
+      const orderBy = paginationArgs.orderBy;
+      return this.placesService.findPaginatedCafeInfos(paginationArgs, prismaSelect, where, orderBy);
     }
 }

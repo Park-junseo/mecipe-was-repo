@@ -10,6 +10,7 @@
 	export * from './prisma-model-delegate-type';
 	export * from './prisma-model-getpayload-type';
 	export * from './prisma-model-whereinput-type';
+	export * from './prisma-model-orderbywithrelationinput-type';
 	export * from './prisma-model-typename-type';
 	export * from './prisma-model-type-type';
   
