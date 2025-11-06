@@ -1,0 +1,52 @@
+config:
+  target: "http://localhost:4000"
+  phases:
+    # 스트레스 테스트: 빠르게 부하 증가
+    - duration: 20
+      arrivalRate: 5
+      rampTo: 20
+      name: "Rapid ramp up"
+    # 최대 부하 유지
+    - duration: 60
+      arrivalRate: 20
+      name: "Maximum stress"
+    # 스파이크 테스트
+    - duration: 10
+      arrivalRate: 50
+      name: "Spike test"
+    # 복구 테스트
+    - duration: 30
+      arrivalRate: 50
+      rampTo: 5
+      name: "Recovery test"
+  variables:
+    baseUrl: "http://localhost:4000"
+
+scenarios:
+  - name: "Stress Test - Mixed Endpoints"
+    weight: 100
+    flow:
+      # 빠른 연속 요청
+      - get:
+          url: "/hello"
+      
+      - get:
+          url: "/"
+      
+      - get:
+          url: "/products"
+          qs:
+            page: "{{ $randomInt(1, 10) }}"
+            limit: "{{ $pick([10, 20, 50]) }}"
+      
+      - get:
+          url: "/products/{{ $randomInt(1, 100) }}"
+      
+      # 짧은 대기 시간으로 연속 요청
+      - think: 0.5
+      
+      - get:
+          url: "/products/cafe-info-code/CAFE{{ $randomInt(1, 10) }}"
+          qs:
+            limit: 20
+

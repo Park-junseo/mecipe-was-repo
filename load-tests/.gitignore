@@ -1,0 +1,6 @@
+reports/*.json
+reports/*.html
+
+# Environment variables
+.env
+

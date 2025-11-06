@@ -1,0 +1,32 @@
+config:
+  target: "http://localhost:4000"
+  phases:
+    # 메타 뷰어 API 부하 테스트
+    - duration: 30
+      arrivalRate: 2
+      rampTo: 5
+      name: "Warm up"
+    - duration: 90
+      arrivalRate: 5
+      name: "Normal load"
+    - duration: 20
+      arrivalRate: 5
+      rampTo: 1
+      name: "Cool down"
+  variables:
+    baseUrl: "http://localhost:4000"
+
+scenarios:
+  - name: "Meta Viewer Public API"
+    weight: 100
+    flow:
+      # Code로 MetaViewerInfo 조회 (공개 API)
+      - get:
+          url: "/meta-viewer-infos/code/{{ $pick(['cafe_001', 'cafe_002', 'cafe_003', 'test_code']) }}"
+          capture:
+            - json: "$.id"
+              as: "metaViewerId"
+            - statusCode: "status"
+          expect:
+            - statusCode: [200, 404]
+
