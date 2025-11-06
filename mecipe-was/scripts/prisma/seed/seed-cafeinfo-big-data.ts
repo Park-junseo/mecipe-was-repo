@@ -71,8 +71,11 @@ export const resetCafeInfoBigData: SeedModuleAction = async (repository: { datab
   }
 }
 
-export const seedCafeInfoBigData: SeedModuleAction = async (repository: { databaseUrl: string }|PrismaService) => {
+export const seedCafeInfoBigData: SeedModuleAction = async (repository: { databaseUrl: string }|PrismaService, cafeInfoCount: string = '100') => {
+  const NUM_CAFES_TO_CREATE = parseInt(cafeInfoCount, 10);
+
   console.log('✨ Start seeding with services...');
+  console.log(`🔍 Seeding ${NUM_CAFES_TO_CREATE} CafeInfos...`);
 
   prisma = repository instanceof PrismaService ? repository : new PrismaService({
     datasources: {
@@ -116,7 +119,6 @@ export const seedCafeInfoBigData: SeedModuleAction = async (repository: { databa
 
   // 3. CafeInfos (서비스를 통해 생성)
   console.log('☕ Seeding CafeInfos with service...');
-  const NUM_CAFES_TO_CREATE = parseInt(process.env.SEED_COUNT_CAFES || '100', 10); // 서비스로 개별 생성이라 적게 설정
   let createdCafesCount = 0;
 
   if (createdRegionCategories.length > 0) {
@@ -162,7 +164,7 @@ if (require.main === module) {
     process.exit(1);
   }
 
-  seedCafeInfoBigData({ databaseUrl }).catch(async (e) => {
+  seedCafeInfoBigData({ databaseUrl }, args[1] || '100').catch(async (e) => {
     console.error('❌ Seeding failed:', e);
     await prisma?.$disconnect();
     process.exit(1);

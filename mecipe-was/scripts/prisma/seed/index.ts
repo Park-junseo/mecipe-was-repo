@@ -1,7 +1,8 @@
 import { PrismaService } from 'src/global/prisma.service';
 import { seedCafeInfoBigData, resetCafeInfoBigData } from './seed-cafeinfo-big-data';
+import { getCommandParameters } from 'src/util/get-command-parameter';
 
-export type SeedModuleAction = (repository: PrismaService|{ databaseUrl: string }) => Promise<void>;
+export type SeedModuleAction = (repository: PrismaService|{ databaseUrl: string }, ...args: string[]) => Promise<void>;
 export type SeedModule = {
     main: SeedModuleAction;
     reset: SeedModuleAction;
@@ -9,30 +10,17 @@ export type SeedModule = {
 
 let prisma: PrismaService;
 
-export const seedModules: Record<string, SeedModule> = {
+export const SeedModules = {
     'cafeinfo-big-data': {main: seedCafeInfoBigData, reset: resetCafeInfoBigData},
 };
-export type seedModuleName = keyof typeof seedModules;
+export type SeedModuleName = keyof typeof SeedModules;
 
-// [--seed:cafeinfo-big-data] ==> ['cafeinfo-big-data']
-// [--seed:cafeinfo-big-data, --seed:cafeinfo-big-data] ==> ['cafeinfo-big-data', 'cafeinfo-big-data']
-export function getSeedModules(parameters: string[]): seedModuleName[] {
-    const seedModuleNames: seedModuleName[] = [];
-    for (const parameter of parameters) {
-        if (parameter.startsWith('--seed:')) {
-            const parameterName = parameter.split(':')[1] || '';
-            if (parameterName in seedModules) {
-                seedModuleNames.push(parameterName);
-            }
-        }
-    }
-    if (seedModuleNames.length === 0) {
-        throw new Error('존재하지 않는 seed 파일입니다.');
-    }
-    return seedModuleNames;
-}
+export async function executeSeed(databaseUrl: string, argv: string[]) {
+    const commandParameters = getCommandParameters('--seed', argv).filter(parameter => parameter.length > 0 && parameter[0] in SeedModules);
 
-export async function executeSeed(databaseUrl: string, seedFiles: string[]) {
+    if(commandParameters.length === 0) {
+        throw new Error('❌ Seed module is required');
+    }
     console.log('Database URL:', databaseUrl);
     prisma = new PrismaService({
         datasources: {
@@ -43,23 +31,24 @@ export async function executeSeed(databaseUrl: string, seedFiles: string[]) {
     });
 
     const resetFunctions: SeedModuleAction[] = [];
-    for (const seedFile of seedFiles) {
-        console.log('실행할 seed 파일:', seedFile);
+    for (const seedModuleArgs of commandParameters) {
+        console.log('실행할 seed 파일:', seedModuleArgs[0]);
+        let seedModuleName: SeedModuleName;
         try {
-            const seedModule = seedModules[seedFile];
+            seedModuleName = seedModuleArgs[0] as SeedModuleName;
+            const seedModule = SeedModules[seedModuleName];
             if (!seedModule) {
-                console.log('존재하지 않는 seed 파일입니다.');
-                throw new Error('존재하지 않는 seed 파일입니다.');
+                throw new Error(`❌ ${seedModuleName} seed module not found`);
             }
             resetFunctions.push(seedModule.reset);
-            await seedModule.main(prisma);
+            await seedModule.main(prisma, ...seedModuleArgs.slice(1));
             console.log('✅ Seeding completed');
         } catch (e) {
             console.error('❌ Seeding failed:', e);
             for (const resetFunction of resetFunctions) {
                 await resetFunction(prisma);
             }
-            throw new Error(`${seedFile} seeding failed`);
+            throw new Error(`❌ ${seedModuleName} seeding failed`);
         }
     }
 }
@@ -75,13 +64,13 @@ if (require.main === module) {
         process.exit(1);
     }
 
-    const seedFiles = args.slice(1);
-    if (seedFiles.length === 0) {
+    const argv = args.slice(1);
+    if (argv.length === 0) {
         console.error('❌ Seed file is required');
         process.exit(1);
     }
 
-    executeSeed(databaseUrl, seedFiles).then(() => {
+    executeSeed(databaseUrl, argv).then(() => {
         process.exit(0);
     }).catch((e) => {
         console.error('❌ Seeding failed:', e);

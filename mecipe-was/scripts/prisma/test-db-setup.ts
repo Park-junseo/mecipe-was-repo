@@ -1,9 +1,22 @@
 // scripts/test-db-setup.ts
+
+/**
+ * npm run start:test-- --start-app
+ * nestjs 앱 실행
+ */
+/**
+ * npm run start:test-db -- --start-app --start-prisma-studio
+ * nestjs 앱 실행하고 prisma studio 실행
+ */
+/**
+ * npm run start:test-db --seed:cafeinfo-big-data:100
+ * cafeinfo-big-data 시딩 100개
+ */
+
 import { GenericContainer, StartedTestContainer } from 'testcontainers';
 import { ChildProcess, exec as _exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import * as path from 'path';
-import { getSeedModules, seedModuleName } from './seed';
 
 const exec = promisify(_exec);
 
@@ -132,9 +145,8 @@ async function seedTestDatabase(connectionString: string, argv: string[], isWind
 
   console.log('🌱 Starting seeding script...');
 
-  const seedModuleNames = getSeedModules(argv);
   // 시딩 스크립트가 시작될 때도 DATABASE_URL을 명시적으로 전달
-  const seedProcess = spawn(tsNodePath, ['-r', 'tsconfig-paths/register', './scripts/prisma/seed/index.ts', connectionString, ...seedModuleNames], {
+  const seedProcess = spawn(tsNodePath, ['-r', 'tsconfig-paths/register', './scripts/prisma/seed/index.ts', connectionString, ...argv], {
     stdio: 'inherit',
     shell: isWindows,
     cwd: path.resolve(process.cwd()),
