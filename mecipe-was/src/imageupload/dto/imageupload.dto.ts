@@ -1,4 +1,4 @@
-type ImageUploadDirectResponse = {
+export type ImageUploadDirectResponse = {
   result: {
     id: string;
     uploadURL: string;
@@ -9,7 +9,7 @@ type ImageUploadDirectResponse = {
   messages: any[];
 };
 
-type ImageUploadCheckResponse = {
+export type ImageUploadCheckResponse = {
   result: {
     id: string;
     metadata: {
