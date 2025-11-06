@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import axios from 'axios';
+import type { ImageUploadDirectResponse, ImageUploadCheckResponse } from './dto/imageupload.dto';
 
 @Injectable()
 export class ImageuploadService {

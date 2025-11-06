@@ -1,8 +1,7 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger, Optional } from '@nestjs/common';
 // import { PrismaClient } from 'prisma/basic';
 import * as dayjs from 'dayjs';
 import { Prisma, PrismaClient } from 'prisma/basic';
-import { PrismaClientOptions } from 'prisma/basic/runtime';
 import { isPrimitive } from 'src/util/isPrimitive';
 
 @Injectable()
@@ -12,7 +11,7 @@ export class PrismaService
 
   private readonly logger = new Logger(PrismaService.name);
 
-  constructor() {
+  constructor(@Optional() options?: Prisma.PrismaClientOptions) {
     super({
       log: [
         { emit: 'event', level: 'query' },
@@ -20,6 +19,7 @@ export class PrismaService
         { emit: 'event', level: 'warn' },
         { emit: 'event', level: 'info' },
       ],
+      ...options,
     });
   }
 

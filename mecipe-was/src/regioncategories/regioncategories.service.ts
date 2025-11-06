@@ -6,9 +6,9 @@ import { Prisma, PrismaPromise, RegionCategory } from 'prisma/basic';
 
 @Injectable()
 export class RegioncategoriesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
-  async createRegionCategoryByAdmin(
+  async createRegionCategory(
     createRegioncategoryDto: CreateRegioncategoryDto,
     parentCategoryId?: number,
   ) {
@@ -104,10 +104,10 @@ export class RegioncategoriesService {
       skipDuplicates: true,
     });
 
-    return this.findAllRegionCategories(true);
+    return newCategory;
   }
 
-  async disbleRegionCategoryByAdmin(categoryId: number, isDisable: boolean) {
+  async disbleRegionCategory(categoryId: number, isDisable: boolean) {
     const closueList = await this.prisma.closureRegionCategory.findMany({
       where: {
         ancestor: categoryId,
@@ -124,10 +124,10 @@ export class RegioncategoriesService {
       },
     });
 
-    return this.findAllRegionCategories(true);
+    return this.prisma.regionCategory.findUnique({ where: { id: categoryId } });
   }
 
-  async updateRegionCategoryByAdmin(
+  async updateRegionCategory(
     targetId: number,
     updateDto: UpdateRegioncategoryDto,
     newParentId?: number,
@@ -135,8 +135,9 @@ export class RegioncategoriesService {
     const isMovingToTopLevel =
       typeof newParentId === 'number' && newParentId < 0;
 
+    let updatedCategory: RegionCategory | null = null;
     if ((newParentId && newParentId !== targetId) || isMovingToTopLevel) {
-      await this.prisma.$transaction(async (tx) => {
+      updatedCategory = await this.prisma.$transaction(async (tx) => {
         // 1. 기존 Closure 관계 제거
         await tx.closureRegionCategory.deleteMany({
           where: { descendant: targetId },
@@ -184,7 +185,7 @@ export class RegioncategoriesService {
       });
     } else {
       // 5. 관계 변경 없이 정보만 수정
-      await this.prisma.regionCategory.update({
+      updatedCategory = await this.prisma.regionCategory.update({
         where: { id: targetId },
         data: {
           ...updateDto,
@@ -193,7 +194,7 @@ export class RegioncategoriesService {
     }
 
     // 6. 전체 카테고리 반환
-    return this.findAllRegionCategories(true);
+    return updatedCategory;
   }
   async findAllRegionCategories(withDisable = false) {
     if (withDisable) {
@@ -236,7 +237,7 @@ export class RegioncategoriesService {
     }
   }
 
-  async findChildRegionCategoriesByAdmin(parentId?: number) {
+  async findChildRegionCategories(parentId?: number) {
     if (parentId) {
       // 바로 아래 자식 카테고리 (depth = 1)
       const directChildren = await this.prisma.closureRegionCategory.findMany({
