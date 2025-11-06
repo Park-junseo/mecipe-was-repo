@@ -1,0 +1,54 @@
+config:
+  target: "http://localhost:4000"
+  phases:
+    # 워밍업 단계: 30초 동안 점진적으로 부하 증가
+    - duration: 30
+      arrivalRate: 1
+      rampTo: 5
+      name: "Warm up"
+    # 정상 부하 단계: 60초 동안 초당 5명의 사용자
+    - duration: 60
+      arrivalRate: 5
+      name: "Normal load"
+    # 피크 부하 단계: 30초 동안 초당 10명의 사용자
+    - duration: 30
+      arrivalRate: 10
+      name: "Peak load"
+    # 쿨다운 단계: 20초 동안 점진적으로 부하 감소
+    - duration: 20
+      arrivalRate: 10
+      rampTo: 1
+      name: "Cool down"
+  variables:
+    baseUrl: "http://localhost:4000"
+
+scenarios:
+  - name: "Health Check and Public APIs"
+    weight: 100
+    flow:
+      # Health check
+      - get:
+          url: "/hello"
+          capture:
+            - json: "$.message"
+              as: "helloMessage"
+      
+      # Root endpoint
+      - get:
+          url: "/"
+      
+      # Products list (public)
+      - get:
+          url: "/products"
+          qs:
+            page: 1
+            limit: 10
+      
+      # Random product detail
+      - get:
+          url: "/products/{{ $randomInt(1, 100) }}"
+          capture:
+            - json: "$.id"
+              as: "productId"
+            - statusCode: "status"
+

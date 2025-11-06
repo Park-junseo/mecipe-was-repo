@@ -1,0 +1,59 @@
+config:
+  target: "http://localhost:4000"
+  phases:
+    # 제품 API 전용 부하 테스트
+    - duration: 60
+      arrivalRate: 3
+      rampTo: 8
+      name: "Ramp up products API"
+    - duration: 120
+      arrivalRate: 8
+      name: "Sustained load"
+    - duration: 30
+      arrivalRate: 8
+      rampTo: 2
+      name: "Ramp down"
+  variables:
+    baseUrl: "http://localhost:4000"
+
+scenarios:
+  - name: "Product Search and Browse"
+    weight: 70
+    flow:
+      # 제품 목록 조회 (검색)
+      - get:
+          url: "/products"
+          qs:
+            page: "{{ $randomInt(1, 5) }}"
+            limit: 20
+            searchText: "{{ $pick(['카페', '커피', '음료', '디저트']) }}"
+          capture:
+            - json: "$.products[*].id"
+              as: "productIds"
+      
+      # 카페 코드로 제품 조회
+      - get:
+          url: "/products/cafe-info-code/CAFE001"
+          qs:
+            limit: 10
+      
+      # 제품 상세 조회
+      - get:
+          url: "/products/{{ $randomInt(1, 50) }}"
+          capture:
+            - json: "$.id"
+              as: "productId"
+            - statusCode: "status"
+
+  - name: "Product Admin API"
+    weight: 30
+    flow:
+      # 관리자 제품 목록 (인증 필요 - 실패 예상)
+      - get:
+          url: "/products/admin"
+          qs:
+            page: 1
+            limit: 20
+          expect:
+            - statusCode: [200, 401, 403]
+

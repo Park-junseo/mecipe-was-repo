@@ -1,0 +1,13 @@
+{
+    "name": "load-tests",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "artillery": "node scripts/run-scenario.js",
+        "artillery:graph": "node scripts/generate-report.js",
+        "artillery:cloud": "node scripts/run-cloud.js"
+    },
+    "devDependencies": {
+        "artillery": "^2.0.26"
+    }
+}
