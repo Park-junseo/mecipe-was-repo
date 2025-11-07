@@ -1,0 +1,56 @@
+config:
+  target: "http://localhost:4000"
+  processor: "../helper/processors.js"
+  phases:
+    # 워밍업 단계: 30초 동안 5명/초에서 20명/초로 증가
+    - duration: 30
+      arrivalRate: 5
+      rampTo: 20
+      name: "Warm up"
+    # 지속 부하 단계: 2분 동안 20명/초 유지
+    - duration: 120
+      arrivalRate: 20
+      name: "Sustained load"
+    # 피크 부하 단계: 1분 동안 20명/초에서 40명/초로 증가
+    - duration: 60
+      arrivalRate: 20
+      rampTo: 40
+      name: "Peak load"
+    # 쿨다운 단계: 30초 동안 40명/초에서 5명/초로 감소
+    - duration: 30
+      arrivalRate: 40
+      rampTo: 5
+      name: "Cool down"
+  variables:
+    baseUrl: "http://localhost:4000"
+
+scenarios:
+  - name: "Offset-based Pagination Test"
+    weight: 100
+    flow:
+      # Offset 기반 페이지네이션 테스트
+      # page=1000은 깊은 페이지로, offset 기반 페이지네이션의 성능 저하를 확인하기 위함
+      - get:
+          url: "/places/admin/pagination"
+          qs:
+            page: 10
+            take: 10
+            after: "aWRfMTAx"
+          capture:
+            - json: "$.edges"
+              as: "cafeInfosEdges"
+          expect:
+            - statusCode: [200, 400, 404, 500]
+      
+      # 다양한 페이지 번호로 테스트 (1, 100, 500, 1000)
+      - function: "setRandomCursorPage"
+      - get:
+          url: "/places/admin/pagination"
+          qs:
+            page: "{{ cursorPage }}"
+            take: 10
+            after: "aWRfMTAx"
+          expect:
+            - statusCode: [200, 400, 404, 500]
+
+

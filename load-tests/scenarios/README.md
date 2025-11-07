@@ -10,6 +10,10 @@
 - `stress-test.yml` - 스트레스 테스트
 - `meta-viewer-test.yml` - 메타 뷰어 API 테스트
 
+### 페이지네이션 성능 비교
+- `offset-pagination-test.yml` - Offset 기반 페이지네이션 테스트
+- `cursor-pagination-test.yml` - Cursor 기반 페이지네이션 테스트
+
 ## 사용 방법
 
 ```bash

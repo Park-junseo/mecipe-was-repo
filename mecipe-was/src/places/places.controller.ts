@@ -20,7 +20,7 @@ import { Public } from 'src/util/decorators';
 
 @Controller('places')
 export class PlacesController {
-  constructor(private readonly placesService: PlacesService) {}
+  constructor(private readonly placesService: PlacesService) { }
 
   @Patch('admin/update/:id')
   @UseGuards(AdminAuthGuard)
@@ -56,16 +56,41 @@ export class PlacesController {
     return this.placesService.createPlaceByAdmin(dto, regionCategoryId);
   }
 
+  //어드민 페이징(Cursor)
+  @Get('admin/pagination')
+  @UseGuards(AdminAuthGuard)
+  findAllPlacesPaginationCursor(
+    @Query('page') page: string,
+    @Query('take') limit: string,
+    @Query('after') after: string,
+    @Query('searchType') searchType: string,
+    @Query('searchText') searchText: string,
+    @Query('regionCategoryId') regionCategoryId: string,
+    @Query('isDisable') isDisable: string,
+  ) {
+    return this.placesService.findAllPlacesPaginationCursor(
+      {
+        page: page ? +page : undefined,
+        limit: limit ? +limit : undefined,
+        after: after ? after : undefined,
+      },
+      searchType,
+      searchText,
+      regionCategoryId ? +regionCategoryId : undefined,
+      isDisable ? isDisable === 'true' : isDisable === 'false' ? false : undefined,
+    );
+  }
+
   @Get('admin/:id')
   @UseGuards(AdminAuthGuard)
   findPlaceByAdmin(@Param('id') id: string) {
     return this.placesService.findPlaceByAdmin(+id);
   }
 
-  //어드민 페이징
+  //어드민 페이징(Offset)
   @Get('admin')
   @UseGuards(AdminAuthGuard)
-  findAllPlacesByAdmin(
+  findAllPlacesPaginationOffset(
     @Query('page') page: string,
     @Query('take') take: string,
     @Query('searchType') searchType: string,
@@ -73,13 +98,13 @@ export class PlacesController {
     @Query('regionCategoryId') regionCategoryId: string,
     @Query('isDisable') isDisable: string,
   ) {
-    return this.placesService.findAllPlacesByAdmin(
+    return this.placesService.findAllPlacesPaginationOffset(
       +page,
       +take,
       searchType,
       searchText,
       regionCategoryId ? +regionCategoryId : undefined,
-      isDisable === 'true' ? true : false,
+      isDisable ? isDisable === 'true' : isDisable === 'false' ? false : undefined,
     );
   }
 

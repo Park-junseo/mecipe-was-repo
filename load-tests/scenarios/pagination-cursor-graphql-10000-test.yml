@@ -1,0 +1,118 @@
+config:
+  target: "http://localhost:4000"
+  processor: "../helper/processors.js"
+  phases:
+    # 워밍업 단계: 30초 동안 5명/초에서 20명/초로 증가
+    - duration: 30
+      arrivalRate: 5
+      rampTo: 20
+      name: "Warm up"
+    # 지속 부하 단계: 2분 동안 20명/초 유지
+    - duration: 120
+      arrivalRate: 20
+      name: "Sustained load"
+    # 피크 부하 단계: 1분 동안 20명/초에서 40명/초로 증가
+    - duration: 60
+      arrivalRate: 20
+      rampTo: 40
+      name: "Peak load"
+    # 쿨다운 단계: 30초 동안 40명/초에서 5명/초로 감소
+    - duration: 30
+      arrivalRate: 40
+      rampTo: 5
+      name: "Cool down"
+  variables:
+    baseUrl: "http://localhost:4000"
+    # Base64 인코딩된 cursor 값들 (예: "id_101" -> "aWRfMTAx")
+
+scenarios:
+  - name: "Cursor-based Pagination Test"
+    weight: 100
+    flow:
+      # Cursor 기반 페이지네이션 테스트 (GraphQL)
+      - post:
+          url: "/graphql"
+          headers:
+            Content-Type: "application/json"
+          json:
+            query: |
+              query FindPaginatedCafeInfos($page: Int, $limit: Int, $orderBy: JSON, $after: String) {
+                findPaginatedCafeInfos(page: $page, limit: $limit, orderBy: $orderBy, after: $after) {
+                  edges {
+                    node {
+                        id
+                        createdAt
+                        name
+                        address
+                        code
+                        directions
+                        businessNumber
+                        ceoName
+                        regionCategoryId
+                        RegionCategory {
+                          id
+                          createdAt
+                          name
+                          isDisable
+                          govermentType
+                        }
+                    }
+                    cursor
+                  }
+                  pageInfo {
+                    hasNextPage
+                    hasPreviousPage
+                    startCursor
+                    endCursor
+                  }
+                }
+              }
+            variables:
+              page: 10
+              limit: 10
+              orderBy:
+                id: 'desc'
+              after: "aWRfMTAx"
+          capture:
+            - json: "$.data.findPaginatedCafeInfos.edges"
+              as: "cafeInfosEdges"
+            - json: "$.data.findPaginatedCafeInfos.pageInfo.endCursor"
+              as: "nextCursor"
+          expect:
+            - statusCode: [200, 400, 500]
+      
+      # 다양한 cursor로 테스트
+      - function: "setRandomCursorPaginationInput"
+      - post:
+          url: "/graphql"
+          headers:
+            Content-Type: "application/json"
+          json:
+            query: |
+              query FindPaginatedCafeInfos($page: Int, $limit: Int, $orderBy: JSON, $after: String) {
+                findPaginatedCafeInfos(page: $page, limit: $limit, orderBy: $orderBy, after: $after) {
+                  edges {
+                    node {
+                      id
+                      name
+                    }
+                    cursor
+                  }
+                  pageInfo {
+                    hasNextPage
+                    hasPreviousPage
+                    startCursor
+                    endCursor
+                  }
+                }
+              }
+            variables:
+              page: 1
+              limit: 10
+              orderBy:
+                id: 'desc'
+              after: "aWRfMTAx"
+          expect:
+            - statusCode: [200, 400, 500]
+
+

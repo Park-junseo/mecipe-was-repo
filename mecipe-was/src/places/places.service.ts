@@ -67,13 +67,70 @@ export class PlacesService {
     });
   }
 
-  async findAllPlacesByAdmin(
+  async findAllPlacesPaginationCursor(
+    args: PaginationArgs,
+    searchType: string,
+    searchText: string,
+    regionCategoryId?: number,
+    isDisable?: boolean,
+  ): Promise<CafeInfoConnectionType> {
+    const where: Prisma.CafeInfoWhereInput = {};
+
+    if (searchType === '이름') {
+      where.name = { contains: searchText };
+    } else if (searchType === '주소') {
+      where.address = { contains: searchText };
+    } else if (searchType === '사업자번호') {
+      where.businessNumber = { contains: searchText };
+    } else if (searchType === '사업자명') {
+      where.ceoName = { contains: searchText };
+    }
+
+    if (regionCategoryId) {
+      where.regionCategoryId = {
+        in: await this.getDescendantCategoryIds(regionCategoryId),
+      };
+    }
+
+    where.isDisable = isDisable;
+
+    return findPaginationBasedCursor(
+      this.prisma.cafeInfo,
+      args,
+      'id',
+      {
+        id:true,
+        name:true,
+        address:true,
+        businessNumber:true,
+        ceoName:true,
+        regionCategoryId:true,
+        isDisable:true,
+        createdAt:true,
+        RegionCategory: {
+          select: {
+            id: true,
+            name: true,
+            govermentType: true,
+            isDisable: true,
+            createdAt: true,
+          },
+        },
+      },
+      where,
+      {
+        id: 'desc',
+      }
+    );
+  }
+
+  async findAllPlacesPaginationOffset(
     skip: number,
     take: number,
     searchType: string,
     searchText: string,
     regionCategoryId?: number,
-    isDisable = false,
+    isDisable?: boolean
   ) {
     const where: Prisma.CafeInfoWhereInput = {};
 

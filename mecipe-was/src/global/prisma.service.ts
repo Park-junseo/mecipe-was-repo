@@ -24,11 +24,11 @@ export class PrismaService
   }
 
   async onModuleInit() {
-    this.$use(async (params, next) => {
-      const result = await next(params);
+    // this.$use(async (params, next) => {
+    //   const result = await next(params);
 
-      return prismaTimeMod(result);
-    });
+    //   return prismaTimeMod(result);
+    // });
 
     await this.$connect();
 

@@ -1,4 +1,4 @@
-import { Field, Int, ObjectType, registerEnumType } from "@nestjs/graphql";
+import { Field, GraphQLISODateTime, Int, ObjectType, registerEnumType } from "@nestjs/graphql";
 import * as Prisma from "prisma/basic";
 import { GovermentType } from "prisma/basic";
 import { CafeInfo, ICafeInfo } from "src/places/entities/cafe-info.entity";
@@ -10,7 +10,7 @@ registerEnumType(GovermentType, { name: "GovermentType" });
 export class RegionCategory implements Prisma.RegionCategory {
   @Field(() => Int, { description: 'ID' })
   id: number;
-  @Field(() => Date, { description: '생성일' })
+  @Field(() => GraphQLISODateTime, { description: '생성일' })
   createdAt: Date;
   @Field(() => Boolean, { description: '비활성화 여부' })
   isDisable: boolean;
