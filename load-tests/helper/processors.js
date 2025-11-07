@@ -23,7 +23,7 @@ module.exports = {
 
   // Offset 기반 페이지네이션용 랜덤 페이지 설정
   setRandomOffsetPage: function (context, events, done) {
-    context.vars.offsetPage = getRandomPage(10) + 990;
+    context.vars.offsetPage = getRandomPage(10) + 490;
     return done();
   },
 

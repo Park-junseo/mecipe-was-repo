@@ -33,8 +33,10 @@ scenarios:
       - get:
           url: "/places/admin"
           qs:
-            page: 1000
+            page: 500
             take: 10
+            searchType: "이름"
+            searchText: "Cafe"
           capture:
             - json: "$.data"
               as: "placesData"
@@ -48,6 +50,8 @@ scenarios:
           qs:
             page: "{{ offsetPage }}"
             take: 10
+            searchType: "이름"
+            searchText: "Cafe"
           expect:
             - statusCode: [200, 400, 404, 500]
 

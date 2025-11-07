@@ -35,7 +35,9 @@ scenarios:
           qs:
             page: 10
             take: 10
-            after: "aWRfMTAx"
+            after: "aWRfMjk1"
+            searchType: "이름"
+            searchText: "Cafe"
           capture:
             - json: "$.edges"
               as: "cafeInfosEdges"
@@ -49,7 +51,9 @@ scenarios:
           qs:
             page: "{{ cursorPage }}"
             take: 10
-            after: "aWRfMTAx"
+            after: "aWRfMjk1"
+            searchType: "이름"
+            searchText: "Cafe"
           expect:
             - statusCode: [200, 400, 404, 500]
 
