@@ -2,33 +2,42 @@ import { Injectable, OnModuleInit, OnModuleDestroy, Logger, Optional } from '@ne
 // import { PrismaClient } from 'prisma/basic';
 import * as dayjs from 'dayjs';
 import { Prisma, PrismaClient } from 'prisma/basic';
+import { FilteredOnlyRequired, RequiredKeys } from 'src/util/types';
 import { isPrimitive } from 'src/util/isPrimitive';
 
+type DefaultClientOptions = Pick<Prisma.PrismaClientOptions, 'log'>
+
+type IterableSubset<T> = {
+  [key in keyof T]: T[key];
+}
+
 @Injectable()
-export class PrismaService
-  extends PrismaClient<Prisma.PrismaClientOptions, Prisma.LogLevel>
+export class PrismaService<TClientOptions extends Prisma.PrismaClientOptions = Prisma.PrismaClientOptions>
+  extends PrismaClient<DefaultClientOptions & TClientOptions, Prisma.LogLevel>
   implements OnModuleInit, OnModuleDestroy {
 
   private readonly logger = new Logger(PrismaService.name);
 
-  constructor(@Optional() options?: Prisma.PrismaClientOptions) {
-    super({
+  // constructor(@Optional() optionsArg: IterableSubset<TClientOptions>|undefined = undefined) {
+  constructor(@Optional() optionsArg: Prisma.Subset<TClientOptions, Prisma.PrismaClientOptions>|undefined = undefined) {
+    const options: Prisma.Subset<DefaultClientOptions & TClientOptions, Prisma.PrismaClientOptions> = {
       log: [
         { emit: 'event', level: 'query' },
         { emit: 'event', level: 'error' },
         { emit: 'event', level: 'warn' },
         { emit: 'event', level: 'info' },
       ],
-      ...options,
-    });
+      ...(optionsArg ?? {}),
+    } as Prisma.Subset<DefaultClientOptions & TClientOptions, Prisma.PrismaClientOptions>;
+    super(options);
   }
 
   async onModuleInit() {
-    this.$use(async (params, next) => {
-      const result = await next(params);
-
-      return prismaTimeMod(result);
-    });
+    // this.$extends({
+    //     result: (args) => {
+    //       return prismaTimeMod(args);
+    //     },
+    // });
 
     await this.$connect();
 

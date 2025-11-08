@@ -15,7 +15,7 @@ RUN npm ci --prefer-offline --no-audit --progress=true
 COPY . .
 
 # Prisma Client 생성 (필수!)
-RUN npx prisma generate
+RUN npm run prisma
 
 # NestJS 빌드
 RUN npm run build

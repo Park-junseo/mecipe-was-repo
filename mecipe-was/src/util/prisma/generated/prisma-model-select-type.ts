@@ -12,7 +12,7 @@ import { Prisma } from 'prisma/basic';
 /**
  * Prisma ModelName으로부터 해당 모델의 PrismaModelSelect 타입을 추출하는 헬퍼 타입
  * 
- * 자동 생성됨: 2025-11-04T13:12:21.388Z
+ * 자동 생성됨: 2025-11-08T03:24:37.134Z
  * 모델 개수: 28
  */
 export type PrismaModelSelect<TModelName extends Prisma.ModelName> = 

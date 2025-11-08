@@ -3,7 +3,7 @@
 
 generator client {
   provider = "prisma-client-js"
-  output = "./basic"
+  output   = "./basic"
 }
 
 datasource db {
@@ -32,24 +32,24 @@ enum UserType {
 
 // 유저
 model User {
-  id                        Int      @id @default(autoincrement())
-  createdAt                 DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 
-  loginId                   String // 로그인 ID (SNS 토큰)
-  loginPw                   String?   @db.Text // 로그인 PW 
-  username                  String
-  loginType                 LoginType
-  userType                  UserType
-  nickname                  String
-  email                     String
-  isDisable                 Boolean   @default(false)
+  loginId   String // 로그인 ID (SNS 토큰)
+  loginPw   String?   @db.Text // 로그인 PW 
+  username  String
+  loginType LoginType
+  userType  UserType
+  nickname  String
+  email     String
+  isDisable Boolean   @default(false)
 
-  Boards                    Board[]
-  BoardReplies              BoardReply[]
-  Notices                   Notice[]
+  Boards       Board[]
+  BoardReplies BoardReply[]
+  Notices      Notice[]
 
-  ProxyUsers                ProxyUser[]
-  CafeCouponHistories       CafeCouponHistory[]
+  ProxyUsers          ProxyUser[]
+  CafeCouponHistories CafeCouponHistory[]
 
   @@unique([loginType, loginId], name: "loginUnique")
 }
@@ -62,8 +62,8 @@ model Notice {
   content String? @db.Text
   link    String?
 
-  userId  Int
-  User    User  @relation(fields: [userId], references: [id])
+  userId Int
+  User   User @relation(fields: [userId], references: [id])
 }
 
 // 게시물 상태
@@ -76,44 +76,44 @@ enum BoardType {
 
 // 게시물
 model Board {
-  id                Int           @id @default(autoincrement())
-  createdAt         DateTime      @default(now())
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 
-  title             String
-  content           String?       @db.Text
-  link              String?
-  startDay          DateTime      @default(now())
-  endDay            DateTime?
+  title    String
+  content  String?   @db.Text
+  link     String?
+  startDay DateTime  @default(now())
+  endDay   DateTime?
 
-  isDisable         Boolean       @default(false) // 노출 여부 false 노출 true 비노출
-  isReplyAvaliable  Boolean       @default(true)
-  BoardImages       BoardImage[]
-  BoardReplies      BoardReply[]
+  isDisable        Boolean      @default(false) // 노출 여부 false 노출 true 비노출
+  isReplyAvaliable Boolean      @default(true)
+  BoardImages      BoardImage[]
+  BoardReplies     BoardReply[]
 
-  userId  Int
-  User    User  @relation(fields: [userId], references: [id])
+  userId Int
+  User   User @relation(fields: [userId], references: [id])
 
-  boardType  BoardType    @default(BTALK) //처음에는 보드타입(잡담)
+  boardType BoardType @default(BTALK) //처음에는 보드타입(잡담)
 
   CafeBoards CafeBoard[]
 }
 
 // 게시물 이미지
 model BoardImage {
-  id        Int       @id @default(autoincrement())
-  createdAt DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 
-  url    String       @db.Text
-  thumbnailUrl        String       @db.Text
-  width  Int
-  height Int
-  size   Int
+  url          String @db.Text
+  thumbnailUrl String @db.Text
+  width        Int
+  height       Int
+  size         Int
 
-  isThumb   Boolean   @default(false) // 썸네일이미지 여부 true 썸네일 false 상세
-  isDisable Boolean   @default(false)
+  isThumb   Boolean @default(false) // 썸네일이미지 여부 true 썸네일 false 상세
+  isDisable Boolean @default(false)
 
-  boardId Int        
-  Board   Board       @relation(fields: [boardId], references: [id])
+  boardId Int
+  Board   Board @relation(fields: [boardId], references: [id])
 }
 
 // 게시물 댓글
@@ -125,211 +125,210 @@ model BoardReply {
   content   String
   isDisable Boolean @default(false)
 
-  userId  Int
-  User    User  @relation(fields: [userId], references: [id])
-  boardId Int
-  Board   Board @relation(fields: [boardId], references: [id])
-  boardReplyId Int?
-  BoardReply BoardReply? @relation("BoardNestedReply",fields: [boardReplyId], references: [id])
+  userId             Int
+  User               User         @relation(fields: [userId], references: [id])
+  boardId            Int
+  Board              Board        @relation(fields: [boardId], references: [id])
+  boardReplyId       Int?
+  BoardReply         BoardReply?  @relation("BoardNestedReply", fields: [boardReplyId], references: [id])
   BoardNestedReplies BoardReply[] @relation("BoardNestedReply")
 }
 
 // 카페 관련 게시물
 model CafeBoard {
-  boardId         Int
-  cafeInfoId      Int
+  boardId    Int
+  cafeInfoId Int
 
-  Board           Board       @relation(fields: [boardId], references: [id])
-  CafeInfo        CafeInfo    @relation(fields: [cafeInfoId], references: [id])
+  Board    Board    @relation(fields: [boardId], references: [id])
+  CafeInfo CafeInfo @relation(fields: [cafeInfoId], references: [id])
 
-  createdAt       DateTime    @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([boardId, cafeInfoId], name: "cafeBoardUnique")
-
 }
 
 enum GovermentType {
-  SPECIAL_CITY                     // 특별시
-  METROPOLITAN_CITY                // 광역시
-  SPECIAL_SELF_GOVERNING_CITY      // 특별자치시
-  PROVINCE                         // 도
-  SPECIAL_SELF_GOVERNING_PROVINCE  // 특별자치도
-  DISTRICT                         // 자치구, 시 안의 구
-  CITY                             // 자치시, 도 안의 시
-  COUNTY                           // 군
-  TOWN                             // 읍
-  TOWNSHIP                         // 면
-  NEIGHBORHOOD                     // 행정동
-  PLACENAME                        // 지명
+  SPECIAL_CITY // 특별시
+  METROPOLITAN_CITY // 광역시
+  SPECIAL_SELF_GOVERNING_CITY // 특별자치시
+  PROVINCE // 도
+  SPECIAL_SELF_GOVERNING_PROVINCE // 특별자치도
+  DISTRICT // 자치구, 시 안의 구
+  CITY // 자치시, 도 안의 시
+  COUNTY // 군
+  TOWN // 읍
+  TOWNSHIP // 면
+  NEIGHBORHOOD // 행정동
+  PLACENAME // 지명
 }
 
 model RegionCategory {
-  id        Int       @id @default(autoincrement())
-  createdAt DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 
   name      String
   isDisable Boolean @default(false)
 
-  govermentType   GovermentType
+  govermentType GovermentType
 
   CafeInfos CafeInfo[]
 
-  AncestorCategories    ClosureRegionCategory[] @relation("AncestorCategory")
-  DescendantCategories  ClosureRegionCategory[] @relation("DescendantCategory")
+  AncestorCategories   ClosureRegionCategory[] @relation("AncestorCategory")
+  DescendantCategories ClosureRegionCategory[] @relation("DescendantCategory")
 }
 
 model ClosureRegionCategory {
-  ancestor    Int
-  descendant  Int
-  depth       Int @default(0)
+  ancestor   Int
+  descendant Int
+  depth      Int @default(0)
 
-  AncestorCategory RegionCategory @relation("AncestorCategory", fields: [ancestor], references: [id])
+  AncestorCategory   RegionCategory @relation("AncestorCategory", fields: [ancestor], references: [id])
   DescendantCategory RegionCategory @relation("DescendantCategory", fields: [descendant], references: [id])
 
   @@unique([ancestor, descendant, depth], name: "regionCategoryTreeUnique")
 }
 
 model CafeInfo {
-  id                Int       @id @default(autoincrement())
-  createdAt         DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 
-  isDisable         Boolean   @default(false)
+  isDisable Boolean @default(false)
 
-  name              String
-  code              String?    @unique
-  regionCategoryId  Int
-  RegionCategory    RegionCategory  @relation(fields: [regionCategoryId], references: [id])
+  name             String
+  code             String?        @unique
+  regionCategoryId Int
+  RegionCategory   RegionCategory @relation(fields: [regionCategoryId], references: [id])
 
-  address           String
-  directions        String
-  businessNumber    String
+  address        String
+  directions     String
+  businessNumber String
 
-  ceoName           String
-  
-  CafeVirtualLinks      CafeVirtualLink[]
+  ceoName String
 
-  CafeThumbnailImages   CafeThumbnailImage[]
-  CafeVirtualImages     CafeVirtualImage[]
-  CafeRealImages        CafeRealImage[]
+  CafeVirtualLinks CafeVirtualLink[]
 
-  CafeCouponGroupPartners      CafeCouponGoupPartner[]
+  CafeThumbnailImages CafeThumbnailImage[]
+  CafeVirtualImages   CafeVirtualImage[]
+  CafeRealImages      CafeRealImage[]
 
-  CafeBoards            CafeBoard[]
-  
-  MetaViewerInfos       MetaViewerInfo[]
-  Products                Product[]
+  CafeCouponGroupPartners CafeCouponGoupPartner[]
+
+  CafeBoards CafeBoard[]
+
+  MetaViewerInfos MetaViewerInfo[]
+  Products        Product[]
 }
 
 // 카페 썸네일 이미지
 model CafeThumbnailImage {
-  id        Int       @id @default(autoincrement())
-  createdAt DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 
-  url                 String       @db.Text
-  thumbnailUrl        String       @db.Text
-  width     Int
-  height    Int
-  size      Int
+  url          String @db.Text
+  thumbnailUrl String @db.Text
+  width        Int
+  height       Int
+  size         Int
 
-  priority  Int @default(0)
+  priority  Int     @default(0)
   isDisable Boolean @default(false)
 
-  cafeInfoId  Int
-  CafeInfo    CafeInfo @relation(fields: [cafeInfoId], references: [id])
+  cafeInfoId Int
+  CafeInfo   CafeInfo @relation(fields: [cafeInfoId], references: [id])
 }
 
 // 카페 가상현실 이미지
 model CafeVirtualImage {
-  id        Int       @id @default(autoincrement())
-  createdAt DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 
-  url       String       @db.Text
-  width     Int
-  height    Int
-  size      Int
+  url    String @db.Text
+  width  Int
+  height Int
+  size   Int
 
-  priority  Int @default(0)
+  priority  Int     @default(0)
   isDisable Boolean @default(false)
 
-  cafeInfoId  Int
-  CafeInfo    CafeInfo @relation(fields: [cafeInfoId], references: [id])
+  cafeInfoId Int
+  CafeInfo   CafeInfo @relation(fields: [cafeInfoId], references: [id])
 }
 
 // 카페 실제 이미지
 model CafeRealImage {
-  id        Int       @id @default(autoincrement())
-  createdAt DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 
-  url       String       @db.Text
-  width     Int
-  height    Int
-  size      Int
+  url    String @db.Text
+  width  Int
+  height Int
+  size   Int
 
-  priority  Int @default(0)
+  priority  Int     @default(0)
   isDisable Boolean @default(false)
 
-  cafeInfoId  Int
-  CafeInfo    CafeInfo @relation(fields: [cafeInfoId], references: [id])
+  cafeInfoId Int
+  CafeInfo   CafeInfo @relation(fields: [cafeInfoId], references: [id])
 }
 
 // 카페 가상현실 링크
 model CafeVirtualLink {
-  id        Int       @id @default(autoincrement())
-  createdAt DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 
-  name      String
-  url       String
-  type      String
+  name String
+  url  String
+  type String
 
   isDisable   Boolean @default(false)
   isAvaliable Boolean @default(true)
 
-  cafeInfoId  Int
-  CafeInfo    CafeInfo @relation(fields: [cafeInfoId], references: [id])
+  cafeInfoId Int
+  CafeInfo   CafeInfo @relation(fields: [cafeInfoId], references: [id])
 
   CafeVirtualLinkThumbnailImage CafeVirtualLinkThumbnailImage?
 }
 
 // 카페 가상현실 링크 썸네일
 model CafeVirtualLinkThumbnailImage {
-  id        Int       @id @default(autoincrement())
-  createdAt DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 
-  url       String       @db.Text
-  width     Int
-  height    Int
-  size      Int
+  url    String @db.Text
+  width  Int
+  height Int
+  size   Int
 
-  cafeVirtualLinkId Int   @unique
+  cafeVirtualLinkId Int             @unique
   CafeVirtualLink   CafeVirtualLink @relation(fields: [cafeVirtualLinkId], references: [id])
 }
 
 model CafeCouponGroup {
-  id        Int       @id @default(autoincrement())
-  createdAt DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 
-  code          String    @unique
-  name          String
-  tag           String
-  description   String
-  isDisable     Boolean @default(false)
+  code        String  @unique
+  name        String
+  tag         String
+  description String
+  isDisable   Boolean @default(false)
 
-  startDay        DateTime  @default(now())
-  endDay          DateTime
+  startDay DateTime @default(now())
+  endDay   DateTime
 
-  issuanceStartDay  DateTime
-  issuanceEndDay    DateTime
+  issuanceStartDay DateTime
+  issuanceEndDay   DateTime
 
-  CafeCoupons   CafeCoupon[]
+  CafeCoupons            CafeCoupon[]
   CafeCouponGoupPartners CafeCouponGoupPartner[]
 }
 
 model CafeCouponGoupPartner {
-  cafeCouponGroupId   Int
-  CafeCouponGroup     CafeCouponGroup @relation(fields: [cafeCouponGroupId], references: [id])
+  cafeCouponGroupId Int
+  CafeCouponGroup   CafeCouponGroup @relation(fields: [cafeCouponGroupId], references: [id])
 
-  cafeInfoId          Int
-  CafeInfo            CafeInfo @relation(fields: [cafeInfoId], references: [id])
+  cafeInfoId Int
+  CafeInfo   CafeInfo @relation(fields: [cafeInfoId], references: [id])
 
   @@unique([cafeCouponGroupId, cafeInfoId], name: "cafeCouponGroupPartnerUnique")
 }
@@ -342,55 +341,54 @@ enum ProxyUserType {
 }
 
 model ProxyUser {
-  id              Int     @id @default(autoincrement())
-  memberId        String
-  createdAt       DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  memberId  String
+  createdAt DateTime @default(now())
 
-  proxyUserType   ProxyUserType
+  proxyUserType ProxyUserType
 
-  name            String
-  token           String
-  userId          Int?
-  User            User?    @relation(fields: [userId], references: [id])
+  name   String
+  token  String
+  userId Int?
+  User   User?  @relation(fields: [userId], references: [id])
 
-  CafeCoupons     CafeCoupon[]
+  CafeCoupons      CafeCoupon[]
   WishlistProducts WishlistProduct[]
 
   @@unique([memberId, proxyUserType], name: "proxyUserUnique")
-
 }
 
 // 카페 쿠폰
 model CafeCoupon {
-  id        Int       @id @default(autoincrement())
-  createdAt DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 
-  name            String
-  content         String
-  serialNumber    String    @unique
+  name         String
+  content      String
+  serialNumber String @unique
 
-  startDay        DateTime  @default(now())
-  endDay          DateTime? // 쿠폰 만료일 오버라이딩
+  startDay DateTime  @default(now())
+  endDay   DateTime? // 쿠폰 만료일 오버라이딩
 
-  isDisable       Boolean @default(false)
+  isDisable Boolean @default(false)
 
-  proxyUserId     Int
-  ProxyUser       ProxyUser @relation(fields: [proxyUserId], references: [id])
+  proxyUserId Int
+  ProxyUser   ProxyUser @relation(fields: [proxyUserId], references: [id])
 
-  cafeCouponGroupId     Int
-  CafeCouponGroup       CafeCouponGroup @relation(fields: [cafeCouponGroupId], references: [id])
+  cafeCouponGroupId Int
+  CafeCouponGroup   CafeCouponGroup @relation(fields: [cafeCouponGroupId], references: [id])
 
-  CafeCouponQRCodes     CafeCouponQRCode[]
+  CafeCouponQRCodes CafeCouponQRCode[]
 
-  CafeCouponHistories   CafeCouponHistory[]
+  CafeCouponHistories CafeCouponHistory[]
 }
 
 enum CafeCouponEventType {
   CREATED // 쿠폰 발급됨
-  USED    // 쿠폰 사용됨
+  USED // 쿠폰 사용됨
   REVOKED // 관리자에 의해 회수됨
   EXPIRED // 쿠폰 만료됨됨
-  UPDATE  // 유효기간 연장됨
+  UPDATE // 유효기간 연장됨
 }
 
 enum CafeCouponStatus {
@@ -400,82 +398,81 @@ enum CafeCouponStatus {
   EXPIRED
 }
 
-
 // 카페 쿠폰 히스토리
 model CafeCouponHistory {
-  id              Int       @id @default(autoincrement())
-  createdAt       DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 
   // 어떤 쿠폰에 대한 히스토리인지
-  cafeCouponId    Int
-  CafeCoupon      CafeCoupon @relation(fields: [cafeCouponId], references: [id])
+  cafeCouponId Int
+  CafeCoupon   CafeCoupon @relation(fields: [cafeCouponId], references: [id])
 
   // 어떤 이벤트가 발생했는지
-  eventType       CafeCouponEventType
-  description     String
+  eventType   CafeCouponEventType
+  description String
 
   // 변경 주체 (관리자 or 사용자)
-  actorId         Int
-  Actor           User @relation(fields: [actorId], references: [id])
+  actorId Int
+  Actor   User @relation(fields: [actorId], references: [id])
 
   // 예: 사용됨, 회수됨, 만료됨 등
-  statusBefore    CafeCouponStatus?
-  statusAfter     CafeCouponStatus?
+  statusBefore CafeCouponStatus?
+  statusAfter  CafeCouponStatus?
 }
 
 // 쿠폰 QR
-model CafeCouponQRCode{
-  serialNumber    String    @id
-  createdAt       DateTime  @default(now())
+model CafeCouponQRCode {
+  serialNumber String   @id
+  createdAt    DateTime @default(now())
 
-  isDisable       Boolean @default(false)
-  cafeCouponId    Int?
-  CafeCoupon      CafeCoupon? @relation(fields: [cafeCouponId], references: [id])
+  isDisable    Boolean     @default(false)
+  cafeCouponId Int?
+  CafeCoupon   CafeCoupon? @relation(fields: [cafeCouponId], references: [id])
 
-  size            Int
-  base64Data      String
+  size       Int
+  base64Data String
 }
 
 // ************** 메타 뷰어어 *************
 
 // 메타 뷰어 정보
 model MetaViewerInfo {
-  id              Int       @id @default(autoincrement())
-  createdAt       DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 
-  code                String   @unique
+  code String @unique
 
-  isDisable           Boolean   @default(false)
+  isDisable Boolean @default(false)
 
-  worldData           Json
+  worldData Json
 
-  cafeInfoId          Int
-  CafeInfo            CafeInfo @relation(fields: [cafeInfoId], references: [id])  
+  cafeInfoId Int
+  CafeInfo   CafeInfo @relation(fields: [cafeInfoId], references: [id])
 
-  MetaViewerMaps      MetaViewerMap[]
-  ActiveMaps          MetaViewerActiveMap?  // 1:1 관계
+  MetaViewerMaps MetaViewerMap[]
+  ActiveMaps     MetaViewerActiveMap? // 1:1 관계
 }
 
 // 메타 뷰어 월드 파일
 model MetaViewerMap {
-  id                  Int       @id @default(autoincrement())
-  createdAt           DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 
-  type                MetaMapType   // RENDER 또는 COLLIDER
-  version             Float     @default(0)
+  type    MetaMapType // RENDER 또는 COLLIDER
+  version Float       @default(0)
 
-  url                 String    @db.Text
-  size                Int
-  contentKey          String?
+  url        String  @db.Text
+  size       Int
+  contentKey String?
 
-  isDraco             Boolean
+  isDraco Boolean
 
-  metaViewerInfoId    Int
-  MetaViewerInfo      MetaViewerInfo @relation(fields: [metaViewerInfoId], references: [id])
-  
+  metaViewerInfoId Int
+  MetaViewerInfo   MetaViewerInfo @relation(fields: [metaViewerInfoId], references: [id])
+
   // 활성 맵으로 사용되는 경우의 역참조
-  ActiveRenderFor     MetaViewerActiveMap[] @relation("ActiveRender")
-  ActiveColliderFor   MetaViewerActiveMap[] @relation("ActiveCollider")
+  ActiveRenderFor   MetaViewerActiveMap[] @relation("ActiveRender")
+  ActiveColliderFor MetaViewerActiveMap[] @relation("ActiveCollider")
 }
 
 // 메타 맵 타입
@@ -486,15 +483,15 @@ enum MetaMapType {
 
 // 활성 맵 관리 (별도 테이블)
 model MetaViewerActiveMap {
-  id                  Int       @id @default(autoincrement())
-  updatedAt           DateTime  @updatedAt
+  id        Int      @id @default(autoincrement())
+  updatedAt DateTime @updatedAt
 
-  metaViewerInfoId    Int       @unique
-  MetaViewerInfo      MetaViewerInfo @relation(fields: [metaViewerInfoId], references: [id])
+  metaViewerInfoId Int            @unique
+  MetaViewerInfo   MetaViewerInfo @relation(fields: [metaViewerInfoId], references: [id])
 
-  activeRenderMapId   Int
-  ActiveRenderMap     MetaViewerMap @relation("ActiveRender", fields: [activeRenderMapId], references: [id])
-  
+  activeRenderMapId Int
+  ActiveRenderMap   MetaViewerMap @relation("ActiveRender", fields: [activeRenderMapId], references: [id])
+
   activeColliderMapId Int
   ActiveColliderMap   MetaViewerMap @relation("ActiveCollider", fields: [activeColliderMapId], references: [id])
 }
@@ -503,84 +500,82 @@ model MetaViewerActiveMap {
 
 // ******* 상품 쇼케이스 *******
 
-
 // 상품 카테고리
 model ProductCategory {
-  id        Int       @id @default(autoincrement())
-  createdAt DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 
-  name      String
+  name        String
   description String?
-  isDisable Boolean @default(false)
+  isDisable   Boolean @default(false)
 
-  code      String  @unique
+  code String @unique
 
   // 계층 구조를 위한 자기참조 관계
-  AncestorCategories    ClosureProductCategory[] @relation("AncestorProductCategory")
-  DescendantCategories  ClosureProductCategory[] @relation("DescendantProductCategory")
+  AncestorCategories   ClosureProductCategory[] @relation("AncestorProductCategory")
+  DescendantCategories ClosureProductCategory[] @relation("DescendantProductCategory")
 
   // 상품과의 관계
-  Products  Product[]
+  Products Product[]
 
   @@map("product_categories")
 }
 
 model ClosureProductCategory {
-  ancestor    Int
-  descendant  Int
-  depth       Int @default(0)
+  ancestor   Int
+  descendant Int
+  depth      Int @default(0)
 
-  AncestorCategory    ProductCategory @relation("AncestorProductCategory", fields: [ancestor], references: [id])
+  AncestorCategory   ProductCategory @relation("AncestorProductCategory", fields: [ancestor], references: [id])
   DescendantCategory ProductCategory @relation("DescendantProductCategory", fields: [descendant], references: [id])
 
   @@unique([ancestor, descendant, depth], name: "productCategoryTreeUnique")
-
   @@map("closure_product_categories")
 }
 
 // 상품
 model Product {
-  id                Int       @id @default(autoincrement())
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  name              String
-  code              String    @unique
-  description       String?   @db.Text
-  price             Int       // 가격 (원 단위)
-  originalPrice     Int?      // 원가 (할인 전 가격)
-  stockQuantity     Int       @default(0) // 재고 수량
-  minOrderQuantity  Int       @default(1) // 최소 주문 수량
-  
-  isDisable         Boolean   @default(false)
-  isAvailable       Boolean   @default(true) // 판매 가능 여부
-  
+  name             String
+  code             String  @unique
+  description      String? @db.Text
+  price            Int // 가격 (원 단위)
+  originalPrice    Int? // 원가 (할인 전 가격)
+  stockQuantity    Int     @default(0) // 재고 수량
+  minOrderQuantity Int     @default(1) // 최소 주문 수량
+
+  isDisable   Boolean @default(false)
+  isAvailable Boolean @default(true) // 판매 가능 여부
+
   // 카테고리 관계
-  categoryId        Int
-  ProductCategory          ProductCategory @relation(fields: [categoryId], references: [id])
-  
+  categoryId      Int
+  ProductCategory ProductCategory @relation(fields: [categoryId], references: [id])
+
   // 카페 정보 관계 (상품을 판매하는 카페)
-  cafeInfoId        Int?
-  CafeInfo          CafeInfo? @relation(fields: [cafeInfoId], references: [id])
+  cafeInfoId Int?
+  CafeInfo   CafeInfo? @relation(fields: [cafeInfoId], references: [id])
 
   // 찜한 상품과의 관계
-  WishlistProducts  WishlistProduct[]
+  WishlistProducts WishlistProduct[]
 
   // 상품 이미지
-  ProductImages     ProductImage[]
+  ProductImages ProductImage[]
 
   // 상품 URL
-  productRedirectUrl  String? @db.Text
+  productRedirectUrl String? @db.Text
 
-  isSignature       Boolean   @default(false)
+  isSignature Boolean @default(false)
 
   @@map("products")
 }
 
 // 찜한 상품
 model WishlistProduct {
-  id        Int       @id @default(autoincrement())
-  createdAt DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 
   // 상품과의 관계
   productId Int
@@ -597,21 +592,21 @@ model WishlistProduct {
 
 // 게시물 이미지
 model ProductImage {
-  id        Int       @id @default(autoincrement())
-  createdAt DateTime  @default(now())
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
 
-  url    String       @db.Text
-  thumbnailUrl        String       @db.Text
-  width  Int
-  height Int
-  size   Int
+  url          String @db.Text
+  thumbnailUrl String @db.Text
+  width        Int
+  height       Int
+  size         Int
 
-  isDisable Boolean   @default(false)
+  isDisable Boolean @default(false)
 
-  isThumb   Boolean   @default(false) // 썸네일이미지 여부 true 썸네일 false 상세
+  isThumb Boolean @default(false) // 썸네일이미지 여부 true 썸네일 false 상세
 
-  productId Int        
-  Product   Product       @relation(fields: [productId], references: [id])
+  productId Int
+  Product   Product @relation(fields: [productId], references: [id])
 
   @@map("product_images")
 }

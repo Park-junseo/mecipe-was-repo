@@ -7,43 +7,43 @@
 */
 
 import { Prisma } from 'prisma/basic';
-
+import { InternalArgs } from 'prisma/basic/runtime/library';
 
 /**
  * Prisma ModelName으로부터 해당 모델의 PrismaModelDelegate 타입을 추출하는 헬퍼 타입
  * 
- * 자동 생성됨: 2025-11-04T13:12:21.391Z
+ * 자동 생성됨: 2025-11-08T03:24:37.138Z
  * 모델 개수: 28
  */
-export type PrismaModelDelegate<TModelName extends Prisma.ModelName, TOptions> = 
-		TModelName extends 'Board' ? Prisma.BoardDelegate<TOptions> :
-		TModelName extends 'BoardImage' ? Prisma.BoardImageDelegate<TOptions> :
-		TModelName extends 'BoardReply' ? Prisma.BoardReplyDelegate<TOptions> :
-		TModelName extends 'CafeBoard' ? Prisma.CafeBoardDelegate<TOptions> :
-		TModelName extends 'CafeCoupon' ? Prisma.CafeCouponDelegate<TOptions> :
-		TModelName extends 'CafeCouponGoupPartner' ? Prisma.CafeCouponGoupPartnerDelegate<TOptions> :
-		TModelName extends 'CafeCouponGroup' ? Prisma.CafeCouponGroupDelegate<TOptions> :
-		TModelName extends 'CafeCouponHistory' ? Prisma.CafeCouponHistoryDelegate<TOptions> :
-		TModelName extends 'CafeCouponQRCode' ? Prisma.CafeCouponQRCodeDelegate<TOptions> :
-		TModelName extends 'CafeInfo' ? Prisma.CafeInfoDelegate<TOptions> :
-		TModelName extends 'CafeRealImage' ? Prisma.CafeRealImageDelegate<TOptions> :
-		TModelName extends 'CafeThumbnailImage' ? Prisma.CafeThumbnailImageDelegate<TOptions> :
-		TModelName extends 'CafeVirtualImage' ? Prisma.CafeVirtualImageDelegate<TOptions> :
-		TModelName extends 'CafeVirtualLink' ? Prisma.CafeVirtualLinkDelegate<TOptions> :
-		TModelName extends 'CafeVirtualLinkThumbnailImage' ? Prisma.CafeVirtualLinkThumbnailImageDelegate<TOptions> :
-		TModelName extends 'ClosureProductCategory' ? Prisma.ClosureProductCategoryDelegate<TOptions> :
-		TModelName extends 'ClosureRegionCategory' ? Prisma.ClosureRegionCategoryDelegate<TOptions> :
-		TModelName extends 'MetaViewerActiveMap' ? Prisma.MetaViewerActiveMapDelegate<TOptions> :
-		TModelName extends 'MetaViewerInfo' ? Prisma.MetaViewerInfoDelegate<TOptions> :
-		TModelName extends 'MetaViewerMap' ? Prisma.MetaViewerMapDelegate<TOptions> :
-		TModelName extends 'Notice' ? Prisma.NoticeDelegate<TOptions> :
-		TModelName extends 'Product' ? Prisma.ProductDelegate<TOptions> :
-		TModelName extends 'ProductCategory' ? Prisma.ProductCategoryDelegate<TOptions> :
-		TModelName extends 'ProductImage' ? Prisma.ProductImageDelegate<TOptions> :
-		TModelName extends 'ProxyUser' ? Prisma.ProxyUserDelegate<TOptions> :
-		TModelName extends 'RegionCategory' ? Prisma.RegionCategoryDelegate<TOptions> :
-		TModelName extends 'User' ? Prisma.UserDelegate<TOptions> :
-		TModelName extends 'WishlistProduct' ? Prisma.WishlistProductDelegate<TOptions> :
+export type PrismaModelDelegate<TModelName extends Prisma.ModelName, TOptions extends InternalArgs> = 
+		TModelName extends 'Board' ? Prisma.BoardDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'BoardImage' ? Prisma.BoardImageDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'BoardReply' ? Prisma.BoardReplyDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'CafeBoard' ? Prisma.CafeBoardDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'CafeCoupon' ? Prisma.CafeCouponDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'CafeCouponGoupPartner' ? Prisma.CafeCouponGoupPartnerDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'CafeCouponGroup' ? Prisma.CafeCouponGroupDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'CafeCouponHistory' ? Prisma.CafeCouponHistoryDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'CafeCouponQRCode' ? Prisma.CafeCouponQRCodeDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'CafeInfo' ? Prisma.CafeInfoDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'CafeRealImage' ? Prisma.CafeRealImageDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'CafeThumbnailImage' ? Prisma.CafeThumbnailImageDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'CafeVirtualImage' ? Prisma.CafeVirtualImageDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'CafeVirtualLink' ? Prisma.CafeVirtualLinkDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'CafeVirtualLinkThumbnailImage' ? Prisma.CafeVirtualLinkThumbnailImageDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'ClosureProductCategory' ? Prisma.ClosureProductCategoryDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'ClosureRegionCategory' ? Prisma.ClosureRegionCategoryDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'MetaViewerActiveMap' ? Prisma.MetaViewerActiveMapDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'MetaViewerInfo' ? Prisma.MetaViewerInfoDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'MetaViewerMap' ? Prisma.MetaViewerMapDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'Notice' ? Prisma.NoticeDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'Product' ? Prisma.ProductDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'ProductCategory' ? Prisma.ProductCategoryDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'ProductImage' ? Prisma.ProductImageDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'ProxyUser' ? Prisma.ProxyUserDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'RegionCategory' ? Prisma.RegionCategoryDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'User' ? Prisma.UserDelegate<TOptions, Prisma.PrismaClientOptions> :
+		TModelName extends 'WishlistProduct' ? Prisma.WishlistProductDelegate<TOptions, Prisma.PrismaClientOptions> :
         // 알 수 없는 모델에 대해서는 Record<string, any>를 반환
         unknown;
   

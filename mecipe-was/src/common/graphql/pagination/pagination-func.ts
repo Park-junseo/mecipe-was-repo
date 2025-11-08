@@ -3,9 +3,10 @@ import { PaginationArgs } from "./pagination-args.input";
 import { PageInfo } from "./page-info.entity";
 import { PrismaModelDelegate, PrismaModelGetPayload, PrismaModelSelect, PrismaModelWhereInput } from "src/util/prisma";
 import { BaseConnectionType } from "./base-connection.type";
+import { InternalArgs } from "prisma/basic/runtime/library";
 
-export async function findPaginationBasedCursor<TModelName extends Prisma.ModelName>(
-  delegate: PrismaModelDelegate<TModelName, unknown>,
+export async function findPaginationBasedCursor<TModelName extends Prisma.ModelName, TDelegateOptions extends InternalArgs, TDelegate extends PrismaModelDelegate<TModelName, TDelegateOptions>>(
+  delegate: TDelegate,
   args: PaginationArgs,
   cursorField: string = "id",
   select: PrismaModelSelect<TModelName> | undefined,
