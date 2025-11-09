@@ -1,7 +1,6 @@
 
 import { PrismaService } from 'src/global/prisma.service'
-import { beforeEach } from 'vitest'
-import { mockDeep, mockReset } from 'vitest-mock-extended'
+import { mockDeep, mockReset } from 'jest-mock-extended'
 
 // 2
 beforeEach(() => {

@@ -2,11 +2,12 @@ import { Prisma } from "prisma/basic";
 import { PaginationArgs } from "./pagination-args.input";
 import { PageInfo } from "./page-info.entity";
 import { PrismaModelDelegate, PrismaModelOrderByWithRelationInput, PrismaModelSelect, PrismaModelWhereInput } from "src/util/prisma";
+import { InternalArgs } from "prisma/basic/runtime/library";
 
 export async function findPaginationBasedCursor<
   TDelegate extends PrismaModelDelegate<Prisma.ModelName, U>,
   TModelName extends Prisma.ModelName = TDelegate extends PrismaModelDelegate<infer M, any> ? M : never,
-  U extends Prisma.RejectOnNotFound | Prisma.RejectPerOperation | false | undefined = 'rejectOnNotFound' extends keyof TDelegate ? TDelegate['rejectOnNotFound'] : false
+  U extends InternalArgs = InternalArgs
 >(
   delegate: TDelegate,
   args: PaginationArgs,

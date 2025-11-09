@@ -21,3 +21,7 @@ test
 .github
 docker-compose.yml
 Dockerfile
+
+# 개발용 스크립트 제외
+scripts/**/*.dev.*
+scripts/**/*.dev/

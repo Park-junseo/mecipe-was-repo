@@ -12,7 +12,6 @@
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "nest build",
-    "postbuild": "node scripts/prisma/copy-prisma-to-dist.js",
     "copy:prisma": "node scripts/prisma/copy-prisma-to-dist.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "daemon": "npm run build && pm2 start dist/main.js -i max --name web-server",
@@ -30,14 +29,14 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:unit": "jest",
-    "prisma": "prisma generate && npm run postgenerate",
+    "prisma": "rimraf prisma/basic && prisma generate && npm run postgenerate",
     "prisma:migrate": "prisma migrate dev",
     "generate:prisma-types": "ts-node scripts/prisma/generate-prisma-types.ts",
     "postgenerate": "npm run generate:prisma-types",
-    "start:test-db": "ts-node -r tsconfig-paths/register ./scripts/prisma/test-db-setup.ts",
+    "start:test-db": "ts-node -r tsconfig-paths/register ./scripts/prisma/test-db-setup.dev.ts",
     "start:test-app": "nest start",
-    "start:test": "ts-node -r tsconfig-paths/register ./scripts/prisma/test-db-setup.ts --start-app",
-    "db:seed": "ts-node -r tsconfig-paths/register ./scripts/prisma/seed/index.ts"
+    "start:test": "ts-node -r tsconfig-paths/register ./scripts/prisma/test-db-setup.dev.ts --start-app",
+    "db:seed": "ts-node -r tsconfig-paths/register ./scripts/prisma/seed.dev/index.ts"
   },
   "dependencies": {
     "@apollo/server": "^5.0.0",
@@ -55,7 +54,7 @@
     "@nestjs/platform-socket.io": "^11.1.8",
     "@nestjs/serve-static": "^5.0.4",
     "@nestjs/websockets": "^11.1.8",
-    "@prisma/client": "^6.18.0",
+    "@prisma/client": "^6.19.0",
     "@types/socket.io": "^3.0.2",
     "axios": "^1.12.2",
     "class-transformer": "^0.5.1",
@@ -94,15 +93,14 @@
     "jest": "^30.2.0",
     "jest-mock-extended": "^4.0.0",
     "prettier": "^3.6.2",
-    "prisma": "^6.18.0",
+    "prisma": "^6.19.0",
     "supertest": "^7.1.4",
     "testcontainers": "^11.7.2",
     "ts-jest": "^29.4.5",
     "ts-loader": "^9.5.4",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.9.3",
-    "vitest-mock-extended": "^3.1.0"
+    "typescript": "^5.9.3"
   },
   "jest": {
     "moduleFileExtensions": [

@@ -12,7 +12,7 @@ import { Prisma } from 'prisma/basic';
 /**
  * Prisma ModelName으로부터 해당 모델의 PrismaModelWhereInput 타입을 추출하는 헬퍼 타입
  * 
- * 자동 생성됨: 2025-11-06T14:52:03.482Z
+ * 자동 생성됨: 2025-11-08T03:24:37.138Z
  * 모델 개수: 28
  */
 export type PrismaModelWhereInput<TModelName extends Prisma.ModelName> = 
