@@ -10,6 +10,7 @@
     "allowSyntheticDefaultImports": true,
     "target": "esnext",
     "sourceMap": true,
+    "types": ["node", "jest"],
     "outDir": "./dist",
     "baseUrl": "./",
     "incremental": true,
@@ -21,11 +22,11 @@
     "noFallthroughCasesInSwitch": false
   },
   // 이 앱이 포함할 파일 경로 정의 (루트 tsconfig.base.json과 중복될 수 있으므로 주의)
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.d.ts",
-    "test/**/*.ts"
-  ],
+  // "include": [
+  //   "src/**/*.ts",
+  //   "src/**/*.d.ts",
+  //   "test/**/*.ts",
+  // ],
   "exclude": [
     "node_modules",
     "dist"

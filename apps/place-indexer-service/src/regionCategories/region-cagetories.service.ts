@@ -17,20 +17,47 @@ export class RegionCategoriesService {
     private readonly httpService: HttpService, // @nestjs/axios 필요
     private readonly configService: ConfigService,
   ) {
-    this.regionServiceBaseUrl = REGION_CATEGORIES_BASE_URL(this.configService);
+    const baseUrl = REGION_CATEGORIES_BASE_URL(this.configService);
+    // URL 정규화: 끝 슬래시 제거, 공백 제거
+    this.regionServiceBaseUrl = baseUrl.trim().replace(/\/+$/, '');
+
+    if (!this.regionServiceBaseUrl) {
+      this.logger.warn(
+        'REGION_CATEGORIES_BASE_URL is not set. RegionCategory lookups will fail.',
+      );
+    } else {
+      this.logger.log(
+        `RegionCategoriesService initialized with base URL: ${this.regionServiceBaseUrl}`,
+      );
+    }
   }
 
   async getRegionCategoryById(id: number): Promise<IRegionCategory | null> {
+    if (!this.regionServiceBaseUrl) {
+      this.logger.error(
+        'Cannot fetch RegionCategory: REGION_CATEGORIES_BASE_URL is not set',
+      );
+      return null;
+    }
+
     try {
+      // URL 구성: baseUrl/id (슬래시 중복 방지)
+      const url = `${this.regionServiceBaseUrl}/${id}`;
+      this.logger.debug(`Fetching RegionCategory from URL: ${url}`);
+
       // 예시: region-service의 REST API 호출
-      const response = await firstValueFrom<IRegionCategory>(
+      // HTTP 응답은 JSON이므로 createdAt이 Date 문자열("2025-11-14T02:24:25.732Z")로 옴
+      const response = await firstValueFrom(
         this.httpService
-          .get<IRegionCategory>(
-            `${this.regionServiceBaseUrl}/region-categories/${id}`,
-          )
+          .get<IRegionCategory>(url)
           .pipe(map((resp) => resp.data)),
       );
-      return response;
+
+      // Date 문자열을 Date 객체로 변환하여 IRegionCategory 타입에 맞춤
+      return {
+        ...response,
+        createdAt: new Date(response.createdAt),
+      } as IRegionCategory;
     } catch (error: unknown) {
       const errorMessage = isAxiosError(error)
         ? `Axios error ${error.response?.status ?? ''} ${error.message}`

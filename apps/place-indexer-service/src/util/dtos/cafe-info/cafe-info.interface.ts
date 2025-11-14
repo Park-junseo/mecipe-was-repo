@@ -12,5 +12,5 @@ export interface ICafeInfo {
   businessNumber: string;
   ceoName: string;
 
-  RegionCategory: IRegionCategory;
+  RegionCategory?: IRegionCategory;
 }

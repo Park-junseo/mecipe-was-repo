@@ -313,4 +313,8 @@ export class RegioncategoriesService {
       }) ?? []
     );
   }
+
+  async findRegionCategory(id: number) {
+    return this.prisma.regionCategory.findUnique({ where: { id } });
+  }
 }

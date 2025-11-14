@@ -27,12 +27,21 @@ export class CafeInfoChangeProcessor {
 
     if (!regionCategory) {
       this.logger.error(
-        `RegionCategory not found for CafeInfo ID: ${cafeInfoData.id}`,
+        `RegionCategory not found for CafeInfo ID: ${cafeInfoData.id}, regionCategoryId: ${cafeInfoData.regionCategoryId}. Skipping Elasticsearch indexing.`,
       );
+      // RegionCategory가 없어도 Elasticsearch에 인덱싱할지 결정
+      // 현재는 스킵하지만, 필요시 RegionCategory 없이도 인덱싱하도록 수정 가능
       return;
     }
 
+    this.logger.log(
+      `RegionCategory found: ID ${regionCategory.id}, Name: ${regionCategory.name}`,
+    );
+
     // 2. Elasticsearch에 저장할 문서 구성
+    this.logger.debug(
+      `Constructing Elasticsearch document for CafeInfo ID: ${cafeInfoData.id}`,
+    );
     const elasticsearchDoc: IndexDocument<CAFEINFO_INDEX_NAME> = {
       name: cafeInfoData.name,
       code: cafeInfoData.code,
@@ -51,15 +60,25 @@ export class CafeInfoChangeProcessor {
     };
 
     // 3. Elasticsearch에 색인 (id 기준으로 Upsert)
-    const result = await this.elasticsearchService.indexDocument(
-      CAFEINFO_INDEX_NAME,
-      elasticsearchDoc,
-      cafeInfoData.id.toString(),
+    this.logger.log(
+      `Attempting to index CafeInfo ID: ${cafeInfoData.id} to Elasticsearch index: ${CAFEINFO_INDEX_NAME}`,
     );
+    try {
+      const result = await this.elasticsearchService.indexDocument(
+        CAFEINFO_INDEX_NAME,
+        elasticsearchDoc,
+        cafeInfoData.id.toString(),
+      );
 
-    this.logger.log(`CafeInfo ID: ${cafeInfoData.id} indexed successfully.`);
-
-    return result;
+      this.logger.log(`CafeInfo ID: ${cafeInfoData.id} indexed successfully.`);
+      return result;
+    } catch (error) {
+      this.logger.error(
+        `Failed to index CafeInfo ID: ${cafeInfoData.id} to Elasticsearch: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+      throw error;
+    }
   }
 
   async processCafeInfoDelete(cafeInfoData: ICafeInfo) {

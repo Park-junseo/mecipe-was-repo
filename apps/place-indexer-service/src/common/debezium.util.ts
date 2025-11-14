@@ -1,24 +1,13 @@
 // apps/place-indexer-service/src/common/debezium.util.ts
 export class DebeziumUtil {
-  static unwrap<T>(messageValue: { payload: unknown }): {
+  static unwrap<T>(messageValue: unknown): {
     op: string | null;
     after: T | null;
     before: T | null;
     source: unknown;
-    original: { payload: unknown };
+    original: unknown;
   } {
-    if (!messageValue || !messageValue.payload) {
-      // Debezium heartbeat 메시지나 다른 구조의 메시지일 수 있음
-      return {
-        op: null,
-        after: null,
-        before: null,
-        source: null,
-        original: messageValue,
-      };
-    }
-
-    const payload = messageValue.payload as {
+    const payload = messageValue as {
       op: string;
       after: unknown;
       before: unknown;
