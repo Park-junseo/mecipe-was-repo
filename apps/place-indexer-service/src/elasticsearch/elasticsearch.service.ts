@@ -1,22 +1,12 @@
 // apps/place-indexer-service/src/elasticSearch/elasticsearch.service.ts
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import {
-  CAFEINFO_INDEX_NAME,
-  IndexType,
-  INDEX_TYPE_MAP,
-  IndexDocument,
-} from './libs';
+import { Injectable, Logger } from '@nestjs/common';
+import { IndexType, INDEX_TYPE_MAP, IndexDocument } from './libs';
 import { ElasticsearchService as ESService } from '@nestjs/elasticsearch';
 
 @Injectable()
-export class ElasticsearchService implements OnModuleInit {
+export class ElasticsearchService {
   private readonly logger: Logger = new Logger(ElasticsearchService.name);
   constructor(private readonly elasticsearchService: ESService) {}
-
-  async onModuleInit() {
-    // 앱 시작 시 인덱스가 존재하는지 확인하고 없으면 생성
-    await this.createIndexIfNotExist(CAFEINFO_INDEX_NAME);
-  }
 
   async createIndexIfNotExist(indexName: IndexType) {
     const exists = await this.elasticsearchService.indices.exists({

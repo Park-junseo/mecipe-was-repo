@@ -640,7 +640,9 @@ async function setupKSQLQueries(ksqlDbUrl: string) {
     );
     await executeKSQL(
       `
-      CREATE TABLE IF NOT EXISTS mv_cafe_info_with_region AS
+      CREATE TABLE IF NOT EXISTS mv_cafe_info_with_region 
+      WITH (KAFKA_TOPIC='mv_cafe_info_with_region')
+      AS
       SELECT 
         ci.id                   AS "id",
         ci."createdAt"          AS "createdAt",
@@ -669,7 +671,7 @@ async function setupKSQLQueries(ksqlDbUrl: string) {
 
     console.log('✅ KSQL queries setup completed');
     console.log('   📊 Created table: mv_cafe_info_with_region');
-    console.log('   📊 Output topic (changelog): CAFE_INFO_WITH_REGION_MV');
+    console.log('   📊 Output topic (changelog): mv_cafe_info_with_region');
   } catch (error) {
     console.error('❌ Failed to setup KSQL queries:', error);
     throw error;
@@ -749,12 +751,10 @@ async function cleanUp(code: number = 0) {
 
 function startNestJS({
   shouldStartAppWithWatch,
-  regionCategoriesBaseUrl,
   elasticsearchUrl,
   kafkaUrl,
 }: {
   shouldStartAppWithWatch: boolean;
-  regionCategoriesBaseUrl: string;
   elasticsearchUrl?: string;
   kafkaUrl: string;
 }) {
@@ -769,7 +769,6 @@ function startNestJS({
     {
       env: {
         ...process.env,
-        REGION_CATEGORIES_BASE_URL: regionCategoriesBaseUrl,
         ELASTICSEARCH_HOSTS: elasticsearchUrl,
         ELASTICSEARCH_USERNAME: ELASTIC_USERNAME,
         ELASTICSEARCH_PASSWORD: ELASTIC_PASSWORD,
@@ -804,9 +803,44 @@ async function removeNetwork() {
 }
 
 async function bootstrap(args: string[]) {
-  network = await new Network({
-    nextUuid: () => 'mecipe-network-test',
-  }).start();
+  // 네트워크가 이미 존재하는 경우 삭제 후 재생성
+  const networkName = 'mecipe-network-test';
+  try {
+    network = await new Network({
+      nextUuid: () => networkName,
+    }).start();
+  } catch (error: unknown) {
+    // 네트워크가 이미 존재하는 경우 (409 에러)
+    const isNetworkExistsError =
+      (error as { statusCode?: number })?.statusCode === 409 ||
+      (error as { message?: string })?.message?.includes('already exists');
+    if (isNetworkExistsError) {
+      console.log(
+        `⚠️  Network "${networkName}" already exists. Removing and recreating...`,
+      );
+      // Docker CLI를 통해 기존 네트워크 삭제
+      const { exec } = await import('child_process');
+      const { promisify } = await import('util');
+      const execAsync = promisify(exec);
+      try {
+        await execAsync(`docker network rm ${networkName}`);
+        console.log(`✅ Existing network "${networkName}" removed`);
+        // 잠시 대기 후 재시도
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      } catch (removeError) {
+        // 네트워크가 사용 중이거나 없는 경우 무시
+        console.log(
+          `   ℹ️  Could not remove network (may be in use or already removed): ${removeError}`,
+        );
+      }
+      // 재시도
+      network = await new Network({
+        nextUuid: () => networkName,
+      }).start();
+    } else {
+      throw error;
+    }
+  }
 
   let commandParameters: string[] = [];
   try {
@@ -914,13 +948,6 @@ async function bootstrap(args: string[]) {
   }
   const isStartApp = args.includes('--start-app');
   const isStartAppWithWatch = args.includes('--watch');
-  const regionCategoriesBaseUrl = getCommandParameters(
-    '--region-url',
-    args,
-  )[0][0];
-  if (!regionCategoriesBaseUrl) {
-    throw new Error('❌ Region categories base URL is required');
-  }
   let _elasticsearchUrl: string | undefined = elasticUrl;
   if (!_elasticsearchUrl) {
     const getElasticsearchUrl = getCommandParameters('--es-url', args)[0];
@@ -935,7 +962,6 @@ async function bootstrap(args: string[]) {
   if (isStartApp) {
     startNestJS({
       shouldStartAppWithWatch: isStartAppWithWatch,
-      regionCategoriesBaseUrl,
       elasticsearchUrl: _elasticsearchUrl,
       kafkaUrl: _kafkaUrl,
     });

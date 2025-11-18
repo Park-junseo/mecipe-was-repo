@@ -1,2 +1,2 @@
-export * from './mappings/cafe-info.mapping';
-export * from './utils/index.type';
+export * from './utils';
+export * from './decorators';

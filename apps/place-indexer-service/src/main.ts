@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { KAFKA_BROKERS, KAFKA_CLIENT_ID, KAFKA_GROUP_ID } from './util/types';
@@ -7,6 +8,18 @@ import { ConfigService } from '@nestjs/config';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
+
+  // 전역 ValidationPipe 설정 - 마이크로서비스에도 적용
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: false, // class-validator 데코레이터가 없으므로 false로 설정
+      forbidNonWhitelisted: false, // Kafka 메타데이터 필드를 허용
+      transform: true, // @Transform 데코레이터를 적용하기 위해 true
+      transformOptions: {
+        enableImplicitConversion: true, // @Transform 데코레이터가 작동하도록 함
+      },
+    }),
+  );
 
   // Kafka 브로커 주소 확인
   const brokers = KAFKA_BROKERS(configService);

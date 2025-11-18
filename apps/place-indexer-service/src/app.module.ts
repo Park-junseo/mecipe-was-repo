@@ -3,14 +3,14 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { ElasticsearchModule } from './elasticsearch/elasticsearch.module';
-import { KafkaModule } from './kafka/kafka.module';
+import { CafeInfoModule } from './cafe-info/cafe-info.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot(),
     ConfigModule,
     ElasticsearchModule,
-    KafkaModule,
+    CafeInfoModule,
   ],
   controllers: [AppController],
   providers: [AppService],
