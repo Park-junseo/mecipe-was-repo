@@ -1,4 +1,4 @@
-// npm run start:test -- --start-app --exclude:postgres --region-url:"http://localhost:4000/regioncategories" --postgres:host.docker.internal:32805:testuser:testpassword:testdb
+// npm run start:test -- --start-app --exclude:postgres --region-url:http://localhost:4000/regioncategories --postgres:host.docker.internal:32769:testuser:testpassword:testdb
 import {
   StartedPostgreSqlContainer,
   PostgreSqlContainer,
@@ -28,6 +28,7 @@ let kafkaUi: StartedTestContainer | undefined;
 let kafkaUiUrl: string | undefined;
 let kibana: StartedTestContainer | undefined;
 let kibanaUrl: string | undefined;
+let ksqlDb: StartedTestContainer | undefined;
 let nestProcess: ChildProcess | undefined;
 
 let network: StartedNetwork | undefined;
@@ -41,6 +42,7 @@ const KIBANA_HOST_NAME = 'mecipe-test-kibana';
 const EXTERNAL_HOST_NAME = 'host.docker.internal'; // Docker Desktop 환경
 const ELASTIC_USERNAME = 'elastic';
 const ELASTIC_PASSWORD = 'elasticpassword';
+const KSQLDB_HOST_NAME = 'mecipe-test-ksqldb';
 
 // DEBEZIUM_POSTGRES_CONNECTOR_CONFIG 함수를 수정하여 host.docker.internal을 사용
 // Testcontainers가 외부로 노출된 Postgres를 직접 제어하지 않으므로,
@@ -65,7 +67,7 @@ const DEBEZIUM_POSTGRES_CONNECTOR_CONFIG_FOR_EXTERNAL_DB = (
       'database.dbname': dbName,
       'database.server.name': 'dbserver',
       'topic.prefix': 'dbserver',
-      'table.include.list': 'public.CafeInfo',
+      'table.include.list': 'public.CafeInfo,public.RegionCategory',
       'publication.autocreate.mode': 'all_tables',
       'slot.name': 'debezium_slot',
       'heartbeat.interval.ms': '5000',
@@ -273,7 +275,10 @@ async function startElasticsearch(network: StartedNetwork) {
       ELASTIC_USERNAME,
       ELASTIC_PASSWORD,
     })
-    .withExposedPorts(9200)
+    .withExposedPorts({
+      container: 9200,
+      host: 9200,
+    })
     .start();
   elasticUrl = `http://${elastic?.getHost()}:${elastic?.getMappedPort(9200).toString()}`;
   internalElasticsearchUrl = `http://${ELASTICSEARCH_HOST_NAME}:9200`;
@@ -318,6 +323,359 @@ async function startKafkaUi(
   console.log('✅ Kafka UI started', `url: ${kafkaUiUrl}`);
 }
 
+async function startKSQLDB(
+  network: StartedNetwork,
+  bootstrapKafkaServer: string,
+) {
+  console.log('🔄 Starting KSQLDB...');
+  // NOTE:
+  // - 0.36.0 태그는 Docker Hub에 없음 → manifest unknown 404 에러 발생
+  // - 테스트 환경에서는 유지보수되는 latest 태그를 사용
+  ksqlDb = await new GenericContainer('confluentinc/ksqldb-server:latest')
+    .withNetwork(network)
+    .withNetworkAliases(KSQLDB_HOST_NAME)
+    .withEnvironment({
+      KSQL_LISTENERS: 'http://0.0.0.0:8088',
+      KSQL_BOOTSTRAP_SERVERS: bootstrapKafkaServer,
+      KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE: 'true',
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE: 'true',
+      KSQL_CONFIG_DIR: '/etc/ksqldb',
+      KSQL_STREAMS_AUTO_OFFSET_RESET: 'earliest',
+    })
+    .withExposedPorts(8088)
+    .withWaitStrategy(
+      Wait.forHttp('/info', 8088).forStatusCode(200).withStartupTimeout(60000),
+    )
+    .start();
+  const ksqlDbUrl = `http://${ksqlDb?.getHost()}:${ksqlDb
+    ?.getMappedPort(8088)
+    .toString()}`;
+  console.log('✅ KSQLDB started', `url: ${ksqlDbUrl}`);
+
+  // KSQLDB가 완전히 준비될 때까지 대기
+  console.log('⏳ Waiting for KSQLDB to be fully ready...');
+  await waitForKSQLDBReady(ksqlDbUrl, 60);
+  console.log('✅ KSQLDB is ready to accept queries');
+
+  // KSQL 쿼리 실행
+  await setupKSQLQueries(ksqlDbUrl);
+}
+
+async function waitForKSQLDBReady(ksqlDbUrl: string, maxRetries = 60) {
+  console.log('🔄 Waiting for KSQLDB to be ready...', `url: ${ksqlDbUrl}`);
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const response = await fetch(`${ksqlDbUrl}/info`);
+      if (response.ok) {
+        const data = (await response.json()) as {
+          KsqlServerInfo?: { version?: string };
+        };
+        if (data.KsqlServerInfo?.version) {
+          // KSQLDB가 완전히 준비되려면 추가 시간이 필요할 수 있음
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+          return;
+        }
+      }
+    } catch {
+      // 연결 실패는 정상 (아직 시작 중)
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  throw new Error(
+    `KSQLDB at ${ksqlDbUrl} did not become ready within ${maxRetries} seconds`,
+  );
+}
+
+async function setupKSQLQueries(ksqlDbUrl: string) {
+  console.log('🔄 Setting up KSQL queries...');
+
+  // KSQL REST API를 사용하여 쿼리 실행 (재시도 로직 포함)
+  const executeKSQL = async (
+    ksql: string,
+    streamsProperties: Record<string, string> = {},
+    retries = 3,
+  ) => {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        const response = await fetch(`${ksqlDbUrl}/ksql`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/vnd.ksql.v1+json',
+          },
+          body: JSON.stringify({
+            ksql,
+            streamsProperties,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          // 이미 존재하는 경우는 무시 (에러 메시지에 "already exists" 포함)
+          if (
+            errorText.includes('already exists') ||
+            errorText.includes('already registered')
+          ) {
+            console.log(
+              `   ℹ️  ${ksql.split(' ')[0]} already exists, skipping...`,
+            );
+            return;
+          }
+          throw new Error(
+            `KSQL query failed: ${response.status} ${response.statusText} - ${errorText}`,
+          );
+        }
+
+        const result = (await response.json()) as Array<{
+          errorMessage?: string;
+        }>;
+        if (result[0]?.errorMessage) {
+          // 이미 존재하는 경우는 무시
+          const errorMsg = result[0].errorMessage;
+          if (
+            errorMsg.includes('already exists') ||
+            errorMsg.includes('already registered')
+          ) {
+            console.log(
+              `   ℹ️  ${ksql.split(' ')[0]} already exists, skipping...`,
+            );
+            return;
+          }
+          throw new Error(`KSQL query error: ${errorMsg}`);
+        }
+        return result;
+      } catch (error) {
+        if (attempt < retries) {
+          const waitTime = attempt * 1000; // 1초, 2초, 3초 대기
+          console.log(
+            `   ⚠️  Attempt ${attempt} failed, retrying in ${waitTime}ms...`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, waitTime));
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw new Error('All retry attempts failed');
+  };
+
+  // 기존 스트림/테이블 삭제 (earliest offset을 적용하기 위해)
+  const dropIfExists = async (name: string, type: 'STREAM' | 'TABLE') => {
+    try {
+      await executeKSQL(`DROP ${type} IF EXISTS ${name} DELETE TOPIC;`);
+    } catch {
+      // 삭제 실패는 무시 (존재하지 않는 경우)
+    }
+  };
+
+  try {
+    // 전역 설정: earliest offset으로 설정
+    // console.log('   ⚙️  Setting global auto.offset.reset to earliest...');
+    // await executeKSQL(`SET 'auto.offset.reset'='earliest';`);
+    // console.log('   ✅ Global offset reset configured');
+
+    // 기존 객체들을 먼저 삭제 (earliest offset을 적용하기 위해)
+    // 기존 consumer group offset이 설정되어 있으면 earliest가 적용되지 않음
+    console.log('   🗑️  Cleaning up existing KSQL objects to reset offsets...');
+    await dropIfExists('cafe_info_with_region_mv', 'TABLE');
+    await dropIfExists('cafe_info_table', 'TABLE');
+    await dropIfExists('region_category_table', 'TABLE');
+    await dropIfExists('cafe_info_extracted', 'STREAM');
+    await dropIfExists('region_category_stream', 'STREAM');
+    await dropIfExists('cafe_info_stream', 'STREAM');
+    console.log('   ✅ Cleanup completed - offsets will be reset to earliest');
+    await new Promise((resolve) => setTimeout(resolve, 2000)); // 삭제 완료 대기
+
+    // 1. CafeInfo 토픽을 스트림으로 생성
+    // Debezium 메시지 형식: before, after, op 필드를 포함
+    console.log('   📝 Creating stream for dbserver.public.CafeInfo...');
+    const resultStreamCafeInfo = await executeKSQL(
+      `CREATE STREAM IF NOT EXISTS stream_cafe_info (
+        before STRUCT<
+          id BIGINT,
+          "createdAt" BIGINT,
+          "isDisable" BOOLEAN,
+          name VARCHAR,
+          code VARCHAR,
+          "regionCategoryId" BIGINT,
+          address VARCHAR,
+          directions VARCHAR,
+          "businessNumber" VARCHAR,
+          "ceoName" VARCHAR
+        >,
+        after STRUCT<
+          id BIGINT,
+          "createdAt" BIGINT,
+          "isDisable" BOOLEAN,
+          name VARCHAR,
+          code VARCHAR,
+          "regionCategoryId" BIGINT,
+          address VARCHAR,
+          directions VARCHAR,
+          "businessNumber" VARCHAR,
+          "ceoName" VARCHAR
+        >,
+        op VARCHAR,
+        ts_ms BIGINT
+      ) WITH (
+        KAFKA_TOPIC='dbserver.public.CafeInfo',
+        VALUE_FORMAT='JSON'
+      );
+    `,
+      { 'ksql.streams.auto.offset.reset': 'earliest' },
+    );
+    console.log('✅ CafeInfo stream created', resultStreamCafeInfo);
+    await new Promise((resolve) => setTimeout(resolve, 1000)); // 쿼리 사이 대기
+
+    // 실제 데이터를 추출하는 스트림 생성
+    // c(create), u(update): after 필드에서 데이터 추출
+    // d(delete): before 필드에서 데이터 추출
+    // r(read/snapshot): after 필드에서 데이터 추출
+    await executeKSQL(
+      `
+      CREATE STREAM IF NOT EXISTS stream_cafe_info_extracted 
+      AS
+      SELECT 
+        COALESCE(after->id, before->id) AS id,
+        COALESCE(after->"createdAt", before->"createdAt") AS "createdAt",
+        COALESCE(after->"isDisable", before->"isDisable") AS "isDisable",
+        COALESCE(after->name, before->name) AS name,
+        COALESCE(after->code, before->code) AS code,
+        COALESCE(after->"regionCategoryId", before->"regionCategoryId") AS "regionCategoryId",
+        COALESCE(after->address, before->address) AS address,
+        COALESCE(after->directions, before->directions) AS directions,
+        COALESCE(after->"businessNumber", before->"businessNumber") AS "businessNumber",
+        COALESCE(after->"ceoName", before->"ceoName") AS "ceoName",
+        op,
+        before,
+        after,
+        ts_ms
+      FROM stream_cafe_info
+      WHERE (after IS NOT NULL OR before IS NOT NULL)
+      PARTITION BY COALESCE(after->id, before->id)
+      EMIT CHANGES;
+    `,
+      { 'ksql.streams.auto.offset.reset': 'earliest' },
+    );
+
+    // CafeInfo 테이블 생성 (최신 상태를 저장하는 KSQL TABLE)
+    await executeKSQL(
+      `
+      CREATE TABLE IF NOT EXISTS tbl_cafe_info 
+      WITH (KEY_FORMAT='JSON')
+      AS
+      SELECT 
+        id,
+        LATEST_BY_OFFSET("createdAt") AS "createdAt",
+        LATEST_BY_OFFSET("isDisable") AS "isDisable",
+        LATEST_BY_OFFSET(name) AS name,
+        LATEST_BY_OFFSET(code) AS code,
+        LATEST_BY_OFFSET("regionCategoryId") AS "regionCategoryId",
+        LATEST_BY_OFFSET(address) AS address,
+        LATEST_BY_OFFSET(directions) AS directions,
+        LATEST_BY_OFFSET("businessNumber") AS "businessNumber",
+        LATEST_BY_OFFSET("ceoName") AS "ceoName"
+      FROM stream_cafe_info_extracted
+      GROUP BY id
+      EMIT CHANGES;
+    `,
+      { 'ksql.streams.auto.offset.reset': 'earliest' },
+    );
+
+    // 2. RegionCategory 토픽을 테이블로 생성 (JOIN을 위해 테이블 사용)
+    console.log('   📝 Creating table for dbserver.public.RegionCategory...');
+    const resultStreamRegionCategory = await executeKSQL(
+      `CREATE STREAM IF NOT EXISTS stream_region_category (
+        before STRUCT<
+          id BIGINT,
+          "createdAt" BIGINT,
+          name VARCHAR,
+          "isDisable" BOOLEAN,
+          "govermentType" VARCHAR
+        >,
+        after STRUCT<
+          id BIGINT,
+          "createdAt" BIGINT,
+          name VARCHAR,
+          "isDisable" BOOLEAN,
+          "govermentType" VARCHAR
+        >,
+        op VARCHAR,
+        ts_ms BIGINT
+      ) WITH (
+        KAFKA_TOPIC='dbserver.public.RegionCategory',
+        VALUE_FORMAT='JSON'
+      );
+    `,
+      { 'ksql.streams.auto.offset.reset': 'earliest' },
+    );
+    console.log('✅ RegionCategory stream created', resultStreamRegionCategory);
+    await new Promise((resolve) => setTimeout(resolve, 1000)); // 쿼리 사이 대기
+
+    // RegionCategory 테이블 생성 (after 필드에서 데이터 추출)
+    await executeKSQL(
+      `
+      CREATE TABLE IF NOT EXISTS tbl_region_category 
+      WITH (KEY_FORMAT='JSON')
+      AS
+      SELECT 
+        after->id AS id,
+        LATEST_BY_OFFSET(after->"createdAt") AS "createdAt",
+        LATEST_BY_OFFSET(after->name) AS name,
+        LATEST_BY_OFFSET(after->"isDisable") AS "isDisable",
+        LATEST_BY_OFFSET(after->"govermentType") AS "govermentType"
+      FROM stream_region_category
+      WHERE after IS NOT NULL
+      GROUP BY after->id
+      EMIT CHANGES;
+    `,
+      { 'ksql.streams.auto.offset.reset': 'earliest' },
+    );
+
+    // 3. TABLE*TABLE CTAS로 반정규화된 CafeInfo+RegionCategory 뷰 생성
+    // - 기준: cafe_info_table (최신 CafeInfo 상태)
+    // - JOIN: region_category_table (최신 RegionCategory 상태)
+    // 이 CTAS TABLE의 changelog 토픽은 CafeInfo/RegionCategory 어느 쪽이 바뀌어도 갱신 이벤트를 발행함
+    console.log(
+      '   📝 Creating denormalized TABLE: mv_cafe_info_with_region (TABLE*TABLE)...',
+    );
+    await executeKSQL(
+      `
+      CREATE TABLE IF NOT EXISTS mv_cafe_info_with_region AS
+      SELECT 
+        ci.id                   AS "id",
+        ci."createdAt"          AS "createdAt",
+        ci."isDisable"          AS "isDisable",
+        ci.name                 AS "name",
+        ci.code                 AS "code",
+        ci."regionCategoryId"   AS "regionCategoryId",
+        ci.address              AS "address",
+        ci.directions           AS "directions",
+        ci."businessNumber"     AS "businessNumber",
+        ci."ceoName"            AS "ceoName",
+        STRUCT(
+          "id" := rc.id,
+          "createdAt" := rc."createdAt",
+          "name" := rc.name,
+          "isDisable" := rc."isDisable",
+          "govermentType" := rc."govermentType"
+        ) AS "RegionCategory"
+      FROM tbl_cafe_info ci
+      INNER JOIN tbl_region_category rc
+        ON ci."regionCategoryId" = rc.id
+      EMIT CHANGES;
+    `,
+      { 'ksql.streams.auto.offset.reset': 'earliest' },
+    );
+
+    console.log('✅ KSQL queries setup completed');
+    console.log('   📊 Created table: mv_cafe_info_with_region');
+    console.log('   📊 Output topic (changelog): CAFE_INFO_WITH_REGION_MV');
+  } catch (error) {
+    console.error('❌ Failed to setup KSQL queries:', error);
+    throw error;
+  }
+}
+
 async function stopPostgres() {
   console.log('🔄 Stopping Postgres...');
   await postgres?.stop();
@@ -360,6 +718,14 @@ async function stopKafkaUi() {
   console.log('✅ Kafka UI stopped');
 }
 
+async function stopKSQLDB() {
+  console.log('🔄 Stopping KSQLDB...');
+  await ksqlDb?.stop({
+    removeVolumes: true,
+  });
+  console.log('✅ KSQLDB stopped');
+}
+
 let isStartCleanUp = false;
 async function cleanUp(code: number = 0) {
   if (isStartCleanUp) {
@@ -374,6 +740,7 @@ async function cleanUp(code: number = 0) {
   await stopKibana();
   await stopElasticsearch();
   await stopKafkaUi();
+  await stopKSQLDB();
   await removeNetwork();
   stopNestJS();
   console.log('✅ Clean up completed');
@@ -461,6 +828,8 @@ async function bootstrap(args: string[]) {
   const excludeElasticsearch = commandParameters.includes('elasticsearch');
   if (excludeElasticsearch)
     console.log('🔄 Elasticsearch를 실행하지 않습니다.');
+  const excludeKSQLDB = commandParameters.includes('ksqldb');
+  if (excludeKSQLDB) console.log('🔄 KSQLDB를 실행하지 않습니다.');
   if (!excludePostgres) {
     await startPostgres(network);
   }
@@ -526,6 +895,22 @@ async function bootstrap(args: string[]) {
       throw new Error('❌ Elasticsearch URL is required for Kibana');
     }
     await startKibana(network, _elasticsearchUrl);
+  }
+  if (!excludeKSQLDB) {
+    let bootstrapServer = kafkaInternalBootstrapServer;
+    if (!bootstrapServer) {
+      const kafkaParameter = getCommandParameters('--kafka', args)[0];
+      if (!kafkaParameter?.[0]) {
+        throw new Error(
+          '❌ Kafka bootstrap server is required for KSQLDB (--kafka-url or start Kafka container)',
+        );
+      }
+      bootstrapServer = kafkaParameter[0].replace(/^PLAINTEXT:\/\//, '');
+    }
+    if (!bootstrapServer) {
+      throw new Error('❌ Kafka bootstrap server is required for KSQLDB');
+    }
+    await startKSQLDB(network, bootstrapServer);
   }
   const isStartApp = args.includes('--start-app');
   const isStartAppWithWatch = args.includes('--watch');
