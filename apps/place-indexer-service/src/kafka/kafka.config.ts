@@ -1,6 +1,6 @@
 // apps/search-indexer-service/src/kafka/kafka.config.ts
 import { KafkaOptions, Transport } from '@nestjs/microservices';
-import { KAFKA_BROKERS, KAFKA_CLIENT_ID, KAFKA_GROUP_ID } from '../util/types';
+import { KAFKA_BROKERS, KAFKA_CLIENT_ID, KAFKA_GROUP_ID } from '../util/config';
 import { ConfigService } from '@nestjs/config';
 
 export const getKafkaConfig = (configService: ConfigService): KafkaOptions => ({

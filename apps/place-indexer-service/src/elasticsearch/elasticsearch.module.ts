@@ -6,7 +6,7 @@ import {
   ELASTICSEARCH_HOSTS,
   ELASTICSEARCH_PASSWORD,
   ELASTICSEARCH_USERNAME,
-} from 'src/util/types';
+} from 'src/util/config';
 
 @Global() // 다른 모듈에서 별도 export 없이 바로 ElasticsearchService 주입 가능
 @Module({
