@@ -84,4 +84,10 @@ export class RegioncategoriesController {
   findAllRegionCategories() {
     return this.regioncategoriesService.findAllRegionCategories();
   }
+
+  @Get(':id')
+  @Public()
+  findRegionCategoryById(@Param('id') id: string) {
+    return this.regioncategoriesService.findRegionCategory(+id);
+  }
 }

@@ -55,7 +55,8 @@ async function startPrismaStudio(connectionString: string, isWindows: boolean = 
 async function setupTestDatabase() {
   // 1. PostgreSQL 컨테이너 시작
   console.log('✨ Starting PostgreSQL container...');
-  dbContainer = await new GenericContainer('postgres:15-alpine')
+  dbContainer = await new GenericContainer('debezium/postgres:16-alpine')
+    .withNetworkAliases('test-total-db')
     .withExposedPorts(5432)
     .withEnvironment({
       POSTGRES_USER: 'testuser',
