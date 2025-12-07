@@ -9,7 +9,7 @@
  * nestjs 앱 실행하고 prisma studio 실행
  */
 /**
- * npm run start:test-db --seed:cafeinfo-big-data:100
+ * npm run -- start:test-db --seed:cafeinfo-big-data:100
  * cafeinfo-big-data 시딩 100개
  */
 
@@ -151,6 +151,7 @@ async function seedTestDatabase(connectionString: string, argv: string[], isWind
     stdio: 'inherit',
     shell: isWindows,
     cwd: path.resolve(process.cwd()),
+    env: { ...process.env, DATABASE_URL: connectionString },
   });
 
   await new Promise((resolve, reject) => {

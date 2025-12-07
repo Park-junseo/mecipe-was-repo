@@ -19,12 +19,6 @@ import {
           username: ELASTICSEARCH_USERNAME(configService),
           password: ELASTICSEARCH_PASSWORD(configService),
         },
-        // headers: {
-        //   Accept: 'application/vnd.elasticsearch+json; compatible-with=8',
-        //   'Content-Type':
-        //     'application/vnd.elasticsearch+json; compatible-with=8',
-        // },
-        // enableMetaHeader: true,
       }),
       inject: [ConfigService],
     }),
