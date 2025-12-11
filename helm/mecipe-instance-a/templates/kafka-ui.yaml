@@ -1,0 +1,58 @@
+{{- if .Values.kafkaUI.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mecipe-instance-a.fullname" . }}-kafka-ui
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mecipe-instance-a.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.kafkaUI.service.type }}
+  ports:
+    - port: {{ .Values.kafkaUI.service.port }}
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "mecipe-instance-a.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: kafka-ui
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mecipe-instance-a.fullname" . }}-kafka-ui
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mecipe-instance-a.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kafka-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "mecipe-instance-a.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: kafka-ui
+  template:
+    metadata:
+      labels:
+        {{- include "mecipe-instance-a.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: kafka-ui
+    spec:
+      containers:
+      - name: kafka-ui
+        image: {{ include "mecipe-instance-a.image" (dict "Values" .Values "repository" .Values.kafkaUI.image.repository "tag" .Values.kafkaUI.image.tag) }}
+        imagePullPolicy: {{ .Values.kafkaUI.image.pullPolicy | default "IfNotPresent" }}
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        env:
+        {{- range $index, $cluster := .Values.kafkaUI.kafkaClusters }}
+        - name: KAFKA_CLUSTERS_{{ $index }}_NAME
+          value: {{ $cluster.name | quote }}
+        - name: KAFKA_CLUSTERS_{{ $index }}_BOOTSTRAPSERVERS
+          value: {{ $cluster.bootstrapServers | quote }}
+        {{- end }}
+        - name: SERVER_PORT
+          value: {{ .Values.kafkaUI.service.port | quote }}
+{{- end }}
+

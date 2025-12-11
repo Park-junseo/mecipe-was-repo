@@ -1,0 +1,123 @@
+# Default values for mecipe-instance-b
+# This is a YAML-formatted file.
+
+global:
+  dockerRegistry: ""
+  imagePullSecrets: []
+
+# PostgreSQL Configuration
+postgresql:
+  enabled: true
+  image:
+    repository: debezium/postgres
+    tag: "16-alpine"
+  persistence:
+    enabled: true
+    size: 20Gi
+    storageClass: ""
+  auth:
+    postgresPassword: ""
+    username: postgres
+    database: mydb
+  service:
+    type: ClusterIP
+    port: 5432
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+
+# Elasticsearch Configuration
+elasticsearch:
+  enabled: true
+  image:
+    repository: docker.elastic.co/elasticsearch/elasticsearch
+    tag: "8.14.0"
+  persistence:
+    enabled: true
+    size: 20Gi
+    storageClass: ""
+  discovery:
+    type: single-node
+  security:
+    enabled: true
+    httpSslEnabled: false
+    elasticPassword: ""
+  javaOpts: "-Xms512m -Xmx512m"
+  service:
+    type: ClusterIP
+    port: 9200
+  resources:
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+
+# Kibana Configuration
+kibana:
+  enabled: true
+  image:
+    repository: docker.elastic.co/kibana/kibana
+    tag: "8.14.0"
+  elasticsearch:
+    hosts: "http://elasticsearch:9200"
+    username: kibana_system
+    password: ""
+  service:
+    type: ClusterIP
+    port: 5601
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+# Debezium Connect Configuration
+debezium:
+  enabled: true
+  image:
+    repository: debezium/connect
+    tag: "2.6"
+  kafka:
+    bootstrapServers: "kafka.instance-a.svc.cluster.local:9092"
+  groupId: "1"
+  configStorageTopic: "connect-configs"
+  offsetStorageTopic: "connect-offsets"
+  statusStorageTopic: "connect-status"
+  connector:
+    name: "cafe-infos-debezium-connector"
+    database:
+      hostname: "postgresql"
+      port: "5432"
+      user: ""
+      password: ""
+      dbname: ""
+    serverName: "dbserver"
+    tableIncludeList: "public.CafeInfo,public.RegionCategory"
+  service:
+    type: ClusterIP
+    port: 8083
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+
+# Secrets (should be managed externally)
+secrets:
+  postgresPassword: ""
+  elasticPassword: ""
+  kibanaPassword: ""
+  databaseUser: ""
+  databasePassword: ""
+  databaseName: ""
+

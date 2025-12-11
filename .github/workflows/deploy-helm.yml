@@ -1,0 +1,268 @@
+name: Deploy with Helm
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - 'helm/**'
+      - '.github/workflows/deploy-helm.yml'
+      - 'apps/place-indexer-service/**'
+      - 'mecipe-was/**'
+      - 'nginx/**'
+      - 'scripts/healthcheck-and-fallback.sh'
+  workflow_dispatch:
+
+jobs:
+  # 🧪 1. 테스트 Job
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 20.x
+        cache: 'npm'
+        cache-dependency-path: mecipe-was/package-lock.json
+
+    - name: Install dependencies
+      working-directory: ./mecipe-was
+      run: npm ci
+
+    - name: Generate Prisma Client
+      working-directory: ./mecipe-was
+      run: npx prisma generate
+
+    - name: Run linter
+      working-directory: ./mecipe-was
+      run: npm run lint
+
+    - name: Run tests
+      working-directory: ./mecipe-was
+      run: npm test
+
+    - name: Build application
+      working-directory: ./mecipe-was
+      run: npm run build
+
+    - name: Install dependencies (place-indexer-service)
+      working-directory: ./apps/place-indexer-service
+      run: npm ci
+
+    - name: Build place-indexer-service
+      working-directory: ./apps/place-indexer-service
+      run: npm run build
+
+  # 📦 2. Docker 이미지 빌드 및 푸시
+  build_and_push_docker:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and push mecipe-api-server image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./mecipe-was
+        file: ./mecipe-was/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/mecipe-api-server:latest
+          ${{ secrets.DOCKER_USERNAME }}/mecipe-api-server:${{ github.sha }}
+        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/mecipe-api-server:latest
+        cache-to: type=inline
+
+    - name: Build and push place-indexer-service image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./apps/place-indexer-service
+        file: ./apps/place-indexer-service/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/place-indexer-service:latest
+          ${{ secrets.DOCKER_USERNAME }}/place-indexer-service:${{ github.sha }}
+        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/place-indexer-service:latest
+        cache-to: type=inline
+
+    - name: Build and push Nginx image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./nginx
+        file: ./nginx/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/mecipe-nginx:latest
+          ${{ secrets.DOCKER_USERNAME }}/mecipe-nginx:${{ github.sha }}
+
+  # 🏥 3. 인스턴스 B 헬스체크 및 폴백
+  healthcheck_instance_b:
+    runs-on: [self-hosted, instance-b, Linux, X64]
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Docker
+      run: |
+        sudo systemctl start docker || true
+        sudo usermod -aG docker $USER || true
+
+    - name: Run healthcheck and fallback script
+      env:
+        POSTGRES_HOST: ${{ secrets.POSTGRES_HOST || 'postgresql.instance-b.svc.cluster.local' }}
+        POSTGRES_PORT: ${{ secrets.POSTGRES_PORT || '5432' }}
+        POSTGRES_USER: ${{ secrets.POSTGRES_USER || 'postgres' }}
+        POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        POSTGRES_DB: ${{ secrets.POSTGRES_DB || 'mydb' }}
+        ELASTICSEARCH_HOST: ${{ secrets.ELASTICSEARCH_HOST || 'elasticsearch.instance-b.svc.cluster.local' }}
+        ELASTICSEARCH_PORT: ${{ secrets.ELASTICSEARCH_PORT || '9200' }}
+        ELASTICSEARCH_USERNAME: ${{ secrets.ELASTICSEARCH_USERNAME || 'elastic' }}
+        ELASTICSEARCH_PASSWORD: ${{ secrets.ELASTICSEARCH_PASSWORD }}
+        TIMEOUT: "30"
+      run: |
+        chmod +x ./scripts/healthcheck-and-fallback.sh
+        ./scripts/healthcheck-and-fallback.sh
+
+  # 🚀 4. 인스턴스 A 배포 (Helm)
+  deploy_instance_a:
+    needs: [test, build_and_push_docker]
+    runs-on: [self-hosted, instance-a, Linux, X64]
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Install Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: 'latest'
+
+    - name: Configure kubectl
+      run: |
+        mkdir -p ~/.kube
+        echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+        chmod 600 ~/.kube/config
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Lint Helm charts
+      run: |
+        helm lint ./helm/mecipe-instance-a
+
+    - name: Deploy Instance A with Helm
+      run: |
+        helm upgrade --install mecipe-instance-a ./helm/mecipe-instance-a \
+          --namespace instance-a \
+          --create-namespace \
+          --wait \
+          --timeout 10m \
+          --set global.dockerRegistry="${{ secrets.DOCKER_USERNAME }}" \
+          --set placeIndexerService.image.repository="${{ secrets.DOCKER_USERNAME }}/place-indexer-service" \
+          --set placeIndexerService.image.tag="${{ github.sha }}" \
+          --set mecipeWAS.image.repository="${{ secrets.DOCKER_USERNAME }}/mecipe-api-server" \
+          --set mecipeWAS.image.tag="${{ github.sha }}" \
+          --set nginx.image.repository="${{ secrets.DOCKER_USERNAME }}/mecipe-nginx" \
+          --set nginx.image.tag="${{ github.sha }}" \
+          --set configMap.domainName="${{ secrets.DOMAIN_NAME }}" \
+          --set secrets.databaseUrl="${{ secrets.DATABASE_URL }}" \
+          --set secrets.jwtSecret="${{ secrets.JWT_SECRET }}" \
+          --set secrets.secretLoginCrypto="${{ secrets.SECRET_LOGIN_CRYPTO }}" \
+          --set secrets.elasticsearchUsername="${{ secrets.ELASTICSEARCH_USERNAME || 'elastic' }}" \
+          --set secrets.elasticsearchPassword="${{ secrets.ELASTICSEARCH_PASSWORD }}" \
+          --set secrets.apiKey="${{ secrets.API_KEY }}" \
+          --set secrets.buildApiKey="${{ secrets.BUILD_API_KEY }}" \
+          --set secrets.couponSecret="${{ secrets.COUPON_SECRET }}" \
+          --set secrets.productSecret="${{ secrets.PRODUCT_SECRET }}"
+
+    - name: Run database migrations
+      run: |
+        kubectl exec -n instance-a deployment/mecipe-instance-a-was -- npx prisma migrate deploy || echo "Migration failed or no migrations to apply"
+
+    - name: Health check
+      run: |
+        echo "Performing health check..."
+        sleep 30
+        kubectl get pods -n instance-a
+        kubectl get svc -n instance-a
+
+  # 🚀 5. 인스턴스 B 배포 (Helm)
+  deploy_instance_b:
+    needs: [test, build_and_push_docker, healthcheck_instance_b]
+    runs-on: [self-hosted, instance-b, Linux, X64]
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Install Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: 'latest'
+
+    - name: Configure kubectl
+      run: |
+        mkdir -p ~/.kube
+        echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+        chmod 600 ~/.kube/config
+
+    - name: Lint Helm charts
+      run: |
+        helm lint ./helm/mecipe-instance-b
+
+    - name: Deploy Instance B with Helm
+      run: |
+        helm upgrade --install mecipe-instance-b ./helm/mecipe-instance-b \
+          --namespace instance-b \
+          --create-namespace \
+          --wait \
+          --timeout 10m \
+          --set secrets.postgresPassword="${{ secrets.POSTGRES_PASSWORD }}" \
+          --set secrets.elasticPassword="${{ secrets.ELASTICSEARCH_PASSWORD }}" \
+          --set secrets.kibanaPassword="${{ secrets.KIBANA_PASSWORD }}" \
+          --set secrets.databaseUser="${{ secrets.POSTGRES_USER || 'postgres' }}" \
+          --set secrets.databasePassword="${{ secrets.POSTGRES_PASSWORD }}" \
+          --set secrets.databaseName="${{ secrets.POSTGRES_DB || 'mydb' }}" \
+          --set debezium.kafka.bootstrapServers="kafka.instance-a.svc.cluster.local:9092" \
+          --set debezium.connector.database.user="${{ secrets.POSTGRES_USER || 'postgres' }}" \
+          --set debezium.connector.database.password="${{ secrets.POSTGRES_PASSWORD }}" \
+          --set debezium.connector.database.dbname="${{ secrets.POSTGRES_DB || 'mydb' }}"
+
+    - name: Setup Elasticsearch users
+      run: |
+        sleep 30
+        ELASTICSEARCH_POD=$(kubectl get pod -l app.kubernetes.io/component=elasticsearch -n instance-b -o jsonpath='{.items[0].metadata.name}')
+        kubectl exec -n instance-b $ELASTICSEARCH_POD -- curl -X POST "localhost:9200/_security/user/kibana_system/_password" \
+          -H 'Content-Type: application/json' \
+          -u elastic:${{ secrets.ELASTICSEARCH_PASSWORD }} \
+          -d "{\"password\":\"${{ secrets.KIBANA_PASSWORD }}\"}" || echo "Kibana user password may already be set"
+
+    - name: Setup Debezium Connector
+      run: |
+        sleep 10
+        DEBEZIUM_POD=$(kubectl get pod -l app.kubernetes.io/component=debezium -n instance-b -o jsonpath='{.items[0].metadata.name}')
+        CONNECTOR_CONFIG=$(kubectl get configmap mecipe-instance-b-debezium-connector-config -n instance-b -o jsonpath='{.data.connector-config\.json}')
+        kubectl exec -n instance-b $DEBEZIUM_POD -- curl -X POST http://localhost:8083/connectors \
+          -H 'Content-Type: application/json' \
+          -d "$CONNECTOR_CONFIG" || echo "Connector may already exist"
+
+    - name: Health check
+      run: |
+        echo "Performing health check..."
+        sleep 30
+        kubectl get pods -n instance-b
+        kubectl get svc -n instance-b
+

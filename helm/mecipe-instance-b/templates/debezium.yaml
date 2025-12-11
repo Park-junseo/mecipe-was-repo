@@ -1,0 +1,109 @@
+{{- if .Values.debezium.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: debezium-connect
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mecipe-instance-b.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.debezium.service.type }}
+  ports:
+    - port: {{ .Values.debezium.service.port }}
+      targetPort: 8083
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "mecipe-instance-b.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: debezium
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: debezium-connect
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mecipe-instance-b.labels" . | nindent 4 }}
+    app.kubernetes.io/component: debezium
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "mecipe-instance-b.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: debezium
+  template:
+    metadata:
+      labels:
+        {{- include "mecipe-instance-b.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: debezium
+    spec:
+      containers:
+      - name: debezium-connect
+        image: {{ include "mecipe-instance-b.image" (dict "Values" .Values "repository" .Values.debezium.image.repository "tag" .Values.debezium.image.tag) }}
+        ports:
+        - containerPort: 8083
+          name: http
+        env:
+        - name: BOOTSTRAP_SERVERS
+          value: {{ .Values.debezium.kafka.bootstrapServers | quote }}
+        - name: GROUP_ID
+          value: {{ .Values.debezium.groupId | quote }}
+        - name: CONFIG_STORAGE_TOPIC
+          value: {{ .Values.debezium.configStorageTopic | quote }}
+        - name: OFFSET_STORAGE_TOPIC
+          value: {{ .Values.debezium.offsetStorageTopic | quote }}
+        - name: STATUS_STORAGE_TOPIC
+          value: {{ .Values.debezium.statusStorageTopic | quote }}
+        {{- with .Values.debezium.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /connectors
+            port: 8083
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /connectors
+            port: 8083
+          initialDelaySeconds: 30
+          periodSeconds: 10
+---
+{{- if .Values.debezium.connector }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mecipe-instance-b.fullname" . }}-debezium-connector-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mecipe-instance-b.labels" . | nindent 4 }}
+data:
+  connector-config.json: |
+    {
+      "name": "{{ .Values.debezium.connector.name }}",
+      "config": {
+        "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+        "plugin.name": "pgoutput",
+        "tasks.max": "1",
+        "database.hostname": "{{ .Values.debezium.connector.database.hostname }}",
+        "database.port": "{{ .Values.debezium.connector.database.port }}",
+        "database.user": "{{ .Values.debezium.connector.database.user }}",
+        "database.password": "{{ .Values.debezium.connector.database.password }}",
+        "database.dbname": "{{ .Values.debezium.connector.database.dbname }}",
+        "database.server.name": "{{ .Values.debezium.connector.serverName }}",
+        "topic.prefix": "{{ .Values.debezium.connector.serverName }}",
+        "table.include.list": "{{ .Values.debezium.connector.tableIncludeList }}",
+        "publication.autocreate.mode": "all_tables",
+        "slot.name": "debezium_slot",
+        "heartbeat.interval.ms": "5000",
+        "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+        "value.converter.schemas.enable": "false",
+        "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+        "key.converter.schemas.enable": "false"
+      }
+    }
+{{- end }}
+{{- end }}
+

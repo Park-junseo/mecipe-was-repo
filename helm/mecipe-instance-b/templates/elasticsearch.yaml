@@ -1,0 +1,98 @@
+{{- if .Values.elasticsearch.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mecipe-instance-b.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.elasticsearch.service.type }}
+  ports:
+    - port: {{ .Values.elasticsearch.service.port }}
+      targetPort: 9200
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "mecipe-instance-b.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: elasticsearch
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mecipe-instance-b.labels" . | nindent 4 }}
+    app.kubernetes.io/component: elasticsearch
+spec:
+  serviceName: elasticsearch
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "mecipe-instance-b.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: elasticsearch
+  template:
+    metadata:
+      labels:
+        {{- include "mecipe-instance-b.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: elasticsearch
+    spec:
+      containers:
+      - name: elasticsearch
+        image: {{ include "mecipe-instance-b.image" (dict "Values" .Values "repository" .Values.elasticsearch.image.repository "tag" .Values.elasticsearch.image.tag) }}
+        ports:
+        - containerPort: 9200
+          name: http
+        env:
+        - name: discovery.type
+          value: {{ .Values.elasticsearch.discovery.type | quote }}
+        - name: xpack.security.enabled
+          value: {{ .Values.elasticsearch.security.enabled | quote }}
+        - name: xpack.security.http.ssl.enabled
+          value: {{ .Values.elasticsearch.security.httpSslEnabled | quote }}
+        {{- if .Values.secrets.elasticPassword }}
+        - name: ELASTIC_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "mecipe-instance-b.fullname" . }}-secrets
+              key: elastic-password
+        {{- end }}
+        - name: ES_JAVA_OPTS
+          value: {{ .Values.elasticsearch.javaOpts | quote }}
+        volumeMounts:
+        - name: elasticsearch-data
+          mountPath: /usr/share/elasticsearch/data
+        {{- with .Values.elasticsearch.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /_cluster/health
+            port: 9200
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /_cluster/health
+            port: 9200
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+  {{- if .Values.elasticsearch.persistence.enabled }}
+  volumeClaimTemplates:
+  - metadata:
+      name: elasticsearch-data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      {{- if .Values.elasticsearch.persistence.storageClass }}
+      storageClassName: {{ .Values.elasticsearch.persistence.storageClass }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.elasticsearch.persistence.size }}
+  {{- end }}
+{{- end }}

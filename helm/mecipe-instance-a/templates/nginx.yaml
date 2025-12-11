@@ -1,0 +1,108 @@
+{{- if .Values.nginx.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mecipe-instance-a.fullname" . }}-nginx
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mecipe-instance-a.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.nginx.service.type }}
+  ports:
+    - port: {{ .Values.nginx.service.ports.http }}
+      targetPort: 80
+      protocol: TCP
+      name: http
+    - port: {{ .Values.nginx.service.ports.https }}
+      targetPort: 443
+      protocol: TCP
+      name: https
+  selector:
+    {{- include "mecipe-instance-a.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: nginx
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mecipe-instance-a.fullname" . }}-nginx
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mecipe-instance-a.labels" . | nindent 4 }}
+    app.kubernetes.io/component: nginx
+spec:
+  replicas: {{ .Values.nginx.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "mecipe-instance-a.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: nginx
+  template:
+    metadata:
+      labels:
+        {{- include "mecipe-instance-a.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: nginx
+    spec:
+      {{- if and .Values.global.imagePullSecrets (gt (len .Values.global.imagePullSecrets) 0) }}
+      imagePullSecrets:
+        {{- toYaml .Values.global.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: nginx
+        image: {{ include "mecipe-instance-a.image" (dict "Values" .Values "repository" .Values.nginx.image.repository "tag" .Values.nginx.image.tag) }}
+        imagePullPolicy: {{ .Values.nginx.image.pullPolicy | default "Always" }}
+        ports:
+        - name: http
+          containerPort: 80
+          protocol: TCP
+        - name: https
+          containerPort: 443
+          protocol: TCP
+        env:
+        - name: DOMAIN_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "mecipe-instance-a.fullname" . }}-config
+              key: domain-name
+        - name: APP_PORT
+          value: {{ .Values.nginx.env.appPort | quote }}
+        - name: SOCKET_PORT
+          value: {{ .Values.nginx.env.socketPort | quote }}
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        {{- if .Values.nginx.persistence.certbotConf.enabled }}
+        - name: certbot-conf
+          mountPath: /etc/letsencrypt
+          readOnly: true
+        {{- end }}
+        {{- if .Values.nginx.persistence.certbotWww.enabled }}
+        - name: certbot-www
+          mountPath: /var/www/certbot
+          readOnly: true
+        {{- end }}
+        {{- if .Values.nginx.persistence.media.enabled }}
+        - name: media-storage
+          mountPath: /var/www/media
+          readOnly: true
+        {{- end }}
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: {{ include "mecipe-instance-a.fullname" . }}-nginx-config
+      {{- if .Values.nginx.persistence.certbotConf.enabled }}
+      - name: certbot-conf
+        persistentVolumeClaim:
+          claimName: {{ include "mecipe-instance-a.fullname" . }}-certbot-conf-pvc
+      {{- end }}
+      {{- if .Values.nginx.persistence.certbotWww.enabled }}
+      - name: certbot-www
+        persistentVolumeClaim:
+          claimName: {{ include "mecipe-instance-a.fullname" . }}-certbot-www-pvc
+      {{- end }}
+      {{- if .Values.nginx.persistence.media.enabled }}
+      - name: media-storage
+        persistentVolumeClaim:
+          claimName: {{ include "mecipe-instance-a.fullname" . }}-media-pvc
+      {{- end }}
+{{- end }}
+
