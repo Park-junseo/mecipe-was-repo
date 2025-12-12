@@ -20,12 +20,12 @@ function copyRecursive(src, dest) {
 
 // Prisma 파일을 dist로 복사
 if (fs.existsSync('prisma/basic')) {
-  const destDir = 'dist/prisma/basic';
-  if (!fs.existsSync('dist/prisma')) {
-    fs.mkdirSync('dist/prisma', { recursive: true });
+  const destDir = 'dist/mecipe-was/prisma/basic';
+  if (!fs.existsSync('dist/mecipe-was/prisma')) {
+    fs.mkdirSync('dist/mecipe-was/prisma', { recursive: true });
   }
   copyRecursive('prisma/basic', destDir);
-  console.log('✅ Prisma files copied to dist/prisma/basic');
+  console.log('✅ Prisma files copied to dist/mecipe-was/prisma/basic');
 } else {
   console.warn('⚠️ prisma/basic folder not found');
 }

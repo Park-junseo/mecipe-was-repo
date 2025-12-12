@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger, Optional } from '@nestjs/common';
 // import { PrismaClient } from 'prisma/basic';
-import * as dayjs from 'dayjs';
+import dayjs from 'dayjs';
 import { Prisma, PrismaClient } from 'prisma/basic';
 import { FilteredOnlyRequired, RequiredKeys } from 'src/util/types';
 import { isPrimitive } from 'src/util/isPrimitive';

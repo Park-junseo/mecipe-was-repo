@@ -1,7 +1,6 @@
 import { GraphQLResolveInfo } from 'graphql';
 import { getPrismaSelectFromInfo } from '../graphql/graphql-query-parser.util';
 import { parseResolveInfo, ResolveTree, FieldsByTypeName } from 'graphql-parse-resolve-info';
-import { NodeLocation } from 'src/common/graphql';
 import { createGraphQLResolveInfoFromQuery } from '../graphql/test-helpers/graphql-info-helper';
 
 describe('getPrismaSelectFromInfo - 실제 GraphQL 쿼리 사용', () => {

@@ -1,0 +1,86 @@
+{
+  "name": "mecipe-was",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "mecipe-was/src",
+  "projectType": "application",
+  "tags": ["app", "nestjs"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/mecipe-was/dist/mecipe-was"],
+      "defaultConfiguration": "production",
+      "options": {
+        "command": "nest build",
+        "cwd": "mecipe-was"
+      },
+      "configurations": {
+        "development": {},
+        "production": {}
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "nest start",
+        "cwd": "mecipe-was"
+      },
+      "configurations": {
+        "development": {
+          "command": "nest start --watch",
+          "cwd": "mecipe-was"
+        },
+        "production": {
+          "command": "node dist/mecipe-was/src/main.js",
+          "cwd": "mecipe-was"
+        }
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["mecipe-was/**/*.ts"]
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "jest --config jest.config.ts",
+        "cwd": "mecipe-was"
+      },
+      "configurations": {
+        "ci": {
+          "command": "jest --config jest.config.ts --ci --coverage",
+          "cwd": "mecipe-was"
+        }
+      }
+    },
+    "prisma": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm --filter mecipe-was prisma",
+        "cwd": "mecipe-was"
+      }
+    },
+    "prisma:migrate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm --filter mecipe-was prisma:migrate",
+        "cwd": "mecipe-was"
+      }
+    },
+    "test:env": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "ts-node -r tsconfig-paths/register mecipe-was/scripts/prisma/test-db-setup.dev.ts --start-app",
+        "cwd": "{workspaceRoot}"
+      },
+      "configurations": {
+        "watch": {
+          "command": "ts-node -r tsconfig-paths/register mecipe-was/scripts/prisma/test-db-setup.dev.ts --start-app --watch"
+        }
+      }
+    }
+  }
+}
+

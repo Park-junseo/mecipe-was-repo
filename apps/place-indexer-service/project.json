@@ -1,0 +1,72 @@
+{
+  "name": "place-indexer-service",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/place-indexer-service/src",
+  "projectType": "application",
+  "tags": ["app", "nestjs"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/apps/place-indexer-service/dist/apps/place-indexer-service"],
+      "defaultConfiguration": "production",
+      "options": {
+        "command": "nest build",
+        "cwd": "apps/place-indexer-service"
+      },
+      "configurations": {
+        "development": {},
+        "production": {}
+      }
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "nest start",
+        "cwd": "apps/place-indexer-service"
+      },
+      "configurations": {
+        "development": {
+          "command": "nest start --watch",
+          "cwd": "apps/place-indexer-service"
+        },
+        "production": {
+          "command": "node dist/apps/place-indexer-service/src/main.js",
+          "cwd": "apps/place-indexer-service"
+        }
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["apps/place-indexer-service/**/*.ts"]
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "jest --config jest.config.ts",
+        "cwd": "apps/place-indexer-service"
+      },
+      "configurations": {
+        "ci": {
+          "command": "jest --config jest.config.ts --ci --coverage",
+          "cwd": "apps/place-indexer-service"
+        }
+      }
+    },
+    "test:env": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "ts-node -r tsconfig-paths/register apps/place-indexer-service/scripts/test-infra-setup.dev.ts --start-app",
+        "cwd": "{workspaceRoot}"
+      },
+      "configurations": {
+        "watch": {
+          "command": "ts-node -r tsconfig-paths/register apps/place-indexer-service/scripts/test-infra-setup.dev.ts --start-app --watch"
+        }
+      }
+    }
+  }
+}
+

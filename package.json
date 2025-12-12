@@ -1,0 +1,39 @@
+{
+  "name": "virtualcafe-was-repo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Virtual Cafe WAS Monorepo",
+  "scripts": {
+    "build": "nx run-many --target=build --all",
+    "test": "nx run-many --target=test --all",
+    "lint": "nx run-many --target=lint --all",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "prepare": "node -e \"try { require('husky').install() } catch (e) {}\"",
+    "test:env": "nx run-many --target=test:env --all",
+    "test:env:watch": "nx run-many --target=test:env --all --configuration=watch"
+  },
+  "devDependencies": {
+    "@nx/devkit": "^20.0.0",
+    "@nx/eslint": "^20.0.0",
+    "@nx/jest": "^20.0.0",
+    "@nx/js": "^20.0.0",
+    "@nx/node": "^20.0.0",
+    "@nx/nest": "^20.0.0",
+    "@nx/webpack": "^20.0.0",
+    "@nx/workspace": "^20.0.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.0.0",
+    "eslint": "^9.0.0",
+    "jest": "^30.0.0",
+    "nx": "^20.0.0",
+    "prettier": "^3.0.0",
+    "ts-jest": "^29.4.5",
+    "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.0.0"
+}
+

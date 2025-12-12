@@ -3,14 +3,15 @@
 /**
  * npm run start:test-- --start-app
  * nestjs 앱 실행
- */
-/**
+ * 
  * npm run start:test-db -- --start-app --start-prisma-studio
  * nestjs 앱 실행하고 prisma studio 실행
- */
-/**
- * npm run -- start:test-db --seed:cafeinfo-big-data:100
+ * 
+ * npm run start:test-db -- --seed:cafeinfo-big-data:100
  * cafeinfo-big-data 시딩 100개
+ * 
+ * npm run start:test-db -- --seed:cafeinfo-big-data:100 --start-app --start-prisma-studio
+ * cafeinfo-big-data 시딩 100개하고 nestjs 앱 실행하고 prisma studio 실행
  */
 
 import { GenericContainer, StartedTestContainer } from 'testcontainers';
