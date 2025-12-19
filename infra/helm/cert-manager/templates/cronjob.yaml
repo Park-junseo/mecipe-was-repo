@@ -1,0 +1,52 @@
+{{ if .Values.persistence.tempCertbotConf.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "common.fullname" . }}-certbot
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.schedule | quote }}
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "common.selectorLabels" . | nindent 12 }}
+        spec:
+          {{- include "common.nodeSelector" . }}
+          restartPolicy: OnFailure
+          containers:
+          - name: certbot
+            image: certbot/certbot:latest
+            command:
+            - certbot
+            - renew
+            - --quiet
+            - --no-self-upgrade
+            {{- if .Values.persistence.certbotConf.enabled }}
+            volumeMounts:
+            - name: certbot-conf
+              mountPath: /etc/letsencrypt
+            {{- end }}
+            {{- if .Values.persistence.certbotWww.enabled }}
+            - name: certbot-www
+              mountPath: /var/www/certbot
+            {{- end }}
+          {{- if or .Values.persistence.certbotConf.enabled .Values.persistence.certbotWww.enabled }}
+          volumes:
+          {{- if .Values.persistence.certbotConf.enabled }}
+          - name: certbot-conf
+            persistentVolumeClaim:
+              claimName: nginx-certbot-conf-pvc
+          {{- end }}
+          {{- if .Values.persistence.certbotWww.enabled }}
+          - name: certbot-www
+            persistentVolumeClaim:
+              claimName: nginx-certbot-www-pvc
+          {{- end }}
+          {{- end }}
+

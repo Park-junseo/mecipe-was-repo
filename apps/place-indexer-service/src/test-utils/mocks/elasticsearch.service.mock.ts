@@ -1,5 +1,5 @@
 import { ElasticsearchService as ESService } from '@nestjs/elasticsearch';
-import { ElasticsearchService } from 'src/elasticsearch/elasticsearch.service';
+import { ElasticsearchService } from '../../elasticsearch/elasticsearch.service';
 
 export type MockNestElasticsearchService = Awaited<
   ReturnType<typeof createMockNestElasticsearchService>

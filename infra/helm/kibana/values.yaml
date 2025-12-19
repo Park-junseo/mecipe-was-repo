@@ -1,0 +1,33 @@
+# Default values for kibana
+global:
+  dockerRegistry: ""
+  imagePullSecrets: []
+
+# Node selector - Instance B (data node)
+nodeSelector:
+  node-role: data
+
+image:
+  repository: docker.elastic.co/kibana/kibana
+  tag: "8.14.0"
+
+elasticsearch:
+  hosts: "http://elasticsearch:9200"
+  username: kibana_system
+  password: ""
+
+service:
+  type: ClusterIP
+  port: 5601
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+secrets:
+  kibanaPassword: ""
+

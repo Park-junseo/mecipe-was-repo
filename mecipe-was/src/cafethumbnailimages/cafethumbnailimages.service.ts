@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
-import { PrismaService } from 'src/global/prisma.service';
+import { PrismaService } from '../global/prisma.service';
 import { UpsertCafethumbnailimageListDto } from './dto/upsert-cafethumbnailimage.dto';
-import { CafeThumbnailImage } from 'prisma/basic';
+import { CafeThumbnailImage, Prisma } from '../../prisma/basic';
 
 @Injectable()
 export class CafethumbnailimagesService {
@@ -34,7 +34,7 @@ export class CafethumbnailimagesService {
         for (let i = 0; i < createDto.length; i++) {
           const created = await tx.cafeThumbnailImage.create({
             data: {
-              ...createDto[i],
+              ...createDto[i]
             },
           });
 

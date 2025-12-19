@@ -1,0 +1,81 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: es-security-init
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": hook-succeeded
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: init
+          image: curlimages/curl:8.5.0
+          envFrom:
+            - secretRef:
+                name: {{ include "common.fullname" . }}-secrets
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+
+              ES="http://elasticsearch:9200"
+
+              echo "⏳ Waiting for Elasticsearch to be ready..."
+              until curl -s -u "elastic:$ELASTIC_SUPERPASS" \
+                "$ES/_cluster/health" | grep -q '"status":"green"\|"status":"yellow"'; do
+                echo "  Elasticsearch not ready yet..."
+                sleep 5
+              done
+              echo "✅ Elasticsearch is ready"
+
+              create_role() {
+                ROLE=$1
+                echo "🔐 Ensuring role exists: $ROLE"
+
+                curl -s -o /dev/null -w "%{http_code}" \
+                  -u "elastic:$ELASTIC_SUPERPASS" \
+                  -X PUT "$ES/_security/role/$ROLE" \
+                  -H "Content-Type: application/json" \
+                  -d '{
+                    "cluster": [],
+                    "indices": [
+                      {
+                        "names": ["*"],
+                        "privileges": ["read", "write"]
+                      }
+                    ]
+                  }'
+              }
+
+              create_user() {
+                USER=$1
+                PASS=$2
+                ROLE=$3
+
+                echo "👤 Creating/updating user: $USER (role: $ROLE)"
+
+                curl -s -o /dev/null -w "%{http_code}" \
+                  -u "elastic:$ELASTIC_SUPERPASS" \
+                  -X PUT "$ES/_security/user/$USER" \
+                  -H "Content-Type: application/json" \
+                  -d '{
+                    "password": "'"$PASS"'",
+                    "roles": ["'"$ROLE"'"]
+                  }'
+              }
+
+              echo "🔧 Initializing roles..."
+              create_role producer
+              create_role app
+
+              echo "🔧 Initializing users..."
+              create_user "$KIBANA_USER_NAME"   "$KIBANA_USER_PASS"   "kibana_system"
+              create_user "$PRODUCER_USER_NAME" "$PRODUCER_USER_PASS" "producer"
+              create_user "$APP_USER_NAME"      "$APP_USER_PASS"      "app"
+
+              echo "✅ Elasticsearch security initialized"

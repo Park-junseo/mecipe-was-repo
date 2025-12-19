@@ -1,4 +1,4 @@
-import { Prisma } from 'prisma/basic';
+import { Prisma } from '../../../prisma/basic';
 
 // 방법 1: Prisma 타입을 그대로 사용 (검증 없음)
 export type CreateBoardDto = Prisma.BoardCreateInput;

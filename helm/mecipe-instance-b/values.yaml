@@ -86,7 +86,7 @@ debezium:
     repository: debezium/connect
     tag: "2.6"
   kafka:
-    bootstrapServers: "kafka.instance-a.svc.cluster.local:9092"
+    bootstrapServers: "kafka.instance-pre-a.svc.cluster.local:9092"
   groupId: "1"
   configStorageTopic: "connect-configs"
   offsetStorageTopic: "connect-offsets"

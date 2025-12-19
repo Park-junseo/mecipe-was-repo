@@ -1,0 +1,18 @@
+# Default values for kafka
+global:
+  dockerRegistry: ""
+  imagePullSecrets: []
+
+# Node selector - Instance A (app node)
+nodeSelector:
+  node-role: app
+
+# Bitnami Kafka Chart values
+kafka:
+  enabled: true
+  persistence:
+    enabled: true
+    size: 10Gi
+  nodeSelector:
+    node-role: app
+

@@ -1,8 +1,8 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { CreateRegioncategoryDto } from './dto/create-regioncategory.dto';
 import { UpdateRegioncategoryDto } from './dto/update-regioncategory.dto';
-import { PrismaService } from 'src/global/prisma.service';
-import { Prisma, PrismaPromise, RegionCategory } from 'prisma/basic';
+import { PrismaService } from '../global/prisma.service';
+import { Prisma, RegionCategory } from '../../prisma/basic';
 
 @Injectable()
 export class RegioncategoriesService {

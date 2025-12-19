@@ -1,0 +1,28 @@
+# Default values for kafka-ui
+global:
+  dockerRegistry: ""
+  imagePullSecrets: []
+
+# Node selector - Instance A (app node)
+nodeSelector:
+  node-role: app
+
+image:
+  repository: provectuslabs/kafka-ui
+  tag: latest
+
+kafka:
+  brokers: "kafka:9092"
+
+service:
+  type: ClusterIP
+  port: 8080
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+

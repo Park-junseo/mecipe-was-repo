@@ -15,5 +15,5 @@ export const INDEX_TYPE_MAP = getIndexTypeMap();
 export type IndexDocument<TIndexType extends IndexType> = InferMappingDocument<
   (typeof INDEX_TYPE_MAP)[TIndexType]
 >;
-
 export type IndexType = keyof typeof INDEX_TYPE_MAP;
+

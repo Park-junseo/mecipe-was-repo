@@ -7,9 +7,10 @@
     "moduleResolution": "node",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
+    "useDefineForClassFields": false,
     "importHelpers": false,
-    "target": "ES2022",
-    "module": "commonjs",
+    "target": "es2022",
+    "module": "es2022",
     "lib": ["ES2022"],
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
@@ -17,24 +18,11 @@
     "paths": {
       "@virtualcafe/common": ["libs/common/src/index.ts"],
       "@virtualcafe/database": ["libs/database/src/index.ts"],
-      "@virtualcafe/place-indexer-service": ["apps/place-indexer-service/src/index.ts"],
-      "@virtualcafe/mecipe-was": ["mecipe-was/src/index.ts"]
-    },
-    "strict": false,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "resolveJsonModule": true,
-    "forceConsistentCasingInFileNames": false,
-    "strictPropertyInitialization": false,
-    "noImplicitAny": false,
-    "strictNullChecks": false,
-    "strictFunctionTypes": false,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noImplicitReturns": false,
-    "noFallthroughCasesInSwitch": false,
-    "types": ["node", "jest"]
+      "@virtualcafe/mecipe-was": ["mecipe-was/src/index.ts"],
+      "@virtualcafe/place-indexer-service": [
+        "apps/place-indexer-service/src/index.ts"
+      ]
+    }
   },
   "exclude": ["node_modules", "tmp", "dist"]
 }
-

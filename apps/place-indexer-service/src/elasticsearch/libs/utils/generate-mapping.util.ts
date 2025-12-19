@@ -6,7 +6,7 @@ import {
 import {
   ELASTICSEARCH_FIELDS_KEY,
   ELASTICSEARCH_NESTED_KEY,
-} from '../decorators/elasticsearch.decorator';
+} from '../decorators';
 
 type Constructor = new (...args: any[]) => any;
 

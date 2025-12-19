@@ -1,0 +1,24 @@
+# # Default values for cert-manager
+# global:
+#   dockerRegistry: ""
+#   imagePullSecrets: []
+
+# # Node selector - Instance A (app node)
+# nodeSelector:
+#   node-role: app
+
+# schedule: "0 0,12 * * *"  # 매일 자정과 정오
+
+# persistence:
+#   certbotConf:
+#     enabled: true
+#   certbotWww:
+#     enabled: true
+
+email: "admin@mecipe.com"
+letsencrypt:
+  server: "https://acme-v02.api.letsencrypt.org/directory"
+
+persistence:
+  tempCertbotConf:
+    enabled: false

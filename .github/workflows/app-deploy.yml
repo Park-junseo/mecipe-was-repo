@@ -1,0 +1,228 @@
+name: Deploy Applications
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - 'apps/place-indexer-service/**'
+      - 'mecipe-was/**'
+      - 'infra/helm/apps/mecipe-was/**'
+      - 'infra/helm/apps/place-indexer-service/**'
+      - '.github/workflows/app-deploy.yml'
+  workflow_dispatch:
+
+jobs:
+  # 🧪 1. 테스트
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 20.x
+        cache: 'npm'
+        cache-dependency-path: mecipe-was/package-lock.json
+
+    - name: Install dependencies
+      working-directory: ./mecipe-was
+      run: npm ci
+
+    - name: Generate Prisma Client
+      working-directory: ./mecipe-was
+      run: npx prisma generate
+
+    - name: Run linter
+      working-directory: ./mecipe-was
+      run: npm run lint
+
+    - name: Run tests
+      working-directory: ./mecipe-was
+      run: npm run test
+
+    - name: Build application
+      working-directory: ./mecipe-was
+      run: npm run build
+
+    - name: Install dependencies (place-indexer-service)
+      working-directory: ./apps/place-indexer-service
+      run: npm ci
+
+    - name: Build place-indexer-service
+      working-directory: ./apps/place-indexer-service
+      run: npm run build
+
+  # 📦 2. Docker 이미지 빌드 및 푸시
+  build_and_push_docker:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and push mecipe-api-server image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./mecipe-was
+        file: ./mecipe-was/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/mecipe-api-server:latest
+          ${{ secrets.DOCKER_USERNAME }}/mecipe-api-server:${{ github.sha }}
+        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/mecipe-api-server:latest
+        cache-to: type=inline
+
+    - name: Build and push place-indexer-service image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./apps/place-indexer-service
+        file: ./apps/place-indexer-service/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/place-indexer-service:latest
+          ${{ secrets.DOCKER_USERNAME }}/place-indexer-service:${{ github.sha }}
+        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/place-indexer-service:latest
+        cache-to: type=inline
+
+  # 🚀 3. 앱 배포
+  deploy:
+    needs: [test, build_and_push_docker]
+    runs-on: self-hosted
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set kubeconfig
+      run: |
+        mkdir -p ~/.kube
+        echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+        chmod 600 ~/.kube/config
+
+    - name: Install Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: 'latest'
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    # 인프라 준비 상태 확인 (앱 배포 전 필수)
+    - name: Wait for Infrastructure
+      run: |
+        echo "⏳ Checking infrastructure readiness..."
+        MAX_RETRIES=30
+        RETRY_COUNT=0
+        
+        while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+          # Kafka 확인 (app namespace)
+          KAFKA_READY=$(kubectl get pods -n app -l app.kubernetes.io/name=kafka -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "False")
+          # Elasticsearch 확인 (data namespace)
+          ES_READY=$(kubectl get pods -n data -l app.kubernetes.io/name=elasticsearch -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "False")
+          # PostgreSQL 확인 (data namespace 또는 외부)
+          POSTGRES_READY=$(kubectl get pods -n data -l app.kubernetes.io/name=postgres -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+          
+          echo "📊 Infrastructure status:"
+          echo "  Kafka: $KAFKA_READY"
+          echo "  Elasticsearch: $ES_READY"
+          echo "  PostgreSQL: $POSTGRES_READY"
+          
+          # Kafka와 Elasticsearch가 준비되면 진행 (PostgreSQL은 외부일 수 있음)
+          if [ "$KAFKA_READY" = "True" ] && [ "$ES_READY" = "True" ]; then
+            echo "✅ Infrastructure is ready!"
+            break
+          fi
+          
+          RETRY_COUNT=$((RETRY_COUNT + 1))
+          if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+            echo "⏳ Waiting for infrastructure... ($RETRY_COUNT/$MAX_RETRIES) - retrying in 10s"
+            sleep 10
+          fi
+        done
+        
+        if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+          echo "⚠️  Infrastructure may not be fully ready, but continuing with deployment..."
+          echo "⚠️  Please ensure infrastructure is deployed before app deployment."
+        fi
+
+    - name: Deploy Apps
+      run: |
+        echo "🚀 Deploying applications to app namespace..."
+
+        POSTGRES_DEPLOY_FLAG="${{ secrets.POSTGRES_DEPLOY || 'true' }}"
+        if [ "$POSTGRES_DEPLOY_FLAG" = "false" ]; then
+          echo "⏭️  PostgreSQL deployment disabled (external database)"
+          POSTGRES_CONNECTION_HOST="${{ secrets.POSTGRES_HOST || 'localhost' }}"
+          POSTGRES_CONNECTION_PORT="${{ secrets.POSTGRES_PORT || '5432' }}"
+        else
+          echo "📦 Deploying PostgreSQL in Kubernetes..."
+          POSTGRES_CONNECTION_HOST="postgres.data.svc.cluster.local"
+          POSTGRES_CONNECTION_PORT="5432"
+        fi
+        
+        # Mecipe WAS
+        helm upgrade --install mecipe-was ./infra/helm/apps/mecipe-was \
+          --namespace app \
+          --create-namespace \
+          --wait \
+          --timeout 10m \
+          --set global.dockerRegistry="${{ secrets.DOCKER_USERNAME }}" \
+          --set image.repository="${{ secrets.DOCKER_USERNAME }}/mecipe-api-server" \
+          --set image.tag="${{ github.sha }}" \
+          --set env.nodeEnv="production" \
+          --set postgres.username="${{ secrets.POSTGRES_USER }}" \
+          --set postgres.password="${{ secrets.POSTGRES_PASSWORD }}" \
+          --set postgres.database="${{ secrets.POSTGRES_DB }}" \
+          --set postgres.hosts="${POSTGRES_CONNECTION_HOST}:${POSTGRES_CONNECTION_PORT}" \
+          --set elasticsearch.hosts="http://elasticsearch.data.svc.cluster.local:9200" \
+          --set elasticsearch.username="${{ secrets.ELASTICSEARCH_APP_USER_NAME }}" \
+          --set elasticsearch.password="${{ secrets.ELASTICSEARCH_APP_USER_PASS }}" \
+          --set env.port="${{ secrets.PORT }}" \
+          --set env.socketPort="${{ secrets.SOCKET_PORT }}" \
+          --set secrets.jwtSecret="${{ secrets.JWT_SECRET }}" \
+          --set secrets.secretLoginCrypto="${{ secrets.SECRET_LOGIN_CRYPTO }}" \
+          --set secrets.apiKey="${{ secrets.API_KEY }}" \
+          --set secrets.buildApiKey="${{ secrets.BUILD_API_KEY }}" \
+          --set secrets.couponSecret="${{ secrets.COUPON_SECRET }}" \
+          --set secrets.productSecret="${{ secrets.PRODUCT_SECRET }}" \
+          --set ingress.enabled=true \
+          --set ingress.host="${{ secrets.DOMAIN_NAME }}" \
+          --set ingress.tlsSecret="mecipe-was-tls"
+        
+        # Place Indexer Service
+        helm upgrade --install place-indexer-service ./infra/helm/apps/place-indexer-service \
+          --namespace app \
+          --create-namespace \
+          --wait \
+          --timeout 10m \
+          --set global.dockerRegistry="${{ secrets.DOCKER_USERNAME }}" \
+          --set image.repository="${{ secrets.DOCKER_USERNAME }}/place-indexer-service" \
+          --set image.tag="${{ github.sha }}" \
+          --set env.elasticsearchHosts="http://elasticsearch.data.svc.cluster.local:9200" \
+          --set secrets.elasticsearchUsername="${{ secrets.ELASTICSEARCH_PRODUCER_USER_NAME }}" \
+          --set secrets.elasticsearchPassword="${{ secrets.ELASTICSEARCH_PRODUCER_USER_PASS }}"
+
+    - name: Run database migrations
+      run: |
+        kubectl exec -n app deployment/mecipe-was -- npx prisma migrate deploy || echo "Migration failed or no migrations to apply"
+
+    - name: Health check
+      run: |
+        echo "🔍 Final verification..."
+        kubectl get pods -n app -o wide
+        kubectl get svc -n app
+

@@ -17,7 +17,7 @@ import {
   UpdateCafeVirtaulLinkThumbnailImageDto,
   UpdateCafevirtuallinkDto,
 } from './dto/update-cafevirtuallink.dto';
-import { AdminAuthGuard } from 'src/auth/jwt.guard.admin';
+import { AdminAuthGuard } from '../auth/jwt.guard.admin';
 
 @Controller('cafevirtuallinks')
 export class CafevirtuallinksController {

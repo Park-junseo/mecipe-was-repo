@@ -1,6 +1,6 @@
 import { faker } from '@faker-js/faker';
-import { GovermentType } from 'prisma/basic';
-import { CreateUncheckedRegioncategoryDto } from "src/regioncategories/dto/create-regioncategory.dto";
+import { GovermentType } from '../basic';
+import { CreateUncheckedRegioncategoryDto } from "../../src/regioncategories/dto/create-regioncategory.dto";
 
 export function buildRegionCategoryDto(
     params?: Partial<CreateUncheckedRegioncategoryDto>,

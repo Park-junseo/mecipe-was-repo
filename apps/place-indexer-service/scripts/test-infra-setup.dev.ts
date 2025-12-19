@@ -1,4 +1,4 @@
-// npm run start:test -- --start-app --exclude:postgres --region-url:http://localhost:4000/regioncategories --postgres:host.docker.internal:32769:testuser:testpassword:testdb
+// pnpm run start:test -- --start-app --exclude:postgres --region-url:http://localhost:4000/regioncategories --postgres:host.docker.internal:32769:testuser:testpassword:testdb
 // 리펙토링
 import {
   StartedPostgreSqlContainer,
@@ -1021,9 +1021,9 @@ async function createOrUpdateElasticsearchUser(
 async function startNestJS(config: NestJSConfig): Promise<ChildProcess> {
   const { shouldStartAppWithWatch, elasticsearchUrl, kafkaUrl } = config;
   const isWindows = process.platform === 'win32';
-  const nestCliPath = isWindows
-    ? path.resolve(process.cwd(), './node_modules/.bin/nest.cmd')
-    : path.resolve(process.cwd(), './node_modules/.bin/nest');
+  const nxCliPath = isWindows
+    ? path.resolve(__dirname, '../../../node_modules/.bin/nx.cmd')
+    : path.resolve(__dirname, '../../../node_modules/.bin/nx');
 
   console.log('🔄 Creating/updating NestJS user...');
   await createOrUpdateElasticsearchUser(
@@ -1032,8 +1032,8 @@ async function startNestJS(config: NestJSConfig): Promise<ChildProcess> {
   );
 
   nestProcess = spawn(
-    nestCliPath,
-    ['start', shouldStartAppWithWatch ? '--watch' : ''],
+    nxCliPath,
+    ['serve', 'place-indexer-service', shouldStartAppWithWatch ? '--configuration=development' : ''],
     {
       env: {
         ...process.env,

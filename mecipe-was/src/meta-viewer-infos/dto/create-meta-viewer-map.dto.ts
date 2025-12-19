@@ -7,7 +7,7 @@ import {
   IsNumber,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { MetaMapType } from 'prisma/basic';
+import { MetaMapType } from '../../../prisma/basic';
 
 export class CreateMetaViewerMapDto {
   @IsEnum(MetaMapType)

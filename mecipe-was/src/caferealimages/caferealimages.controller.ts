@@ -9,7 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CaferealimagesService } from './caferealimages.service';
-import { AdminAuthGuard } from 'src/auth/jwt.guard.admin';
+import { AdminAuthGuard } from '../auth/jwt.guard.admin';
 import { UpsertCafeRealImageListDto } from './dto/upsert-caferealimage.dto';
 
 @Controller('caferealimages')

@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CafevirtualimagesService } from './cafevirtualimages.service';
 import { CafevirtualimagesController } from './cafevirtualimages.controller';
-import { PrismaService } from 'src/global/prisma.service';
+import { PrismaService } from '../global/prisma.service';
 
 @Module({
   imports: [],

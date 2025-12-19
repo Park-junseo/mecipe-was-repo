@@ -2,10 +2,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "mecipe-instance-a.fullname" . }}-kafka-ui
+  name: {{ include "mecipe-instance-pre-a.fullname" . }}-kafka-ui
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "mecipe-instance-a.labels" . | nindent 4 }}
+    {{- include "mecipe-instance-pre-a.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.kafkaUI.service.type }}
   ports:
@@ -14,32 +14,32 @@ spec:
       protocol: TCP
       name: http
   selector:
-    {{- include "mecipe-instance-a.selectorLabels" . | nindent 4 }}
+    {{- include "mecipe-instance-pre-a.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: kafka-ui
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "mecipe-instance-a.fullname" . }}-kafka-ui
+  name: {{ include "mecipe-instance-pre-a.fullname" . }}-kafka-ui
   namespace: {{ .Release.Namespace }}
   labels:
-    {{- include "mecipe-instance-a.labels" . | nindent 4 }}
+    {{- include "mecipe-instance-pre-a.labels" . | nindent 4 }}
     app.kubernetes.io/component: kafka-ui
 spec:
   replicas: 1
   selector:
     matchLabels:
-      {{- include "mecipe-instance-a.selectorLabels" . | nindent 6 }}
+      {{- include "mecipe-instance-pre-a.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: kafka-ui
   template:
     metadata:
       labels:
-        {{- include "mecipe-instance-a.selectorLabels" . | nindent 8 }}
+        {{- include "mecipe-instance-pre-a.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: kafka-ui
     spec:
       containers:
       - name: kafka-ui
-        image: {{ include "mecipe-instance-a.image" (dict "Values" .Values "repository" .Values.kafkaUI.image.repository "tag" .Values.kafkaUI.image.tag) }}
+        image: {{ include "mecipe-instance-pre-a.image" (dict "Values" .Values "repository" .Values.kafkaUI.image.repository "tag" .Values.kafkaUI.image.tag) }}
         imagePullPolicy: {{ .Values.kafkaUI.image.pullPolicy | default "IfNotPresent" }}
         ports:
         - name: http

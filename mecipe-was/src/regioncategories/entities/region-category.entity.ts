@@ -1,7 +1,7 @@
 import { Field, Int, ObjectType, registerEnumType } from "@nestjs/graphql";
-import * as Prisma from "prisma/basic";
-import { GovermentType } from "prisma/basic";
-import { CafeInfo, ICafeInfo } from "src/places/entities/cafe-info.entity";
+import * as Prisma from "../../../prisma/basic";
+import { GovermentType } from "../../../prisma/basic";
+import { CafeInfo, ICafeInfo } from "../../places/entities/cafe-info.entity";
 
 // GraphQL Enum 등록
 registerEnumType(GovermentType, { name: "GovermentType" });

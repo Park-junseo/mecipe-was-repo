@@ -1,10 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { CafeInfoController } from 'src/cafe-info/cafe-info.controller';
-import { CafeInfoService } from 'src/cafe-info/cafe-info.service';
-import { ElasticsearchService } from 'src/elasticsearch/elasticsearch.service';
+import { CafeInfoController } from '../../cafe-info/cafe-info.controller';
+import { CafeInfoService } from '../../cafe-info/cafe-info.service';
+import { ElasticsearchService } from '../../elasticsearch/elasticsearch.service';
 import { createMockElasticsearchService } from '../mocks/elasticsearch.service.mock';
 import { ValidationPipe, ArgumentMetadata } from '@nestjs/common';
-import { CafeInfo } from 'src/cafe-info/entity/cafe-info.entity';
+import { CafeInfo } from '../../cafe-info/entity/cafe-info.entity';
 
 export type MockCafeInfoService = ReturnType<typeof createMockCafeInfoService>;
 export const createMockCafeInfoService = () => {

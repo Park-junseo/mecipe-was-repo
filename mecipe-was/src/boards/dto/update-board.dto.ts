@@ -9,7 +9,7 @@ import {
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { BoardType } from './create-board.dto';
-import { Prisma } from 'prisma/basic';
+import { Prisma } from '../../../prisma/basic';
 import { CreateBoardImageDto } from './create-board.dto';
 
 export class UpdateBoardDto implements Partial<Prisma.BoardUpdateInput> {

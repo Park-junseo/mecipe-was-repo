@@ -10,30 +10,50 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "prepare": "node -e \"try { require('husky').install() } catch (e) {}\"",
     "test:env": "nx run-many --target=test:env --all",
-    "test:env:watch": "nx run-many --target=test:env --all --configuration=watch"
+    "test:env:watch": "nx run-many --target=test:env --all --configuration=watch",
+    "deploy:local": "bash ./scripts/dev/local-deploy-test.sh",
+    "deploy:local:apps": "bash ./scripts/dev/local-deploy-test.sh apps",
+    "deploy:local:infra": "bash ./scripts/dev/local-deploy-test.sh infra",
+    "deploy:local:all": "bash ./scripts/dev/local-deploy-test.sh all"
   },
   "devDependencies": {
+    "@nestjs/schematics": "^11.0.9",
+    "@nestjs/testing": "^11.1.8",
     "@nx/devkit": "^20.0.0",
     "@nx/eslint": "^20.0.0",
-    "@nx/jest": "^20.0.0",
-    "@nx/js": "^20.0.0",
-    "@nx/node": "^20.0.0",
-    "@nx/nest": "^20.0.0",
-    "@nx/webpack": "^20.0.0",
+    "@nx/jest": "20.8.3",
+    "@nx/js": "20.8.3",
+    "@nx/nest": "20.8.3",
+    "@nx/node": "20.8.3",
+    "@nx/web": "20.8.3",
+    "@nx/webpack": "20.8.3",
     "@nx/workspace": "^20.0.0",
+    "@swc-node/register": "~1.9.1",
+    "@swc/core": "~1.5.7",
+    "@swc/helpers": "~0.5.11",
     "@types/jest": "^30.0.0",
     "@types/node": "^20.0.0",
     "eslint": "^9.0.0",
     "jest": "^30.0.0",
+    "jest-environment-node": "^29.7.0",
     "nx": "^20.0.0",
     "prettier": "^3.0.0",
     "ts-jest": "^29.4.5",
-    "typescript": "^5.9.0"
+    "ts-node": "10.9.1",
+    "typescript": "^5.9.0",
+    "webpack-cli": "^5.1.4"
   },
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
   },
-  "packageManager": "pnpm@9.0.0"
+  "packageManager": "pnpm@9.0.0",
+  "dependencies": {
+    "@nestjs/common": "^11.1.8",
+    "@nestjs/core": "^11.1.8",
+    "@nestjs/platform-express": "^11.1.8",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "tslib": "^2.3.0"
+  }
 }
-

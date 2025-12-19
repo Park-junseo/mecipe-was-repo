@@ -12,7 +12,7 @@
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "nx build mecipe-was",
-    "copy:prisma": "node scripts/prisma/copy-prisma-to-dist.js",
+    "copy:prisma": "node scripts/prisma/copy-prisma-to-dist.js mecipe-was",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "daemon": "pnpm build && pm2 start dist/main.js -i max --name web-server",
     "daemon:re": "pnpm build && pm2 stop web-server && pm2 start dist/main.js -i max --name web-server",
@@ -29,14 +29,14 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:unit": "nx test mecipe-was",
-    "prisma": "rimraf prisma/basic && prisma generate && pnpm postgenerate",
+    "prisma:clean": "rimraf prisma/basic",
+    "prisma": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "generate:prisma-types": "ts-node scripts/prisma/generate-prisma-types.ts",
-    "postgenerate": "pnpm generate:prisma-types",
-    "start:test-db": "ts-node -r tsconfig-paths/register ./scripts/prisma/test-db-setup.dev.ts",
+    "prisma:generate-types": "tsx scripts/prisma/generate-prisma-types.ts",
+    "start:test-db": "tsx ./scripts/prisma/test-db-setup.dev.ts",
     "start:test-app": "nx serve mecipe-was",
-    "start:test": "ts-node -r tsconfig-paths/register ./scripts/prisma/test-db-setup.dev.ts --start-app",
-    "db:seed": "ts-node -r tsconfig-paths/register ./scripts/prisma/seed.dev/index.ts"
+    "start:test": "tsx./scripts/prisma/test-db-setup.dev.ts --start-app",
+    "db:seed": "tsx ./scripts/prisma/seed.dev/index.ts"
   },
   "dependencies": {
     "@apollo/server": "^5.0.0",
@@ -71,7 +71,7 @@
     "qrcode": "^1.5.4",
     "qrcode-generator": "^2.0.4",
     "reflect-metadata": "^0.2.2",
-    "rimraf": "^6.0.1",
+    "rimraf": "^5.0.5",
     "rxjs": "^7.8.2",
     "socket.io": "^4.8.1"
   },
@@ -102,7 +102,9 @@
     "ts-jest": "^29.4.5",
     "ts-loader": "^9.5.4",
     "ts-node": "^10.9.2",
+    "tsc-alias": "^1.8.16",
     "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }
 }

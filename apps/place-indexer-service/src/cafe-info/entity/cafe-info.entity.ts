@@ -1,10 +1,10 @@
 import { Transform, Type } from 'class-transformer';
-import { CAFEINFO_INDEX_NAME } from 'src/elasticsearch/libs/indices';
 import {
   ElasticsearchIndex,
   ElasticsearchField,
-  ElasticsearchNested,
-} from 'src/elasticsearch/libs/decorators';
+  ElasticsearchNested
+} from '../../elasticsearch/libs/decorators';
+import { CAFEINFO_INDEX_NAME } from '../../elasticsearch/libs/indices';
 import {
   GovermentType,
   ICafeInfo,

@@ -15,8 +15,8 @@ import {
   CreateUcheckedCafeInfoDto,
 } from './dto/create-place.dto';
 import { UpdateCafeInoDto } from './dto/update-place.dto';
-import { AdminAuthGuard } from 'src/auth/jwt.guard.admin';
-import { Public } from 'src/util/decorators';
+import { AdminAuthGuard } from '../auth/jwt.guard.admin';
+import { Public } from '../util/decorators';
 
 @Controller('places')
 export class PlacesController {

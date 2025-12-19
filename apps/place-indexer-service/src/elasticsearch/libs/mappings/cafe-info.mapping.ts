@@ -1,6 +1,6 @@
 import { MappingTypeMapping } from '@elastic/elasticsearch/lib/api/types';
 import { generateMappingFromEntity } from '../utils/generate-mapping.util';
-import { CafeInfo } from 'src/cafe-info/entity/cafe-info.entity';
+import { CafeInfo } from '../../../cafe-info/entity/cafe-info.entity';
 
 // 엔티티 클래스에서 자동으로 매핑 생성 (지연 평가)
 // 순환 참조 문제를 피하기 위해 지연 평가 사용

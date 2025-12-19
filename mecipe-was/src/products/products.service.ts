@@ -6,9 +6,9 @@ import {
 } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-import { PrismaService } from 'src/global/prisma.service';
+import { PrismaService } from '../global/prisma.service';
 import { SearchProductDto } from './dto/search-product.dto';
-import { Prisma } from 'prisma/basic';
+import { Prisma } from '../../prisma/basic';
 import { CategoryTree } from './dto/public-product.dto';
 
 type ProductCategoryInfo = Prisma.ProductCategoryGetPayload<{

@@ -1,0 +1,45 @@
+# Default values for postgres
+global:
+  dockerRegistry: ""
+  imagePullSecrets: []
+
+# PostgreSQL 배포 여부
+# 외부 PostgreSQL 사용 시: enabled: false
+# Kubernetes 내부 배포 시: enabled: true
+enabled: true
+
+# Node selector - Instance B (data node)
+nodeSelector:
+  node-role: data
+
+# PostgreSQL Configuration
+image:
+  repository: debezium/postgres
+  tag: "16-alpine"
+
+persistence:
+  enabled: true
+  size: 20Gi
+  storageClass: ""
+
+auth:
+  postgresPassword: ""
+  username: postgres
+  database: mydb
+
+service:
+  type: ClusterIP
+  port: 5432
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+# Secrets (should be set via --set or values file)
+secrets:
+  postgresPassword: ""
+

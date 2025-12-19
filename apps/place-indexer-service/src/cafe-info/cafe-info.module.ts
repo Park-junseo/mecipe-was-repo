@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ElasticsearchModule } from 'src/elasticsearch';
+import { ElasticsearchModule } from '../elasticsearch';
 import { CafeInfoController } from './cafe-info.controller';
 import { CafeInfoService } from './cafe-info.service';
 

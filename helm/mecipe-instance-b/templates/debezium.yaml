@@ -16,6 +16,7 @@ spec:
   selector:
     {{- include "mecipe-instance-b.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: debezium
+
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -82,19 +83,19 @@ metadata:
 data:
   connector-config.json: |
     {
-      "name": "{{ .Values.debezium.connector.name }}",
+      "name": {{ .Values.debezium.connector.name | quote }},
       "config": {
         "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
         "plugin.name": "pgoutput",
         "tasks.max": "1",
-        "database.hostname": "{{ .Values.debezium.connector.database.hostname }}",
-        "database.port": "{{ .Values.debezium.connector.database.port }}",
-        "database.user": "{{ .Values.debezium.connector.database.user }}",
-        "database.password": "{{ .Values.debezium.connector.database.password }}",
-        "database.dbname": "{{ .Values.debezium.connector.database.dbname }}",
-        "database.server.name": "{{ .Values.debezium.connector.serverName }}",
-        "topic.prefix": "{{ .Values.debezium.connector.serverName }}",
-        "table.include.list": "{{ .Values.debezium.connector.tableIncludeList }}",
+        "database.hostname": {{ .Values.debezium.connector.database.hostname | quote }},
+        "database.port": {{ .Values.debezium.connector.database.port | quote }},
+        "database.user": {{ .Values.debezium.connector.database.user | quote }},
+        "database.password": {{ .Values.debezium.connector.database.password | quote }},
+        "database.dbname": {{ .Values.debezium.connector.database.dbname | quote }},
+        "database.server.name": {{ .Values.debezium.connector.serverName | quote }},
+        "topic.prefix": {{ .Values.debezium.connector.serverName | quote }},
+        "table.include.list": {{ .Values.debezium.connector.tableIncludeList | quote }},
         "publication.autocreate.mode": "all_tables",
         "slot.name": "debezium_slot",
         "heartbeat.interval.ms": "5000",

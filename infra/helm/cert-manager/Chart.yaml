@@ -1,0 +1,11 @@
+# apiVersion: v2
+# name: cert-manager
+# description: Certbot for Mecipe
+# type: application
+# version: 0.1.0
+# appVersion: "latest"
+
+apiVersion: v2
+name: cert-manager-bootstrap
+version: 0.1.0
+description: Install cert-manager and ClusterIssuer

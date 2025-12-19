@@ -1,0 +1,69 @@
+{{ if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mecipe-was
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+  annotations:
+    kubernetes.io/ingress.class: nginx
+
+    # 🔐 cert-manager (DNS01 or HTTP01)
+    cert-manager.io/cluster-issuer: letsencrypt-dns
+
+    # 🔁 HTTP → HTTPS redirect
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+
+    # 🔒 Security headers
+    nginx.ingress.kubernetes.io/hsts: "true"
+    nginx.ingress.kubernetes.io/hsts-max-age: "31536000"
+    nginx.ingress.kubernetes.io/hsts-include-subdomains: "true"
+    nginx.ingress.kubernetes.io/hsts-preload: "true"
+
+    nginx.ingress.kubernetes.io/x-frame-options: "SAMEORIGIN"
+    nginx.ingress.kubernetes.io/x-content-type-options: "nosniff"
+    nginx.ingress.kubernetes.io/x-xss-protection: "1; mode=block"
+    nginx.ingress.kubernetes.io/referrer-policy: "no-referrer-when-downgrade"
+
+    # 🔌 WebSocket 지원
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "86400"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "86400"
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/enable-websocket: "true"
+spec:
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ .Values.ingress.tlsSecret }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          # WebSocket (meta-viewers)
+          - path: /meta-viewers
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "common.fullname" . }}
+                port:
+                  number: {{ .Values.service.ports.socket }}
+
+          # Health check
+          - path: /health
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "common.fullname" . }}
+                port:
+                  number: {{ .Values.service.ports.http }}
+
+          # Default route → NestJS
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "common.fullname" . }}
+                port:
+                  number: {{ .Values.service.ports.http }}

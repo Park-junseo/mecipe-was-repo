@@ -1,0 +1,55 @@
+name: Cluster Bootstrap (One-time Setup)
+
+on:
+  workflow_dispatch:  # 수동 실행만
+  # 또는 최초 1회 자동 실행
+  # push:
+  #   branches: ["main"]
+  #   paths:
+  #     - '.github/workflows/cluster-bootstrap.yml'
+
+jobs:
+  bootstrap:
+    runs-on: self-hosted
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set kubeconfig
+      run: |
+        mkdir -p ~/.kube
+        echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+        chmod 600 ~/.kube/config
+
+    # 🔖 Node Label 설정 (클러스터 최초 1회 작업)
+    - name: Label Nodes
+      run: |
+        echo "🏷️  Setting node labels (one-time cluster setup)..."
+        # Instance A (app node)
+        kubectl label node instance-a node-role=app --overwrite || echo "⚠️  Node instance-a may not exist"
+        # Instance B (data node)
+        kubectl label node instance-b node-role=data --overwrite || echo "⚠️  Node instance-b may not exist"
+        
+        echo "📋 Current node labels:"
+        kubectl get nodes --show-labels
+
+    # 📦 Namespace 생성
+    - name: Create Namespaces
+      run: |
+        kubectl create namespace app --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create namespace data --dry-run=client -o yaml | kubectl apply -f -
+        echo "✅ Namespaces created/verified"
+
+    # ✅ 검증
+    - name: Verify Bootstrap
+      run: |
+        echo "🔍 Verifying cluster bootstrap..."
+        echo ""
+        echo "📊 Nodes:"
+        kubectl get nodes --show-labels
+        echo ""
+        echo "📊 Namespaces:"
+        kubectl get namespaces | grep -E "app|data|default"
+        echo ""
+        echo "✅ Bootstrap complete!"
+

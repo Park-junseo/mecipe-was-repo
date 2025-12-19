@@ -12,7 +12,7 @@ import { UpdateBoardDto } from './dto/update-board.dto';
 import { UpdateBoardImageDto } from './dto/update-board-image.dto';
 import { UpdateBoardReplyDto } from './dto/update-board-reply.dto';
 import { SearchBoardDto, SearchImageIdDto } from './dto/search-board.dto';
-import { PrismaService } from 'src/global/prisma.service';
+import { PrismaService } from '../global/prisma.service';
 import { BoardType } from './dto/create-board.dto';
 
 @Injectable()

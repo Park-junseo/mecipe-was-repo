@@ -1,7 +1,7 @@
 import { Type } from '@nestjs/common';
 import { ObjectType, Field, Int } from '@nestjs/graphql';
-import * as Prisma from 'prisma/basic';
-import { IRegionCategory, RegionCategory } from 'src/regioncategories/entities/region-category.entity';
+import * as Prisma from '../../../prisma/basic';
+import { IRegionCategory, RegionCategory } from '../../regioncategories/entities/region-category.entity';
 
 @ObjectType({description: '카페 정보'})
 export class CafeInfo implements Prisma.CafeInfo {

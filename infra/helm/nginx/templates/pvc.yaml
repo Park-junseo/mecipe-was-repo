@@ -1,0 +1,52 @@
+{{- if .Values.persistence.certbotConf.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "common.fullname" . }}-certbot-conf-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.persistence.certbotConf.size | default "1Gi" }}
+{{- end }}
+{{- if .Values.persistence.certbotWww.enabled }}
+{{- if .Values.persistence.certbotConf.enabled }}
+---
+{{- end }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "common.fullname" . }}-certbot-www-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.persistence.certbotWww.size | default "1Gi" }}
+{{- end }}
+{{- if .Values.persistence.media.enabled }}
+{{- if or .Values.persistence.certbotConf.enabled .Values.persistence.certbotWww.enabled }}
+---
+{{- end }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "common.fullname" . }}-media-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.persistence.media.size }}
+{{- end }}
+

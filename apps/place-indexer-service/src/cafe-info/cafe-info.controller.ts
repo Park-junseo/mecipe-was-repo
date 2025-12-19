@@ -7,8 +7,8 @@ import {
   Payload,
 } from '@nestjs/microservices';
 import { CafeInfo } from './entity/cafe-info.entity';
-import { CAFEINFO_WITH_REGIONCATEGORY_TOPIC } from 'src/kafka/topics';
-import { TransformMessagePipe } from 'src/util/pipes/transform-message.pipe';
+import { CAFEINFO_WITH_REGIONCATEGORY_TOPIC } from '../kafka/topics';
+import { TransformMessagePipe } from '../util/pipes/transform-message.pipe';
 
 @Controller()
 export class CafeInfoController {

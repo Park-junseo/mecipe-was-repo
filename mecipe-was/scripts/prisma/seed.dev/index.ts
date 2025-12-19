@@ -1,6 +1,6 @@
-import { PrismaService } from 'src/global/prisma.service';
+import { PrismaService } from '../../../src/global/prisma.service';
 import { seedCafeInfoBigData, resetCafeInfoBigData } from './seed-cafeinfo-big-data';
-import { getCommandParameters } from 'src/util/get-command-parameter';
+import { getCommandParameters } from '../../../src/util/get-command-parameter';
 
 export type PrismaServiceWithDatabaseUrl = PrismaService<{ datasourceUrl: string }>;
 export type PrismaServiceOrDatabaseUrl = PrismaServiceWithDatabaseUrl|string;
@@ -32,7 +32,7 @@ export async function executeSeed(databaseUrl: string, argv: string[]) {
     const resetFunctions: SeedModuleAction[] = [];
     for (const seedModuleArgs of commandParameters) {
         console.log('실행할 seed 파일:', seedModuleArgs[0]);
-        let seedModuleName: SeedModuleName;
+        let seedModuleName: SeedModuleName | undefined;
         try {
             seedModuleName = seedModuleArgs[0] as SeedModuleName;
             const seedModule = SeedModules[seedModuleName];

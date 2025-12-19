@@ -1,10 +1,9 @@
-import 'reflect-metadata';
 import { KafkaContext } from '@nestjs/microservices';
 import { CafeInfoController } from './cafe-info.controller';
-import { CAFEINFO_WITH_REGIONCATEGORY_TOPIC } from 'src/kafka/topics';
+import { CAFEINFO_WITH_REGIONCATEGORY_TOPIC } from '../kafka/topics';
 import { ICafeInfo, IRegionCategory, CafeInfo } from './entity';
-import { MockCafeInfoService, createCafeInfoTestModule } from 'src/test-utils';
-import { TransformMessagePipe } from 'src/util/pipes/transform-message.pipe';
+import { MockCafeInfoService, createCafeInfoTestModule } from '../test-utils';
+import { TransformMessagePipe } from '../util/pipes/transform-message.pipe';
 
 type KafkaCafeInfo = Omit<ICafeInfo, 'createdAt' | 'RegionCategory'> & {
   createdAt: number;

@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ElasticsearchService } from 'src/elasticsearch';
-import { IndexDocument } from 'src/elasticsearch/libs';
-import { CAFEINFO_INDEX_NAME } from 'src/elasticsearch/libs/indices';
+import { ElasticsearchService } from '../elasticsearch';
+import { IndexDocument } from '../elasticsearch/libs/utils';
+import { CAFEINFO_INDEX_NAME } from '../elasticsearch/libs/indices';
 import { ICafeInfo } from './entity';
 
 @Injectable()
@@ -9,7 +9,13 @@ export class CafeInfoService implements OnModuleInit {
   private readonly logger = new Logger(CafeInfoService.name);
   constructor(private readonly elasticSearchService: ElasticsearchService) {}
   async onModuleInit() {
-    await this.elasticSearchService.createIndexIfNotExist(CAFEINFO_INDEX_NAME);
+    console.log('onModuleInit: CafeInfoService', CAFEINFO_INDEX_NAME);
+    try {
+      await this.elasticSearchService.createIndexIfNotExist(CAFEINFO_INDEX_NAME);
+    } catch (error) {
+      console.error('onModuleInit: CafeInfoService', error);
+      throw error;
+    }
   }
 
   indexCafeInfo(cafeInfo: ICafeInfo, id: string) {

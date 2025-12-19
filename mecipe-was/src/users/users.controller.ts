@@ -14,9 +14,9 @@ import {
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { Public } from 'src/util/decorators';
-import { LoginType, UserType } from 'prisma/basic';
-import { AdminAuthGuard } from 'src/auth/jwt.guard.admin';
+import { Public } from '../util/decorators';
+import { LoginType, UserType } from '../../prisma/basic';
+import { AdminAuthGuard } from '../auth/jwt.guard.admin';
 
 @Controller('users')
 export class UsersController {

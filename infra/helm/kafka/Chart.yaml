@@ -1,0 +1,12 @@
+apiVersion: v2
+name: kafka
+description: Kafka for Mecipe
+type: application
+version: 0.1.0
+appVersion: "7.5.0"
+dependencies:
+  - name: kafka
+    version: "~22.1.0"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: kafka.enabled
+

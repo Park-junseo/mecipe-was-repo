@@ -1,6 +1,10 @@
 {
-  "extends": "./tsconfig.json",
+  "extends": "./tsconfig.app.json",
   "include": ["scripts/**/*.ts"],
-  "exclude": []
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src"
+  ]
 }
 

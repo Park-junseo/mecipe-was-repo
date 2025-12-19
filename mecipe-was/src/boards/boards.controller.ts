@@ -29,7 +29,7 @@ import {
   BoardImage,
   BoardReply,
 } from './entities/board.entity';
-import { Public } from 'src/util/decorators';
+import { Public } from '../util/decorators';
 
 interface RequestWithUser extends Request {
   user: {

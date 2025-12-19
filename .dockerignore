@@ -19,4 +19,5 @@ certbot
 nginx
 .github
 documents
+scripts/dev
 

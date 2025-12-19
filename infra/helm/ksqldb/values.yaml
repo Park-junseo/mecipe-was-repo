@@ -1,0 +1,26 @@
+# Default values for ksqldb
+global:
+  dockerRegistry: ""
+  imagePullSecrets: []
+
+# Node selector - Instance A (app node)
+nodeSelector:
+  node-role: app
+
+image:
+  repository: confluentinc/ksqldb-server
+  tag: latest
+
+kafka:
+  brokers: "kafka:9092"
+
+streamsAutoOffsetReset: "earliest"
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+

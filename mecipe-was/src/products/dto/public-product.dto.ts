@@ -1,4 +1,4 @@
-import { Prisma, Product, ProductCategory, ProductImage } from 'prisma/basic';
+import { Product, ProductCategory, ProductImage } from '../../../prisma/basic';
 
 // 타입 정의
 export type CategoryTree = {

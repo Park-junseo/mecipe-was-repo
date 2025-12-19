@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "postgres-connection.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "postgres-connection.labels" . | nindent 4 }}
+data:
+  POSTGRES_HOST: {{ .Values.connection.host | quote }}
+  POSTGRES_PORT: {{ .Values.connection.port | quote }}
+  POSTGRES_DB: {{ .Values.connection.database | quote }}
+  {{- if .Values.service.enabled }}
+  POSTGRES_SERVICE: "{{ .Values.service.name }}.{{ .Values.service.namespace }}.svc.cluster.local"
+  {{- end }}
+

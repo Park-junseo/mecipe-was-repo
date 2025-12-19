@@ -6,13 +6,13 @@
 * Prisma 스키마 변경 후 이 스크립트를 실행하면 자동으로 업데이트됩니다.
 */
 
-import { Prisma } from 'prisma/basic';
-import { InternalArgs } from 'prisma/basic/runtime/library';
+import { Prisma } from '../../../../prisma/basic';
+import { InternalArgs } from '../../../../prisma/basic/runtime/library';
 
 /**
  * Prisma ModelName으로부터 해당 모델의 PrismaModelDelegate 타입을 추출하는 헬퍼 타입
  * 
- * 자동 생성됨: 2025-11-08T03:24:37.138Z
+ * 자동 생성됨: 2025-12-18T13:43:06.557Z
  * 모델 개수: 28
  */
 export type PrismaModelDelegate<TModelName extends Prisma.ModelName, TOptions extends InternalArgs> = 

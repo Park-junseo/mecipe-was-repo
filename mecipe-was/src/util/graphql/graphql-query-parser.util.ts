@@ -1,6 +1,6 @@
 import { GraphQLResolveInfo } from 'graphql';
 import { FieldsByTypeName, parseResolveInfo, ResolveTree } from 'graphql-parse-resolve-info';
-import { NodeLocation } from 'src/common/graphql';
+import { NodeLocation } from '../../common/graphql';
 import { ModelName, SelectQuery } from '../models';
 
 function getFieldsByTypeName(selectedFields: { [key: string]: ResolveTree }, defaultSelect: SelectQuery = { id: true }): SelectQuery {

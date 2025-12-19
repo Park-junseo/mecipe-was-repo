@@ -1,268 +1,310 @@
-name: Deploy with Helm
+name: Deploy to Kubernetes
 
 on:
   push:
     branches: ["main"]
     paths:
-      - 'helm/**'
+      - 'infra/helm/**'
       - '.github/workflows/deploy-helm.yml'
       - 'apps/place-indexer-service/**'
       - 'mecipe-was/**'
       - 'nginx/**'
-      - 'scripts/healthcheck-and-fallback.sh'
   workflow_dispatch:
 
 jobs:
-  # 🧪 1. 테스트 Job
-  test:
-    runs-on: ubuntu-latest
+  deploy:
+    runs-on: self-hosted
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+    - name: Checkout
+      uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: 20.x
-        cache: 'npm'
-        cache-dependency-path: mecipe-was/package-lock.json
-
-    - name: Install dependencies
-      working-directory: ./mecipe-was
-      run: npm ci
-
-    - name: Generate Prisma Client
-      working-directory: ./mecipe-was
-      run: npx prisma generate
-
-    - name: Run linter
-      working-directory: ./mecipe-was
-      run: npm run lint
-
-    - name: Run tests
-      working-directory: ./mecipe-was
-      run: npm test
-
-    - name: Build application
-      working-directory: ./mecipe-was
-      run: npm run build
-
-    - name: Install dependencies (place-indexer-service)
-      working-directory: ./apps/place-indexer-service
-      run: npm ci
-
-    - name: Build place-indexer-service
-      working-directory: ./apps/place-indexer-service
-      run: npm run build
-
-  # 📦 2. Docker 이미지 빌드 및 푸시
-  build_and_push_docker:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-
-    - name: Login to DockerHub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
-
-    - name: Build and push mecipe-api-server image
-      uses: docker/build-push-action@v5
-      with:
-        context: ./mecipe-was
-        file: ./mecipe-was/Dockerfile
-        push: true
-        tags: |
-          ${{ secrets.DOCKER_USERNAME }}/mecipe-api-server:latest
-          ${{ secrets.DOCKER_USERNAME }}/mecipe-api-server:${{ github.sha }}
-        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/mecipe-api-server:latest
-        cache-to: type=inline
-
-    - name: Build and push place-indexer-service image
-      uses: docker/build-push-action@v5
-      with:
-        context: ./apps/place-indexer-service
-        file: ./apps/place-indexer-service/Dockerfile
-        push: true
-        tags: |
-          ${{ secrets.DOCKER_USERNAME }}/place-indexer-service:latest
-          ${{ secrets.DOCKER_USERNAME }}/place-indexer-service:${{ github.sha }}
-        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/place-indexer-service:latest
-        cache-to: type=inline
-
-    - name: Build and push Nginx image
-      uses: docker/build-push-action@v5
-      with:
-        context: ./nginx
-        file: ./nginx/Dockerfile
-        push: true
-        tags: |
-          ${{ secrets.DOCKER_USERNAME }}/mecipe-nginx:latest
-          ${{ secrets.DOCKER_USERNAME }}/mecipe-nginx:${{ github.sha }}
-
-  # 🏥 3. 인스턴스 B 헬스체크 및 폴백
-  healthcheck_instance_b:
-    runs-on: [self-hosted, instance-b, Linux, X64]
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-
-    - name: Setup Docker
+    - name: Set kubeconfig
       run: |
-        sudo systemctl start docker || true
-        sudo usermod -aG docker $USER || true
-
-    - name: Run healthcheck and fallback script
-      env:
-        POSTGRES_HOST: ${{ secrets.POSTGRES_HOST || 'postgresql.instance-b.svc.cluster.local' }}
-        POSTGRES_PORT: ${{ secrets.POSTGRES_PORT || '5432' }}
-        POSTGRES_USER: ${{ secrets.POSTGRES_USER || 'postgres' }}
-        POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-        POSTGRES_DB: ${{ secrets.POSTGRES_DB || 'mydb' }}
-        ELASTICSEARCH_HOST: ${{ secrets.ELASTICSEARCH_HOST || 'elasticsearch.instance-b.svc.cluster.local' }}
-        ELASTICSEARCH_PORT: ${{ secrets.ELASTICSEARCH_PORT || '9200' }}
-        ELASTICSEARCH_USERNAME: ${{ secrets.ELASTICSEARCH_USERNAME || 'elastic' }}
-        ELASTICSEARCH_PASSWORD: ${{ secrets.ELASTICSEARCH_PASSWORD }}
-        TIMEOUT: "30"
-      run: |
-        chmod +x ./scripts/healthcheck-and-fallback.sh
-        ./scripts/healthcheck-and-fallback.sh
-
-  # 🚀 4. 인스턴스 A 배포 (Helm)
-  deploy_instance_a:
-    needs: [test, build_and_push_docker]
-    runs-on: [self-hosted, instance-a, Linux, X64]
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+        mkdir -p ~/.kube
+        echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+        chmod 600 ~/.kube/config
 
     - name: Install Helm
       uses: azure/setup-helm@v3
       with:
         version: 'latest'
 
-    - name: Configure kubectl
+    # 🔖 1. Node Label 설정 (1회 작업, 이미 설정되어 있어도 안전하게 재설정)
+    - name: Label Nodes
       run: |
-        mkdir -p ~/.kube
-        echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
-        chmod 600 ~/.kube/config
+        echo "🏷️  Setting node labels..."
+        # Instance A (app node)
+        kubectl label node instance-a node-role=app --overwrite || echo "Node instance-a may not exist or already labeled"
+        # Instance B (data node)
+        kubectl label node instance-b node-role=data --overwrite || echo "Node instance-b may not exist or already labeled"
+        
+        echo "📋 Current node labels:"
+        kubectl get nodes --show-labels
 
-    - name: Login to DockerHub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
-
-    - name: Lint Helm charts
+    # 📦 2. Namespace 생성
+    - name: Create Namespaces
       run: |
-        helm lint ./helm/mecipe-instance-a
+        kubectl create namespace app --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create namespace data --dry-run=client -o yaml | kubectl apply -f -
+        echo "✅ Namespaces created/verified"
 
-    - name: Deploy Instance A with Helm
+    # 🔍 3. Check PostgreSQL Deployment Mode
+    - name: Check PostgreSQL Deployment Mode
+      id: postgres_check
       run: |
-        helm upgrade --install mecipe-instance-a ./helm/mecipe-instance-a \
-          --namespace instance-a \
+        # 외부 PostgreSQL 여부 확인
+        # 방법 1: POSTGRES_EXTERNAL 시크릿이 true면 외부
+        # 방법 2: POSTGRES_HOST가 Kubernetes 서비스 이름이 아니면 외부
+        # 방법 3: POSTGRES_DEPLOY가 false면 외부
+        
+        POSTGRES_EXTERNAL="${{ secrets.POSTGRES_EXTERNAL || 'false' }}"
+        POSTGRES_HOST="${{ secrets.POSTGRES_HOST || 'postgres' }}"
+        POSTGRES_DEPLOY="${{ secrets.POSTGRES_DEPLOY || 'true' }}"
+        
+        # Kubernetes 서비스 이름 패턴 체크 (postgres, postgres.data.svc.cluster.local 등)
+        if [ "$POSTGRES_EXTERNAL" = "true" ] || [ "$POSTGRES_DEPLOY" = "false" ]; then
+          IS_EXTERNAL="true"
+          echo "✅ PostgreSQL is EXTERNAL (managed outside Kubernetes)"
+        elif [ "$POSTGRES_HOST" != "postgres" ] && [ "$POSTGRES_HOST" != "postgres.data" ] && [[ ! "$POSTGRES_HOST" =~ ^postgres\. ]]; then
+          IS_EXTERNAL="true"
+          echo "✅ PostgreSQL is EXTERNAL (host: $POSTGRES_HOST is not a Kubernetes service)"
+        else
+          IS_EXTERNAL="false"
+          echo "✅ PostgreSQL will be DEPLOYED in Kubernetes"
+        fi
+        
+        echo "postgres_external=${IS_EXTERNAL}" >> $GITHUB_OUTPUT
+        echo "postgres_host=${POSTGRES_HOST}" >> $GITHUB_OUTPUT
+        echo ""
+        echo "📋 PostgreSQL Configuration:"
+        echo "  External: ${IS_EXTERNAL}"
+        echo "  Host: ${POSTGRES_HOST}"
+
+    # 🚀 4. Deploy Infra (Instance B - data namespace)
+    - name: Deploy Infra (Instance B)
+      run: |
+        echo "🚀 Deploying infrastructure to Instance B (data namespace)..."
+        
+        # PostgreSQL - 조건부 배포
+        if [ "${{ steps.postgres_check.outputs.postgres_external }}" = "false" ]; then
+          echo "📦 Deploying PostgreSQL in Kubernetes..."
+          helm upgrade --install postgres ./infra/helm/postgres \
+            --namespace data \
+            --create-namespace \
+            --wait \
+            --timeout 10m \
+            --set secrets.postgresPassword="${{ secrets.POSTGRES_PASSWORD }}" \
+            --set auth.username="${{ secrets.POSTGRES_USER || 'postgres' }}" \
+            --set auth.database="${{ secrets.POSTGRES_DB || 'mydb' }}"
+        else
+          echo "⏭️  Skipping PostgreSQL deployment (external database)"
+        fi
+        
+        # PostgreSQL 연결 정보 관리 (항상 배포)
+        echo "📋 Managing PostgreSQL connection information..."
+        helm upgrade --install postgres-connection ./infra/helm/postgres-connection \
+          --namespace data \
+          --create-namespace \
+          --wait \
+          --timeout 5m \
+          --set connection.host="${{ steps.postgres_check.outputs.postgres_host || 'postgres' }}" \
+          --set connection.port="${{ secrets.POSTGRES_PORT || '5432' }}" \
+          --set connection.username="${{ secrets.POSTGRES_USER || 'postgres' }}" \
+          --set connection.password="${{ secrets.POSTGRES_PASSWORD }}" \
+          --set connection.database="${{ secrets.POSTGRES_DB || 'mydb' }}" \
+          --set connection.url="${{ secrets.DATABASE_URL }}" \
+          --set service.enabled=${{ steps.postgres_check.outputs.postgres_external == 'false' && 'true' || 'false' }}
+        
+        # Elasticsearch
+        helm upgrade --install elasticsearch ./infra/helm/elasticsearch \
+          --namespace data \
+          --create-namespace \
+          --wait \
+          --timeout 10m \
+          --set secrets.superuser.password="${{ secrets.ELASTICSEARCH_PASSWORD }}"
+        
+        # Debezium
+        # PostgreSQL 호스트 결정: 외부면 시크릿의 호스트, 내부면 Kubernetes 서비스 이름
+        if [ "${{ steps.postgres_check.outputs.postgres_external }}" = "true" ]; then
+          POSTGRES_HOST_FOR_DEBEZIUM="${{ steps.postgres_check.outputs.postgres_host }}"
+          echo "🔗 Debezium will connect to external PostgreSQL: ${POSTGRES_HOST_FOR_DEBEZIUM}"
+        else
+          POSTGRES_HOST_FOR_DEBEZIUM="postgres.data.svc.cluster.local"
+          echo "🔗 Debezium will connect to Kubernetes PostgreSQL service: ${POSTGRES_HOST_FOR_DEBEZIUM}"
+        fi
+        
+        helm upgrade --install debezium ./infra/helm/debezium \
+          --namespace data \
+          --create-namespace \
+          --wait \
+          --timeout 10m \
+          --set connector.database.hostname="${POSTGRES_HOST_FOR_DEBEZIUM}" \
+          --set connector.database.port="${{ secrets.POSTGRES_PORT || '5432' }}" \
+          --set connector.database.user="${{ secrets.POSTGRES_USER || 'postgres' }}" \
+          --set connector.database.password="${{ secrets.POSTGRES_PASSWORD }}" \
+          --set connector.database.dbname="${{ secrets.POSTGRES_DB || 'mydb' }}"
+        
+        # Kibana
+        helm upgrade --install kibana ./infra/helm/kibana \
+          --namespace data \
+          --create-namespace \
+          --wait \
+          --timeout 10m \
+          --set secrets.kibanaPassword="${{ secrets.KIBANA_PASSWORD }}"
+
+    # ✅ 5. Verify Instance B Pod Placement
+    - name: Verify Instance B Pod Placement
+      run: |
+        echo "🔍 Verifying Pod placement in data namespace..."
+        echo ""
+        echo "📊 Pods in data namespace:"
+        kubectl get pods -n data -o wide
+        echo ""
+        echo "🔍 Checking nodeSelector compliance:"
+        for pod in $(kubectl get pods -n data -o jsonpath='{.items[*].metadata.name}'); do
+          echo "--- Pod: $pod ---"
+          NODE_SELECTOR=$(kubectl get pod $pod -n data -o jsonpath='{.spec.nodeSelector}' || echo "{}")
+          echo "NodeSelector: $NODE_SELECTOR"
+          NODE=$(kubectl get pod $pod -n data -o jsonpath='{.spec.nodeName}')
+          echo "Running on node: $NODE"
+          NODE_LABEL=$(kubectl get node $NODE -o jsonpath='{.metadata.labels.node-role}' 2>/dev/null || echo "none")
+          echo "Node label: node-role=$NODE_LABEL"
+          if [ "$NODE_LABEL" != "data" ]; then
+            echo "⚠️  WARNING: Pod $pod is not on a data node!"
+          else
+            echo "✅ Pod $pod is correctly placed on data node"
+          fi
+          echo ""
+        done
+
+    # 🚀 6. Deploy Infra (Instance A - app namespace)
+    - name: Deploy Infra (Instance A)
+      run: |
+        echo "🚀 Deploying infrastructure to Instance A (app namespace)..."
+        
+        # Update Kafka chart dependencies
+        cd ./infra/helm/kafka
+        helm dependency update
+        cd ../../..
+        
+        # Kafka (Bitnami chart with nodeSelector)
+        helm upgrade --install kafka ./infra/helm/kafka \
+          --namespace app \
+          --create-namespace \
+          --wait \
+          --timeout 15m \
+          --set kafka.enabled=true \
+          --set kafka.nodeSelector.node-role=app
+        
+        # Wait for Kafka to be ready
+        echo "⏳ Waiting for Kafka to be ready..."
+        kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=kafka -n app --timeout=5m || echo "Kafka may still be starting"
+        
+        # Kafka UI
+        helm upgrade --install kafka-ui ./infra/helm/kafka-ui \
+          --namespace app \
+          --create-namespace \
+          --wait \
+          --timeout 10m
+        
+        # KSQLDB
+        helm upgrade --install ksqldb ./infra/helm/ksqldb \
+          --namespace app \
+          --create-namespace \
+          --wait \
+          --timeout 10m
+        
+        # Nginx
+        helm upgrade --install nginx ./infra/helm/nginx \
+          --namespace app \
+          --create-namespace \
+          --wait \
+          --timeout 10m \
+          --set image.repository="${{ secrets.DOCKER_USERNAME }}/mecipe-nginx" \
+          --set image.tag="${{ github.sha }}" \
+          --set env.domainName="${{ secrets.DOMAIN_NAME }}"
+        
+        # Cert-manager
+        helm upgrade --install cert-manager ./infra/helm/cert-manager \
+          --namespace app \
+          --create-namespace \
+          --wait \
+          --timeout 10m
+
+    # ✅ 7. Verify Instance A Pod Placement
+    - name: Verify Instance A Pod Placement
+      run: |
+        echo "🔍 Verifying Pod placement in app namespace..."
+        echo ""
+        echo "📊 Pods in app namespace:"
+        kubectl get pods -n app -o wide
+        echo ""
+        echo "🔍 Checking nodeSelector compliance:"
+        for pod in $(kubectl get pods -n app -o jsonpath='{.items[*].metadata.name}'); do
+          echo "--- Pod: $pod ---"
+          NODE_SELECTOR=$(kubectl get pod $pod -n app -o jsonpath='{.spec.nodeSelector}' || echo "{}")
+          echo "NodeSelector: $NODE_SELECTOR"
+          NODE=$(kubectl get pod $pod -n app -o jsonpath='{.spec.nodeName}')
+          echo "Running on node: $NODE"
+          NODE_LABEL=$(kubectl get node $NODE -o jsonpath='{.metadata.labels.node-role}' 2>/dev/null || echo "none")
+          echo "Node label: node-role=$NODE_LABEL"
+          if [ "$NODE_LABEL" != "app" ]; then
+            echo "⚠️  WARNING: Pod $pod is not on an app node!"
+          else
+            echo "✅ Pod $pod is correctly placed on app node"
+          fi
+          echo ""
+        done
+
+    # 🚀 8. Deploy Apps (app namespace)
+    - name: Deploy Apps
+      run: |
+        echo "🚀 Deploying applications to app namespace..."
+        
+        # Mecipe WAS
+        helm upgrade --install mecipe-was ./infra/helm/apps/mecipe-was \
+          --namespace app \
           --create-namespace \
           --wait \
           --timeout 10m \
           --set global.dockerRegistry="${{ secrets.DOCKER_USERNAME }}" \
-          --set placeIndexerService.image.repository="${{ secrets.DOCKER_USERNAME }}/place-indexer-service" \
-          --set placeIndexerService.image.tag="${{ github.sha }}" \
-          --set mecipeWAS.image.repository="${{ secrets.DOCKER_USERNAME }}/mecipe-api-server" \
-          --set mecipeWAS.image.tag="${{ github.sha }}" \
-          --set nginx.image.repository="${{ secrets.DOCKER_USERNAME }}/mecipe-nginx" \
-          --set nginx.image.tag="${{ github.sha }}" \
-          --set configMap.domainName="${{ secrets.DOMAIN_NAME }}" \
+          --set image.repository="${{ secrets.DOCKER_USERNAME }}/mecipe-api-server" \
+          --set image.tag="${{ github.sha }}" \
+          --set env.databaseUrl="${{ secrets.DATABASE_URL }}" \
           --set secrets.databaseUrl="${{ secrets.DATABASE_URL }}" \
           --set secrets.jwtSecret="${{ secrets.JWT_SECRET }}" \
           --set secrets.secretLoginCrypto="${{ secrets.SECRET_LOGIN_CRYPTO }}" \
-          --set secrets.elasticsearchUsername="${{ secrets.ELASTICSEARCH_USERNAME || 'elastic' }}" \
-          --set secrets.elasticsearchPassword="${{ secrets.ELASTICSEARCH_PASSWORD }}" \
           --set secrets.apiKey="${{ secrets.API_KEY }}" \
           --set secrets.buildApiKey="${{ secrets.BUILD_API_KEY }}" \
           --set secrets.couponSecret="${{ secrets.COUPON_SECRET }}" \
           --set secrets.productSecret="${{ secrets.PRODUCT_SECRET }}"
-
-    - name: Run database migrations
-      run: |
-        kubectl exec -n instance-a deployment/mecipe-instance-a-was -- npx prisma migrate deploy || echo "Migration failed or no migrations to apply"
-
-    - name: Health check
-      run: |
-        echo "Performing health check..."
-        sleep 30
-        kubectl get pods -n instance-a
-        kubectl get svc -n instance-a
-
-  # 🚀 5. 인스턴스 B 배포 (Helm)
-  deploy_instance_b:
-    needs: [test, build_and_push_docker, healthcheck_instance_b]
-    runs-on: [self-hosted, instance-b, Linux, X64]
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-
-    - name: Install Helm
-      uses: azure/setup-helm@v3
-      with:
-        version: 'latest'
-
-    - name: Configure kubectl
-      run: |
-        mkdir -p ~/.kube
-        echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
-        chmod 600 ~/.kube/config
-
-    - name: Lint Helm charts
-      run: |
-        helm lint ./helm/mecipe-instance-b
-
-    - name: Deploy Instance B with Helm
-      run: |
-        helm upgrade --install mecipe-instance-b ./helm/mecipe-instance-b \
-          --namespace instance-b \
+        
+        # Place Indexer Service
+        helm upgrade --install place-indexer-service ./infra/helm/apps/place-indexer-service \
+          --namespace app \
           --create-namespace \
           --wait \
           --timeout 10m \
-          --set secrets.postgresPassword="${{ secrets.POSTGRES_PASSWORD }}" \
-          --set secrets.elasticPassword="${{ secrets.ELASTICSEARCH_PASSWORD }}" \
-          --set secrets.kibanaPassword="${{ secrets.KIBANA_PASSWORD }}" \
-          --set secrets.databaseUser="${{ secrets.POSTGRES_USER || 'postgres' }}" \
-          --set secrets.databasePassword="${{ secrets.POSTGRES_PASSWORD }}" \
-          --set secrets.databaseName="${{ secrets.POSTGRES_DB || 'mydb' }}" \
-          --set debezium.kafka.bootstrapServers="kafka.instance-a.svc.cluster.local:9092" \
-          --set debezium.connector.database.user="${{ secrets.POSTGRES_USER || 'postgres' }}" \
-          --set debezium.connector.database.password="${{ secrets.POSTGRES_PASSWORD }}" \
-          --set debezium.connector.database.dbname="${{ secrets.POSTGRES_DB || 'mydb' }}"
+          --set global.dockerRegistry="${{ secrets.DOCKER_USERNAME }}" \
+          --set image.repository="${{ secrets.DOCKER_USERNAME }}/place-indexer-service" \
+          --set image.tag="${{ github.sha }}" \
+          --set env.elasticsearchHosts="http://elasticsearch.data.svc.cluster.local:9200" \
+          --set secrets.elasticsearchUsername="${{ secrets.ELASTICSEARCH_USERNAME || 'elastic' }}" \
+          --set secrets.elasticsearchPassword="${{ secrets.ELASTICSEARCH_PASSWORD }}"
 
-    - name: Setup Elasticsearch users
+    # ✅ 9. Final Verification
+    - name: Final Verification
       run: |
-        sleep 30
-        ELASTICSEARCH_POD=$(kubectl get pod -l app.kubernetes.io/component=elasticsearch -n instance-b -o jsonpath='{.items[0].metadata.name}')
-        kubectl exec -n instance-b $ELASTICSEARCH_POD -- curl -X POST "localhost:9200/_security/user/kibana_system/_password" \
-          -H 'Content-Type: application/json' \
-          -u elastic:${{ secrets.ELASTICSEARCH_PASSWORD }} \
-          -d "{\"password\":\"${{ secrets.KIBANA_PASSWORD }}\"}" || echo "Kibana user password may already be set"
-
-    - name: Setup Debezium Connector
-      run: |
-        sleep 10
-        DEBEZIUM_POD=$(kubectl get pod -l app.kubernetes.io/component=debezium -n instance-b -o jsonpath='{.items[0].metadata.name}')
-        CONNECTOR_CONFIG=$(kubectl get configmap mecipe-instance-b-debezium-connector-config -n instance-b -o jsonpath='{.data.connector-config\.json}')
-        kubectl exec -n instance-b $DEBEZIUM_POD -- curl -X POST http://localhost:8083/connectors \
-          -H 'Content-Type: application/json' \
-          -d "$CONNECTOR_CONFIG" || echo "Connector may already exist"
-
-    - name: Health check
-      run: |
-        echo "Performing health check..."
-        sleep 30
-        kubectl get pods -n instance-b
-        kubectl get svc -n instance-b
-
+        echo "🔍 Final verification of all deployments..."
+        echo ""
+        echo "📊 All pods in app namespace:"
+        kubectl get pods -n app -o wide
+        echo ""
+        echo "📊 All pods in data namespace:"
+        kubectl get pods -n data -o wide
+        echo ""
+        echo "📊 All services:"
+        kubectl get svc -n app
+        kubectl get svc -n data
+        echo ""
+        echo "✅ Deployment complete!"
