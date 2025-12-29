@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { CafevirtualimagesService } from './cafevirtualimages.service';
 import { UpsertCafeVirtualImageListDto } from './dto/upsert-cafevirtualimage.dto';
-import { AdminAuthGuard } from 'src/auth/jwt.guard.admin';
+import { AdminAuthGuard } from '../auth/jwt.guard.admin';
 
 @Controller('cafevirtualimages')
 export class CafevirtualimagesController {

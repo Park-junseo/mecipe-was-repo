@@ -1,0 +1,25 @@
+{{- if .Values.service.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "kafka.fullname" . }}
+  namespace: {{ include "kafka.namespace" . }}
+  labels:
+    {{- include "kafka.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type | default "ClusterIP" }}
+  ports:
+    - name: client
+      protocol: TCP
+      port: {{ .Values.service.port | default 9092 }}
+      targetPort: {{ .Values.service.targetPort | default 9092 }}
+    {{- if and .Values.prometheus (hasKey .Values.prometheus "jmx") .Values.prometheus.jmx.enabled }}
+    - name: metrics
+      protocol: TCP
+      port: {{ .Values.prometheus.jmx.port | default 9404 }}
+      targetPort: {{ .Values.prometheus.jmx.port | default 9404 }}
+    {{- end }}
+  selector:
+    app.kubernetes.io/name: {{ include "kafka.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

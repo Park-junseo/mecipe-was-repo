@@ -1,5 +1,4 @@
-
-import { PrismaService } from 'src/global/prisma.service'
+import { PrismaService } from '../../global/prisma.service'
 import { mockDeep, mockReset } from 'jest-mock-extended'
 
 // 2

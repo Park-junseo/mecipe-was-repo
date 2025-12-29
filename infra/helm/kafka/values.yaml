@@ -1,0 +1,71 @@
+# Default values for Kafka (Confluent Platform)
+# This chart deploys Kafka using Confluent Platform Operator CRD
+
+# Global settings
+global:
+  dockerRegistry: ""
+  imagePullSecrets: []
+
+# Metadata
+name: kafka
+namespace: data-streaming
+
+# Kafka configuration
+replicas: 1
+
+image:
+  application: confluentinc/cp-server:7.6.0
+  init: confluentinc/confluent-init-container:2.7.0
+
+dataVolumeCapacity: 10Gi
+
+nodeSelector:
+  node-role: stream
+
+# Listeners configuration
+listeners:
+  internal:
+    authentication:
+      type: plain
+  # external:
+  #   enabled: false
+  #   authentication:
+  #     type: plaintext
+
+# Service configuration
+# Note: Confluent Platform Operator automatically creates a Service for Kafka CRD
+# This Service resource is optional and can be disabled if not needed
+service:
+  enabled: false  # Set to true if you need a custom Service
+  type: ClusterIP
+  port: 9092
+  targetPort: 9092
+
+# Prometheus JMX metrics (optional)
+prometheus:
+  jmx:
+    enabled: false
+    port: 9404
+
+# Dependencies
+# Zookeeper should be deployed independently using: helm install kafka-zookeeper ./infra/helm/kafka-zookeeper -f ./infra/helm/kafka-zookeeper/values.yaml
+dependencies:
+  zookeeper:
+    name: kafka-zookeeper  # Independently deployed Zookeeper CRD name (release name)
+    namespace: data-streaming  # Namespace where Zookeeper is deployed
+
+# Additional Kafka configuration overrides
+configOverrides:
+  server:
+    # Example:
+    # - offsets.topic.replication.factor=1
+    # - transaction.state.log.replication.factor=1
+
+# Resources (optional)
+# resources:
+#   requests:
+#     cpu: "500m"
+#     memory: "1Gi"
+#   limits:
+#     cpu: "1"
+#     memory: "2Gi"

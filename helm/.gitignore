@@ -1,0 +1,12 @@
+# Values files with sensitive data
+values-*.yaml
+!values.yaml
+values-local.yaml
+values-secrets.yaml
+
+# Helm package files
+*.tgz
+
+# Helm dependency lock files (optional, can be committed)
+# Chart.lock
+

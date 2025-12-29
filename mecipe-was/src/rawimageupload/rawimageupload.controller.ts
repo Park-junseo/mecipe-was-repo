@@ -13,7 +13,7 @@ import {
   FileFieldsInterceptor,
   FileInterceptor,
 } from '@nestjs/platform-express';
-import { AdminAuthGuard } from 'src/auth/jwt.guard.admin';
+import { AdminAuthGuard } from '../auth/jwt.guard.admin';
 import { Request } from 'express';
 
 @Controller('rawimageupload')

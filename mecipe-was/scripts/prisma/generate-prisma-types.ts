@@ -58,7 +58,7 @@ function generateTypeMapping(models: string[], typeName: string, prismaBaseTypeP
 * Prisma 스키마 변경 후 이 스크립트를 실행하면 자동으로 업데이트됩니다.
 */
 
-import { Prisma } from 'prisma/basic';
+import { Prisma } from '../../../../prisma/basic';
 ${importPaths?.join(`\n`) ?? ''}
 
 /**
@@ -111,7 +111,7 @@ export function generatePrismaTypes() {
             { typeName: 'TOptions', extends: 'InternalArgs', isExternal: true },
             { typeName: 'Prisma.PrismaClientOptions', isExternal: false }
         ], 
-        importPaths: ['import { InternalArgs } from \'prisma/basic/runtime/library\';'],
+        importPaths: ['import { InternalArgs } from \'../../../../prisma/basic/runtime/library\';'],
         defaultTypeArg: 'unknown'
     }));
     map.set('GetPayload', generateTypeMapping(models, 'PrismaModelGetPayload', 'Prisma.{model}GetPayload', {
@@ -123,7 +123,7 @@ export function generatePrismaTypes() {
         defaultTypeArg: 'undefined'
     }));
     map.set('Type', generateTypeMapping(models, 'PrismaModelType', 'PrismaBasic.{model}', {
-        importPaths: ['import * as PrismaBasic from \'prisma/basic\';']
+        importPaths: ['import * as PrismaBasic from \'../../../../prisma/basic\';']
     }));
 
     console.log(' 기존 OUTPUT_DIR 삭제 중...');
@@ -135,8 +135,8 @@ export function generatePrismaTypes() {
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
     console.log(' 새로운 OUTPUT_DIR 생성 완료');
 
-    const importReulsts = [];
-    const outputPaths = [];
+    const importReulsts: string[] = [];
+    const outputPaths: string[] = [];
     map.forEach((typeMapping, key) => {
         const outputFilePath = getOutputFilePath(key.toLowerCase());
         // 출력 디렉토리 생성

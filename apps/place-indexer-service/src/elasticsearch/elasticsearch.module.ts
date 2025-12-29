@@ -6,7 +6,7 @@ import {
   ELASTICSEARCH_HOSTS,
   ELASTICSEARCH_PASSWORD,
   ELASTICSEARCH_USERNAME,
-} from 'src/util/config';
+} from '../util/config';
 
 @Global() // 다른 모듈에서 별도 export 없이 바로 ElasticsearchService 주입 가능
 @Module({
@@ -19,12 +19,6 @@ import {
           username: ELASTICSEARCH_USERNAME(configService),
           password: ELASTICSEARCH_PASSWORD(configService),
         },
-        // headers: {
-        //   Accept: 'application/vnd.elasticsearch+json; compatible-with=8',
-        //   'Content-Type':
-        //     'application/vnd.elasticsearch+json; compatible-with=8',
-        // },
-        // enableMetaHeader: true,
       }),
       inject: [ConfigService],
     }),

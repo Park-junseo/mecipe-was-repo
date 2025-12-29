@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "common.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "common.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "common.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- include "common.nodeSelector" . }}
+      containers:
+      - name: debezium-connect
+        image: {{ include "common.image" (dict "Values" .Values "repository" .Values.image.repository "tag" .Values.image.tag) }}
+        ports:
+        - containerPort: 8083
+          name: http
+        env:
+        - name: BOOTSTRAP_SERVERS
+          value: {{ .Values.kafka.bootstrapServers | quote }}
+        - name: GROUP_ID
+          value: {{ .Values.groupId | quote }}
+        - name: CONFIG_STORAGE_TOPIC
+          value: {{ .Values.configStorageTopic | quote }}
+        - name: OFFSET_STORAGE_TOPIC
+          value: {{ .Values.offsetStorageTopic | quote }}
+        - name: STATUS_STORAGE_TOPIC
+          value: {{ .Values.statusStorageTopic | quote }}
+        {{- with .Values.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /connectors
+            port: 8083
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /connectors
+            port: 8083
+          initialDelaySeconds: 30
+          periodSeconds: 10

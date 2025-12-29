@@ -2,7 +2,7 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import { RawImageDescriptionData } from './dto/rawimageupload.dto';
 import { existsSync, rmSync } from 'fs';
 import { join } from 'path';
-import { getAppDirectory } from 'src/util/getAppDirectory';
+import { getAppDirectory } from '../util/getAppDirectory';
 
 @Injectable()
 export class RawimageuploadService {

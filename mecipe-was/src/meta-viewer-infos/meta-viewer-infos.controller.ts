@@ -19,9 +19,9 @@ import { UpdateMetaViewerMapDto } from './dto/update-meta-viewer-map.dto';
 import { CreateMetaViewerActiveMapDto } from './dto/create-meta-viewer-active-map.dto';
 import { UpdateMetaViewerActiveMapDto } from './dto/update-meta-viewer-active-map.dto';
 import { SearchMetaViewerInfoDto } from './dto/search-meta-viewer-info.dto';
-import { AdminAuthGuard } from 'src/auth/jwt.guard.admin';
-import { Public } from 'src/util/decorators';
-import { RequireBuildApiKey } from 'src/auth/api-key.decorator';
+import { AdminAuthGuard } from '../auth/jwt.guard.admin';
+import { Public } from '../util/decorators';
+import { RequireBuildApiKey } from '../auth/api-key.decorator';
 
 @Controller('meta-viewer-infos')
 @UsePipes(

@@ -1,8 +1,8 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { CreateProductcategoryDto } from './dto/create-productcategory.dto';
 import { UpdateProductcategoryDto } from './dto/update-productcategory.dto';
-import { PrismaService } from 'src/global/prisma.service';
-import { Prisma, PrismaPromise, ProductCategory } from 'prisma/basic';
+import { PrismaService } from '../global/prisma.service';
+import { Prisma } from '../../prisma/basic';
 
 @Injectable()
 export class ProductcategoriesService {

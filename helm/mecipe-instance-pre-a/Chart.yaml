@@ -1,0 +1,18 @@
+apiVersion: v2
+name: mecipe-instance-pre-a
+description: Mecipe Instance Pre-A - Kafka Infrastructure
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - mecipe
+  - kafka
+  - streaming
+dependencies:
+  - name: kafka
+    version: "~22.1.0"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: kafka.enabled
+  # ksqldb는 dependency chart로 사용 불가 (repository에 없음)
+  # 필요시 직접 템플릿으로 구현 필요
+

@@ -6,7 +6,7 @@
 * Prisma 스키마 변경 후 이 스크립트를 실행하면 자동으로 업데이트됩니다.
 */
 
-import { Prisma } from 'prisma/basic';
+import { Prisma } from '../../../../prisma/basic';
 
 
 /**

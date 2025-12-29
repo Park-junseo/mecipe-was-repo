@@ -1,10 +1,10 @@
 import { ForbiddenException, GoneException, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { PrismaService } from 'src/global/prisma.service';
+import { PrismaService } from '../global/prisma.service';
 import * as crypto from 'crypto';
-import { loginCryptoConstants } from 'src/auth/jwtConstants';
-import { LoginType, UserType } from 'prisma/basic';
+import { loginCryptoConstants } from '../auth/jwtConstants';
+import { LoginType, UserType } from '../../prisma/basic';
 
 @Injectable()
 export class UsersService {

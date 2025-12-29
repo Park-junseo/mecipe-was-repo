@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { CafethumbnailimagesService as CafethumbnailimagesService } from './cafethumbnailimages.service';
 import { UpsertCafethumbnailimageListDto } from './dto/upsert-cafethumbnailimage.dto';
-import { AdminAuthGuard } from 'src/auth/jwt.guard.admin';
+import { AdminAuthGuard } from '../auth/jwt.guard.admin';
 
 @Controller('cafethumbnailimages')
 export class CafethumbnailimagesController {

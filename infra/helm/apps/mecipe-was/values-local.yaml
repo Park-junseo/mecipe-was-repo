@@ -1,0 +1,89 @@
+# Default values for mecipe-was
+global:
+  dockerRegistry: "local"
+  imagePullSecrets: []
+
+name: mecipe-was
+namespace: app
+
+nodeSelector:
+  node-role: local
+
+image:
+  repository: "mecipe-api-server"
+  tag: "latest"
+  pullPolicy: Always
+
+replicaCount: 1
+
+ingress:
+  enabled: true
+  host: ""
+  tls:
+    enabled: false  # 로컬 환경에서는 TLS 비활성화 (Let's Encrypt 인증서 발급 불가)
+  tlsSecret: "mecipe-was-tls"
+  annotationsSettings:
+    certManager.enabled: false  # 로컬 환경에서는 cert-manager 비활성화
+    certManager.clusterIssuer: letsencrypt-staging
+    https.redirect.enabled: false  # 로컬에서는 HTTPS 리다이렉트 비활성화
+    securityHeaders.enabled: false  # 로컬에서는 HSTS 비활성화 (브라우저가 HTTPS로 강제하는 것 방지)
+    websocket.enabled: true
+
+service:
+  type: ClusterIP
+  ports:
+    http: 4000
+    socket: 4100
+
+env:
+  nodeEnv: production
+  port: "4000"
+  socketPort: "4100"
+
+postgres:
+  username: ""
+  password: ""
+  database: ""
+  hosts: ""
+
+elasticsearch:
+  hosts: ""
+  username: ""
+  password: ""
+
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClass: ""
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+livenessProbe:
+  httpGet:
+    path: /hello
+    port: 4000
+  initialDelaySeconds: 60
+  periodSeconds: 30
+
+readinessProbe:
+  httpGet:
+    path: /hello
+    port: 4000
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+# Secrets (should be set via --set or values file)
+secrets:
+  jwtSecret: ""
+  secretLoginCrypto: ""
+  apiKey: ""
+  buildApiKey: ""
+  couponSecret: ""
+  productSecret: ""
+

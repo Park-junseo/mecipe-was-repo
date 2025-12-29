@@ -1,0 +1,19 @@
+ingress-nginx:
+  controller:
+    replicaCount: 1
+
+    nodeSelector:
+      node-role: ingress
+
+    tolerations: []
+
+    affinity: {}
+
+    service:
+      type: LoadBalancer
+      externalTrafficPolicy: Local
+
+    admissionWebhooks:
+      patch:
+        nodeSelector:
+          node-role: ingress

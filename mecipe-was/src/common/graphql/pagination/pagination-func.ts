@@ -1,8 +1,9 @@
-import { Prisma } from "prisma/basic";
+import { Prisma } from "../../../../prisma/basic";
 import { PaginationArgs } from "./pagination-args.input";
 import { PageInfo } from "./page-info.entity";
-import { PrismaModelDelegate, PrismaModelOrderByWithRelationInput, PrismaModelSelect, PrismaModelWhereInput } from "src/util/prisma";
-import { InternalArgs } from "prisma/basic/runtime/library";
+import { PrismaModelDelegate, PrismaModelOrderByWithRelationInput, PrismaModelSelect, PrismaModelWhereInput } from "../../../util/prisma";
+import { BaseConnectionType } from "./base-connection.type";
+import { InternalArgs } from "../../../../prisma/basic/runtime/library";
 
 export async function findPaginationBasedCursor<
   TDelegate extends PrismaModelDelegate<Prisma.ModelName, U>,

@@ -1,0 +1,75 @@
+{{- if .Values.kibana.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mecipe-instance-b.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.kibana.service.type }}
+  ports:
+    - port: {{ .Values.kibana.service.port }}
+      targetPort: 5601
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "mecipe-instance-b.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: kibana
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kibana
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mecipe-instance-b.labels" . | nindent 4 }}
+    app.kubernetes.io/component: kibana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "mecipe-instance-b.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: kibana
+  template:
+    metadata:
+      labels:
+        {{- include "mecipe-instance-b.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: kibana
+    spec:
+      containers:
+      - name: kibana
+        image: {{ include "mecipe-instance-b.image" (dict "Values" .Values "repository" .Values.kibana.image.repository "tag" .Values.kibana.image.tag) }}
+        ports:
+        - containerPort: 5601
+          name: http
+        env:
+        - name: ELASTICSEARCH_HOSTS
+          value: {{ .Values.kibana.elasticsearch.hosts | quote }}
+        - name: ELASTICSEARCH_USERNAME
+          value: {{ .Values.kibana.elasticsearch.username | quote }}
+        {{- if .Values.secrets.kibanaPassword }}
+        - name: ELASTICSEARCH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "mecipe-instance-b.fullname" . }}-secrets
+              key: kibana-password
+        {{- end }}
+        {{- with .Values.kibana.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        livenessProbe:
+          httpGet:
+            path: /api/status
+            port: 5601
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /api/status
+            port: 5601
+          initialDelaySeconds: 30
+          periodSeconds: 10
+{{- end }}
+

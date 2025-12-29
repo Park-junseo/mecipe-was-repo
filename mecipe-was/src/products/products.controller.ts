@@ -16,8 +16,8 @@ import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { SearchProductDto } from './dto/search-product.dto';
-import { Public } from 'src/util/decorators';
-import { JwtAuthGuard } from 'src/auth/jwt.guard';
+import { Public } from '../util/decorators';
+import { JwtAuthGuard } from '../auth/jwt.guard';
 
 interface RequestWithUser extends Request {
   user: {

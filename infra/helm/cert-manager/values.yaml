@@ -1,0 +1,31 @@
+# # Default values for cert-manager
+# global:
+#   dockerRegistry: ""
+#   imagePullSecrets: []
+
+name: cert-manager
+namespace: infra
+
+nodeSelector:
+  node-role: ingress
+
+# schedule: "0 0,12 * * *"  # 매일 자정과 정오
+
+# persistence:
+#   certbotConf:
+#     enabled: true
+#   certbotWww:
+#     enabled: true
+
+email: "admin@mecipe.com"
+letsencrypt:
+  # Production Let's Encrypt server
+  server: "https://acme-v02.api.letsencrypt.org/directory"
+  # Staging server for testing (no rate limits)
+  staging:
+    enabled: false
+    server: "https://acme-staging-v02.api.letsencrypt.org/directory"
+
+persistence:
+  tempCertbotConf:
+    enabled: false

@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
-import { PrismaService } from 'src/global/prisma.service';
+import { PrismaService } from '../global/prisma.service';
 import { UpsertCafeVirtualImageListDto } from './dto/upsert-cafevirtualimage.dto';
-import { CafeVirtualImage } from 'prisma/basic';
+import { CafeVirtualImage } from '../../prisma/basic';
 
 @Injectable()
 export class CafevirtualimagesService {

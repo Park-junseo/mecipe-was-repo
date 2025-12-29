@@ -43,7 +43,7 @@ import { JSONScalar } from './common/graphql/scalars/json.scalar';
     }),
     GraphQLModule.forRoot<ApolloDriverConfig>({
       driver: ApolloDriver,
-      autoSchemaFile: join(process.cwd(), 'src/common/graphql/schema.gql'),
+      autoSchemaFile: join(__dirname, '..', 'common', 'graphql', 'schema.gql'),
     }),
     GlobalModule,
     ExamplesModule,

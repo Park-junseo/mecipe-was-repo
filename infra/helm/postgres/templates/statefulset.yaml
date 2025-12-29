@@ -1,0 +1,97 @@
+{{- if .Values.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "common.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "common.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- include "common.nodeSelector" . }}
+      {{- if .Values.config.postgresqlConf }}
+      volumes:
+      - name: postgresql-config
+        configMap:
+          name: {{ include "common.fullname" . }}-postgresql-config
+      {{- end }}
+      containers:
+      - name: postgres
+        image: {{ include "common.image" (dict "Values" .Values "repository" .Values.image.repository "tag" .Values.image.tag) }}
+        ports:
+        - containerPort: 5432
+          name: postgres
+        env:
+        - name: POSTGRES_USER
+          value: {{ .Values.auth.username | quote }}
+        {{- if .Values.secrets.postgresPassword }}
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "common.fullname" . }}-secrets
+              key: postgres-password
+        {{- end }}
+        - name: POSTGRES_DB
+          value: {{ .Values.auth.database | quote }}
+        {{- if .Values.config.walLevel }}
+        - name: POSTGRES_INITDB_ARGS
+          value: "-c wal_level={{ .Values.config.walLevel }}"
+        {{- end }}
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        {{- if .Values.config.postgresqlConf }}
+        - name: postgresql-config
+          mountPath: /var/lib/postgresql/data/postgresql.conf
+          subPath: postgresql.conf
+          readOnly: true
+        command:
+        - postgres
+        - -c
+        - config_file=/var/lib/postgresql/data/postgresql.conf
+        {{- end }}
+        {{- with .Values.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - {{ .Values.auth.username }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - {{ .Values.auth.username }}
+          initialDelaySeconds: 10
+          periodSeconds: 5
+  {{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      {{- if .Values.persistence.storageClass }}
+      storageClassName: {{ .Values.persistence.storageClass }}
+      {{- end }}
+      resources:
+        requests:
+          storage: {{ .Values.persistence.size }}
+  {{- end }}
+{{- end }}
+

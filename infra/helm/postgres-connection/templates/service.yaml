@@ -1,0 +1,16 @@
+{{- if .Values.service.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.service.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "postgres-connection.labels" . | nindent 4 }}
+spec:
+  type: ExternalName
+  externalName: {{ .Values.connection.host }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.connection.port }}
+{{- end }}
+

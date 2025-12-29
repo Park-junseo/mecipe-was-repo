@@ -1,0 +1,57 @@
+apiVersion: platform.confluent.io/v1beta1
+kind: KsqlDB
+metadata:
+  name: {{ include "ksqldb.name" . }}
+  namespace: {{ include "ksqldb.namespace" . }}
+  labels:
+    {{- include "ksqldb.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas }}
+
+  image:
+    application: {{ include "ksqldb.image" (dict "Values" .Values "image" .Values.image.application) }}
+    init: {{ include "ksqldb.image" (dict "Values" .Values "image" .Values.image.init) }}
+
+  {{- if .Values.nodeSelector }}
+  podTemplate:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+              {{- range $key, $value := .Values.nodeSelector }}
+              - key: {{ $key | quote }}
+                operator: In
+                values:
+                - {{ $value | quote }}
+              {{- end }}
+  {{- end }}
+
+  dataVolumeCapacity: {{ .Values.dataVolumeCapacity }}
+
+  dependencies:
+    kafka:
+      bootstrapEndpoint: {{ .Values.dependencies.kafka.bootstrapEndpoint }}
+
+  {{- if .Values.configOverrides }}
+  configOverrides:
+    {{- if .Values.configOverrides.server }}
+    server:
+      {{- range .Values.configOverrides.server }}
+      - {{ . }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.configOverrides.ksql }}
+    ksql:
+      {{- range .Values.configOverrides.ksql }}
+      - {{ . }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+
+  {{- if .Values.resources }}
+  resources:
+    {{- toYaml .Values.resources | nindent 4 }}
+  {{- end }}
+
+

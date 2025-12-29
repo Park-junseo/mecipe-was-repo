@@ -1,0 +1,48 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "ksqldb.name" . }}-apply-queries
+  namespace: {{ include "ksqldb.namespace" . }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: apply-queries
+          image: confluentinc/cp-ksqldb-cli:7.6.0
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              
+              echo "Waiting for ksqlDB..."
+              # Install curl if not available (ksql-cli image may not have curl)
+              if ! command -v curl > /dev/null 2>&1; then
+                echo "Installing curl..."
+                apk add --no-cache curl > /dev/null 2>&1 || (apt-get update && apt-get install -y curl > /dev/null 2>&1) || true
+              fi
+              
+              until curl -s http://{{ include "ksqldb.name" . }}:8088/info > /dev/null 2>&1; do
+                sleep 5
+              done
+              echo "✅ ksqlDB is ready"
+
+              echo "Applying queries from queries.sql..."
+              
+              # Execute SQL file using ksql-cli
+              # ksql-cli handles multiple statements, comments, and formatting automatically
+              ksql http://{{ include "ksqldb.name" . }}:8088 < /queries/queries.sql
+              
+              echo "✅ All queries applied successfully!"
+          volumeMounts:
+            - name: queries
+              mountPath: /queries
+      volumes:
+        - name: queries
+          configMap:
+            name: {{ include "ksqldb.name" . }}-queries

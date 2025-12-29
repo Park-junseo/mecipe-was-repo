@@ -1,0 +1,61 @@
+# Default values for elasticsearch
+global:
+  dockerRegistry: ""
+  imagePullSecrets: []
+
+name: elasticsearch
+namespace: data-storage
+
+nodeSelector:
+  node-role: storage
+
+image:
+  repository: docker.elastic.co/elasticsearch/elasticsearch
+  tag: "8.14.0"
+
+persistence:
+  enabled: true
+  size: 20Gi
+  storageClass: ""
+
+discovery:
+  type: single-node
+
+security:
+  enabled: true
+  httpSslEnabled: false
+
+javaOpts: "-Xms512m -Xmx512m"
+
+service:
+  type: ClusterIP
+  port: 9200
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+  requests:
+    cpu: 1000m
+    memory: 1Gi
+
+secrets:
+  password: ""
+
+users:
+  kibana:
+    username: "kibana_system"
+    password: ""
+    roles:
+      - kibana_admin
+  producer:
+    username: "producer_user"
+    password: ""
+    roles:
+      - producer_role
+  app:
+    username: "app_user"
+    password: ""
+    roles:
+      - app_read_write_role
+

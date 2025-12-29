@@ -1,0 +1,178 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: es-security-init
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: init
+          image: curlimages/curl:8.5.0
+          envFrom:
+            - secretRef:
+                name: {{ include "common.fullname" . }}-secrets
+          env:
+            - name: ES_HOST
+              value: {{ .Release.Name }}:{{ .Values.service.port }}
+            {{- range $key, $user := .Values.users }}
+            - name: {{ printf "%s_USERNAME" ($key | upper) }}
+              value: {{ $user.username | quote }}
+            {{- end }}
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+
+              ES="http://$ES_HOST"
+
+              echo "⏳ Waiting for Elasticsearch to be ready..."
+              # 'status':'green' or 'yellow' 가 될 때까지 기다립니다.
+              until curl -s -u "elastic:$ELASTIC_SUPERUSER_PASSWORD" \
+                "$ES/_cluster/health" | grep -q '"status":"green"\|"status":"yellow"'; do
+                echo "  Elasticsearch not ready yet... Retrying in 5s."
+                sleep 5
+              done
+              echo "✅ Elasticsearch is ready."
+
+              # --- Roles Definition ---
+              create_or_update_role() {
+                local ROLE_NAME=$1
+                shift
+                
+                echo "🔐 Ensuring role exists: $ROLE_NAME"
+
+                # 내장 역할(예: kibana_admin)이 아닌 경우에만 생성 시도
+                if [ "$ROLE_NAME" != "kibana_admin" ] && [ "$ROLE_NAME" != "monitoring_user" ]; then
+                  echo "Creating/Updating custom role: $ROLE_NAME"
+                  
+                  # Build JSON without jq (sh-compatible)
+                  local cluster_privs=""
+                  local index_privs=""
+                  
+                  # Process remaining arguments as privileges
+                  for priv in "$@"; do
+                    if echo "$priv" | grep -q "^cluster:"; then
+                      local CLUSTER_PRIV=$(echo "$priv" | cut -d':' -f2)
+                      if [ -z "$cluster_privs" ]; then
+                        cluster_privs="\"$CLUSTER_PRIV\""
+                      else
+                        cluster_privs="$cluster_privs,\"$CLUSTER_PRIV\""
+                      fi
+                    elif echo "$priv" | grep -q "^index:"; then
+                      local INDEX_PRIV=$(echo "$priv" | cut -d':' -f2)
+                      if [ -z "$index_privs" ]; then
+                        index_privs="\"$INDEX_PRIV\""
+                      else
+                        index_privs="$index_privs,\"$INDEX_PRIV\""
+                      fi
+                    elif [ "$priv" = "indices_all_privileges" ]; then
+                      index_privs="\"all\""
+                    elif [ "$priv" = "cluster_all_privileges" ]; then
+                      cluster_privs="\"all\""
+                    fi
+                  done
+                  
+                  # Build final JSON
+                  local json_parts=""
+                  if [ -n "$cluster_privs" ]; then
+                    json_parts="\"cluster\":[$cluster_privs]"
+                  fi
+                  if [ -n "$index_privs" ]; then
+                    if [ -n "$json_parts" ]; then
+                      json_parts="$json_parts,\"indices\":[{\"names\":[\"*\"],\"privileges\":[$index_privs]}]"
+                    else
+                      json_parts="\"indices\":[{\"names\":[\"*\"],\"privileges\":[$index_privs]}]"
+                    fi
+                  fi
+                  
+                  local final_json_data="{$json_parts}"
+
+                  curl -s -f -u "elastic:$ELASTIC_SUPERUSER_PASSWORD" \
+                    -X PUT "$ES/_security/role/$ROLE_NAME" \
+                    -H "Content-Type: application/json" \
+                    -d "$final_json_data" || { echo "Failed to create/update role $ROLE_NAME"; exit 1; }
+                else
+                  echo "Role $ROLE_NAME is a built-in role, skipping creation/update."
+                fi
+              }
+
+              echo "🔧 Initializing custom roles..."
+              # producer 역할: 인덱스 생성, 문서 쓰기/삭제, 읽기 권한
+              # view_index_metadata: 인덱스 존재 여부 확인 (indices.exists)에 필요
+              # Cluster privileges can be added with "cluster:xxx"
+              create_or_update_role producer_role index:create_index index:write index:read index:view_index_metadata 
+              # app 역할: 읽기, 쓰기만
+              create_or_update_role app_read_write_role index:read index:write
+
+              # --- Users Definition ---
+              create_or_update_user() {
+                local USER_NAME=$1
+                local USER_PASS=$2
+                shift 2
+                
+                echo "👤 Creating/updating user: $USER_NAME (roles: $*)"
+                
+                # Reserved users (kibana_system, etc.) can only have password changed, not roles
+                if [ "$USER_NAME" = "kibana_system" ]; then
+                  echo "User $USER_NAME is reserved, updating password only..."
+                  response=$(curl -s -w "\n%{http_code}" -u "elastic:$ELASTIC_SUPERUSER_PASSWORD" \
+                    -X POST "$ES/_security/user/$USER_NAME/_password" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"password\":\"$USER_PASS\"}")
+                  http_code=$(echo "$response" | tail -n1)
+                  body=$(echo "$response" | sed '$d')
+                  if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
+                    echo "Failed to update password for user $USER_NAME (HTTP $http_code): $body"
+                    exit 1
+                  fi
+                  echo "Password for reserved user $USER_NAME updated successfully"
+                  return 0
+                fi
+                
+                # Build JSON array without jq (sh-compatible)
+                local roles_json=""
+                for role in "$@"; do
+                  if [ -z "$roles_json" ]; then
+                    roles_json="\"$role\""
+                  else
+                    roles_json="$roles_json,\"$role\""
+                  fi
+                done
+                if [ -z "$roles_json" ]; then
+                  roles_json="[]"
+                else
+                  roles_json="[$roles_json]"
+                fi
+
+                response=$(curl -s -w "\n%{http_code}" -u "elastic:$ELASTIC_SUPERUSER_PASSWORD" \
+                  -X PUT "$ES/_security/user/$USER_NAME" \
+                  -H "Content-Type: application/json" \
+                  -d "{\"password\":\"$USER_PASS\",\"roles\":$roles_json}")
+                http_code=$(echo "$response" | tail -n1)
+                body=$(echo "$response" | sed '$d')
+                if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
+                  echo "Failed to create/update user $USER_NAME (HTTP $http_code): $body"
+                  exit 1
+                fi
+                echo "User $USER_NAME created/updated successfully"
+              }
+
+              echo "🔧 Initializing users..."
+              {{- range $key, $user := .Values.users }}
+                {{- $passwordEnvName := printf "%s_PASSWORD" ($key | upper) }}
+                {{- $usernameEnvName := printf "%s_USERNAME" ($key | upper) }}
+                create_or_update_user "${{ $usernameEnvName }}" "${{ $passwordEnvName }}" \
+                  {{- range $role := $user.roles }}
+                    "{{ $role }}" \
+                  {{- end }}
+                  ;
+              {{- end }}
+              
+              echo "✅ Elasticsearch security initialized."

@@ -10,7 +10,7 @@ import {
 import { ExamplesService } from './examples.service';
 import { CreateExampleDto } from './dto/create-example.dto';
 import { UpdateExampleDto } from './dto/update-example.dto';
-import { Public } from 'src/util/decorators';
+import { Public } from '../util/decorators';
 
 @Controller('examples')
 export class ExamplesController {

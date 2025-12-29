@@ -6,7 +6,7 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
-import { Prisma } from 'prisma/basic';
+import { Prisma } from '../../../prisma/basic';
 
 export class CreateProductDto implements Partial<Prisma.ProductCreateInput> {
   @IsString()

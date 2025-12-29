@@ -1,0 +1,26 @@
+# Default values for postgres-connection
+# This chart manages connection information for external PostgreSQL
+# It does NOT deploy PostgreSQL itself
+
+name: postgres-connection
+namespace: data-storage
+
+# PostgreSQL Connection Information
+connection:
+  host: ""  # External PostgreSQL host (IP or FQDN)
+  port: "5432"
+  username: ""
+  password: ""
+  database: ""
+  
+  # Connection URL (if provided, will be used directly)
+  url: ""  # Format: postgresql://user:pass@host:port/db?schema=public
+
+# Service for internal reference (optional)
+# If PostgreSQL is in Kubernetes but different namespace
+service:
+  enabled: false
+  name: "postgres"
+  namespace: "data-storage"
+  port: 5432
+

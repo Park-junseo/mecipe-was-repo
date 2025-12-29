@@ -1,0 +1,7 @@
+apiVersion: v2
+name: nginx
+description: Nginx for Mecipe
+type: application
+version: 0.1.0
+appVersion: "latest"
+

@@ -1,0 +1,52 @@
+apiVersion: platform.confluent.io/v1beta1
+kind: Zookeeper
+metadata:
+  name: {{ include "kafka-zookeeper.fullname" . }}
+  namespace: {{ include "kafka-zookeeper.namespace" . }}
+  labels:
+    {{- include "kafka-zookeeper.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas }}
+  
+  image:
+    application: {{ include "kafka-zookeeper.image" (dict "Values" .Values "image" .Values.image.application) }}
+    init: {{ include "kafka-zookeeper.image" (dict "Values" .Values "image" .Values.image.init) }}
+
+  dataVolumeCapacity: {{ .Values.dataVolumeCapacity }}
+  logVolumeCapacity: {{ .Values.logVolumeCapacity | default .Values.dataVolumeCapacity }}
+
+  {{- if .Values.nodeSelector }}
+  podTemplate:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+              {{- range $key, $value := .Values.nodeSelector }}
+              - key: {{ $key | quote }}
+                operator: In
+                values:
+                - {{ $value | quote }}
+              {{- end }}
+  {{- end }}
+
+  {{- if .Values.configOverrides }}
+  configOverrides:
+    {{- if .Values.configOverrides.server }}
+    server:
+      {{- range .Values.configOverrides.server }}
+      - {{ . }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.configOverrides.jvm }}
+    jvm:
+      {{- range .Values.configOverrides.jvm }}
+      - {{ . }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+
+  {{- if .Values.resources }}
+  resources:
+    {{- toYaml .Values.resources | nindent 4 }}
+  {{- end }}

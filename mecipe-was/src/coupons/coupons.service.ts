@@ -4,13 +4,10 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { CreateCouponDataDto, CreateCouponDto } from './dto/create-coupon.dto';
-import { UpdateCouponDto } from './dto/update-coupon.dto';
-import { PrismaService } from 'src/global/prisma.service';
-import { verifySignedMessage } from 'src/util/sha256';
-import { CafeCoupon, CafeCouponHistory, ProxyUserType } from 'prisma/basic';
-import { generateQrMatrix } from 'src/util/qrcode';
-import e from 'express';
+import { PrismaService } from '../global/prisma.service';
+import { verifySignedMessage } from '../util/sha256';
+import { CafeCoupon, CafeCouponHistory, ProxyUserType } from '../../prisma/basic';
+import { generateQrMatrix } from '../util/qrcode';
 
 @Injectable()
 export class CouponsService {

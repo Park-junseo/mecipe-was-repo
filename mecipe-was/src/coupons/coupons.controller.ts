@@ -11,7 +11,7 @@ import {
 import { CouponsService } from './coupons.service';
 import { CreateCouponDataDto } from './dto/create-coupon.dto';
 import { UpdateCouponDto } from './dto/update-coupon.dto';
-import { Public } from 'src/util/decorators';
+import { Public } from '../util/decorators';
 
 @Controller('coupons')
 export class CouponsController {

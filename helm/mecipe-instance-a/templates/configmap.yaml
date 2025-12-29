@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mecipe-instance-a.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mecipe-instance-a.labels" . | nindent 4 }}
+data:
+  domain-name: {{ .Values.configMap.domainName | quote }}
+  elasticsearch-hosts: {{ .Values.configMap.elasticsearchHosts | quote }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mecipe-instance-a.fullname" . }}-nginx-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mecipe-instance-a.labels" . | nindent 4 }}
+data:
+  nginx.conf: |
+    # Nginx configuration will be mounted from ConfigMap
+    # This should be populated from nginx/nginx.conf file
+

@@ -10,7 +10,7 @@ import { INestApplication } from '@nestjs/common';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { join } from 'path';
-import { AppModule } from 'src/app.module';
+import { AppModule } from '../../../app.module';
 import { GraphQLResolveInfo } from 'graphql';
 
 /**

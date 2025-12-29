@@ -1,7 +1,7 @@
-import { createCafeInfoTestModule } from 'src/test-utils';
+import { createCafeInfoTestModule } from '../test-utils';
 import { CafeInfo, ICafeInfo, IRegionCategory } from './entity';
-import { CAFEINFO_WITH_REGIONCATEGORY_TOPIC } from 'src/kafka/topics';
-import { extractEntityFields } from 'src/elasticsearch/libs';
+import { CAFEINFO_WITH_REGIONCATEGORY_TOPIC } from '../kafka/topics';
+import { extractEntityFields } from '../elasticsearch/libs/utils';
 import { plainToInstance } from 'class-transformer';
 
 type KafkaCafeInfo = Omit<ICafeInfo, 'createdAt' | 'RegionCategory'> & {

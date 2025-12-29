@@ -1,0 +1,28 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "rootDir": ".",
+    "sourceMap": true,
+    "declaration": false,
+    "moduleResolution": "node",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
+    "importHelpers": false,
+    "target": "es2022",
+    "module": "es2022",
+    "lib": ["ES2022"],
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@virtualcafe/common": ["libs/common/src/index.ts"],
+      "@virtualcafe/database": ["libs/database/src/index.ts"],
+      "@virtualcafe/mecipe-was": ["mecipe-was/src/index.ts"],
+      "@virtualcafe/place-indexer-service": [
+        "apps/place-indexer-service/src/index.ts"
+      ]
+    }
+  },
+  "exclude": ["node_modules", "tmp", "dist"]
+}

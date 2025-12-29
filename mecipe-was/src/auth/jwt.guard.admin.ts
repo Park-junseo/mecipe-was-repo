@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { UserType } from 'prisma/basic';
+import { UserType } from '../../prisma/basic';
 
 @Injectable()
 export class AdminAuthGuard extends AuthGuard('jwt') {

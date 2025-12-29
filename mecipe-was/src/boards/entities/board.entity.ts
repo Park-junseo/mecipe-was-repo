@@ -1,4 +1,4 @@
-import { Prisma } from 'prisma/basic';
+import { Prisma } from '../../../prisma/basic';
 
 // 기본 Board 타입 (관계 없음)
 export type BoardBasic = Prisma.BoardGetPayload<Record<string, never>>;

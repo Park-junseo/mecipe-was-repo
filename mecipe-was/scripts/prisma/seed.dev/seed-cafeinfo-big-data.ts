@@ -1,11 +1,11 @@
 // prisma/seed/seed.ts
-import { RegioncategoriesService } from 'src/regioncategories/regioncategories.service'; // 다른 서비스
-import { buildRegionCategoryDto } from 'prisma/factories/regionCategory.factory';
-import { buildCafeInfoDto } from 'prisma/factories/cafeInfo.factory'; // ✨ DTO 팩토리
+import { RegioncategoriesService } from '../../../src/regioncategories/regioncategories.service'; // 다른 서비스
+import { buildRegionCategoryDto } from '../../../prisma/factories/regionCategory.factory';
+import { buildCafeInfoDto } from '../../../prisma/factories/cafeInfo.factory'; // ✨ DTO 팩토리
 import { faker } from '@faker-js/faker';
-import { CreateCafeInfoDto } from 'src/places/dto/create-place.dto';
-import { GovermentType, Prisma, RegionCategory } from 'prisma/basic';
-import { PrismaService } from 'src/global/prisma.service';
+import { CreateCafeInfoDto } from '../../../src/places/dto/create-place.dto';
+import { GovermentType, Prisma, RegionCategory } from '../../../prisma/basic';
+import { PrismaService } from '../../../src/global/prisma.service';
 import { PrismaServiceOrDatabaseUrl, PrismaServiceWithDatabaseUrl, SeedModuleAction } from '.';
 
 let prisma: PrismaServiceWithDatabaseUrl;
@@ -27,7 +27,9 @@ async function createRegionCategories(regionCategoryService: RegioncategoriesSer
       continue;
     }
 
-    createdRegionCategories.push(region);
+    if (region) {
+      createdRegionCategories.push(region);
+    }
   }
 
   // 마지막 depth면 현재 생성한 노드들만 반환

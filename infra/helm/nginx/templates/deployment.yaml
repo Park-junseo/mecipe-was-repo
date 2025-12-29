@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "common.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "common.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- include "common.nodeSelector" . }}
+      {{- if and .Values.global.imagePullSecrets (gt (len .Values.global.imagePullSecrets) 0) }}
+      imagePullSecrets:
+        {{- toYaml .Values.global.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: nginx
+        image: {{ include "common.image" (dict "Values" .Values "repository" .Values.image.repository "tag" .Values.image.tag) }}
+        imagePullPolicy: {{ .Values.image.pullPolicy | default "Always" }}
+        ports:
+        - name: http
+          containerPort: 80
+          protocol: TCP
+        - name: https
+          containerPort: 443
+          protocol: TCP
+        env:
+        - name: DOMAIN_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "common.fullname" . }}-config
+              key: domain-name
+        - name: APP_PORT
+          value: {{ .Values.env.appPort | quote }}
+        - name: SOCKET_PORT
+          value: {{ .Values.env.socketPort | quote }}
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+        {{- if .Values.persistence.certbotConf.enabled }}
+        - name: certbot-conf
+          mountPath: /etc/letsencrypt
+          readOnly: true
+        {{- end }}
+        {{- if .Values.persistence.certbotWww.enabled }}
+        - name: certbot-www
+          mountPath: /var/www/certbot
+          readOnly: true
+        {{- end }}
+        {{- if .Values.persistence.media.enabled }}
+        - name: media-storage
+          mountPath: /var/www/media
+          readOnly: true
+        {{- end }}
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: {{ include "common.fullname" . }}-nginx-config
+      {{- if .Values.persistence.certbotConf.enabled }}
+      - name: certbot-conf
+        persistentVolumeClaim:
+          claimName: {{ include "common.fullname" . }}-certbot-conf-pvc
+      {{- end }}
+      {{- if .Values.persistence.certbotWww.enabled }}
+      - name: certbot-www
+        persistentVolumeClaim:
+          claimName: {{ include "common.fullname" . }}-certbot-www-pvc
+      {{- end }}
+      {{- if .Values.persistence.media.enabled }}
+      - name: media-storage
+        persistentVolumeClaim:
+          claimName: {{ include "common.fullname" . }}-media-pvc
+      {{- end }}
+

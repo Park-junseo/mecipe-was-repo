@@ -1,0 +1,55 @@
+# Default values for Kafka Zookeeper (Confluent Platform)
+# This chart deploys Zookeeper using Confluent Platform Operator CRD
+
+# Global settings
+global:
+  dockerRegistry: ""
+  imagePullSecrets: []
+
+# Metadata
+name: kafka-zookeeper
+namespace: data-streaming
+
+# Zookeeper configuration
+replicas: 1
+
+image:
+  application: confluentinc/cp-zookeeper:7.6.0
+  init: confluentinc/confluent-init-container:2.7.0
+
+dataVolumeCapacity: 5Gi
+logVolumeCapacity: 5Gi
+
+nodeSelector:
+  node-role: stream
+
+# Service configuration
+# Note: Confluent Platform Operator automatically creates a Service for Zookeeper CRD
+# This Service resource is optional and can be disabled if not needed
+service:
+  enabled: false  # Set to true if you need a custom Service
+  type: ClusterIP
+  port: 2181
+  targetPort: 2181
+
+# Prometheus JMX metrics (optional)
+prometheus:
+  jmx:
+    enabled: false
+    port: 9404
+
+# Additional Zookeeper configuration overrides
+configOverrides:
+  server:
+    # Example:
+    # - zookeeper.tickTime=2000
+    # - zookeeper.clientPort=2181
+
+# Resources (optional)
+# resources:
+#   requests:
+#     cpu: "500m"
+#     memory: "1Gi"
+#   limits:
+#     cpu: "1"
+#     memory: "2Gi"

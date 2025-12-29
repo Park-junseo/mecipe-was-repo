@@ -12,8 +12,8 @@ import {
 import { ProductcategoriesService } from './productcategories.service';
 import { CreateProductcategoryDto } from './dto/create-productcategory.dto';
 import { UpdateProductcategoryDto } from './dto/update-productcategory.dto';
-import { AdminAuthGuard } from 'src/auth/jwt.guard.admin';
-import { Public } from 'src/util/decorators';
+import { AdminAuthGuard } from '../auth/jwt.guard.admin';
+import { Public } from '../util/decorators';
 
 @Controller('productcategories')
 export class ProductcategoriesController {

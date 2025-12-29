@@ -3,9 +3,9 @@ import {
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { PrismaService } from 'src/global/prisma.service';
+import { PrismaService } from '../global/prisma.service';
 import { UpsertCafeRealImageListDto } from './dto/upsert-caferealimage.dto';
-import { CafeVirtualImage } from 'prisma/basic';
+import { CafeVirtualImage } from '../../prisma/basic';
 
 @Injectable()
 export class CaferealimagesService {

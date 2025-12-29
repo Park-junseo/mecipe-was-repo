@@ -4,14 +4,13 @@ import {
   CreateCafeVirtaulLinkWithImageDto,
   CreateCafeVirtaulLinkWithImageListDto,
 } from './dto/create-cafevirtuallink.dto';
-import { PrismaService } from 'src/global/prisma.service';
+import { PrismaService } from '../global/prisma.service';
 // import { ImageuploadService } from 'src/imageupload/imageupload.service';
 import {
   UpdateCafeVirtaulLinkThumbnailImageDto,
   UpdateCafevirtuallinkDto,
 } from './dto/update-cafevirtuallink.dto';
-import { RawimageuploadService } from 'src/rawimageupload/rawimageupload.service';
-import { CafeVirtualLink, CafeVirtualLinkThumbnailImage } from 'prisma/basic';
+import { CafeVirtualLink, CafeVirtualLinkThumbnailImage } from '../../prisma/basic';
 
 @Injectable()
 export class CafevirtuallinksService {

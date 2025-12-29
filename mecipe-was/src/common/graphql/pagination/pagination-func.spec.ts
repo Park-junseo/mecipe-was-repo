@@ -1,8 +1,7 @@
-
-import { ICafeInfo } from 'src/places/entities/cafe-info.entity';
+import { ICafeInfo } from '../../../places/entities/cafe-info.entity';
 import { findPaginationBasedCursor } from './pagination-func';
-import { GovermentType } from 'prisma/basic';
-import prismaMock from 'src/util/__mocks__/prismaMock';
+import { GovermentType } from '../../../../prisma/basic';
+import prismaMock from '../../../util/__mocks__/prismaMock';
 
 // prisma 모킹 테스트
 // 그러나, 입력값과 상관없이 결과값이 정해지므로, 테스트 의미가 없음

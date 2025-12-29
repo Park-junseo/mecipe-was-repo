@@ -1,0 +1,47 @@
+# Default values for kibana
+global:
+  dockerRegistry: ""
+  imagePullSecrets: []
+
+name: kibana
+namespace: data-storage
+
+nodeSelector:
+  node-role: storage
+
+image:
+  repository: docker.elastic.co/kibana/kibana
+  tag: "8.14.0"
+
+elasticsearch:
+  hosts: "http://elasticsearch:9200"
+  username: kibana_system
+  password: ""
+
+service:
+  type: NodePort
+  port: 5601
+  nodePort: 30561  # 외부 접속 포트 (30000-32767 범위)
+
+ingress:
+  enabled: false
+  hosts:
+    - host: kibana.localhost
+      path: /
+  annotations: {}
+  # tls:
+  #   - secretName: kibana-tls
+  #     hosts:
+  #       - kibana.localhost
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+secrets:
+  kibanaPassword: ""
+

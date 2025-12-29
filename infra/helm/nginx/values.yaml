@@ -1,0 +1,40 @@
+# Default values for nginx
+global:
+  dockerRegistry: ""
+  imagePullSecrets: []
+
+name: nginx
+namespace: infra
+
+nodeSelector:
+  node-role: ingress
+
+image:
+  repository: ""
+  tag: "latest"
+  pullPolicy: Always
+
+replicaCount: 1
+
+service:
+  type: LoadBalancer
+  ports:
+    http: 80
+    https: 443
+
+env:
+  domainName: ""
+  appPort: "4000"
+  socketPort: "4100"
+
+persistence:
+  certbotConf:
+    enabled: true
+    size: 1Gi
+  certbotWww:
+    enabled: true
+    size: 1Gi
+  media:
+    enabled: true
+    size: 10Gi
+

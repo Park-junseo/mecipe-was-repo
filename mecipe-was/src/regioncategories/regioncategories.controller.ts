@@ -12,8 +12,8 @@ import {
 import { RegioncategoriesService } from './regioncategories.service';
 import { CreateRegioncategoryDto } from './dto/create-regioncategory.dto';
 import { UpdateRegioncategoryDto } from './dto/update-regioncategory.dto';
-import { AdminAuthGuard } from 'src/auth/jwt.guard.admin';
-import { Public } from 'src/util/decorators';
+import { AdminAuthGuard } from '../auth/jwt.guard.admin';
+import { Public } from '../util/decorators';
 
 @Controller('regioncategories')
 export class RegioncategoriesController {

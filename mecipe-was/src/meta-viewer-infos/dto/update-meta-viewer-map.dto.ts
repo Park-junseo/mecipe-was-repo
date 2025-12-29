@@ -1,7 +1,7 @@
 import { IsBoolean, IsEnum, IsString, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional } from 'class-validator';
-import { MetaMapType } from 'prisma/basic';
+import { MetaMapType } from '../../../prisma/basic';
 
 export class UpdateMetaViewerMapDto {
   @IsEnum(MetaMapType)

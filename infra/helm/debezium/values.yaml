@@ -1,0 +1,47 @@
+# Default values for debezium
+global:
+  dockerRegistry: ""
+  imagePullSecrets: []
+
+name: debezium
+namespace: data-storage
+
+nodeSelector:
+  node-role: storage
+
+image:
+  repository: debezium/connect
+  tag: "2.6"
+
+kafka:
+  # Kafka는 data-streaming namespace에 있으므로 FQDN 사용
+  bootstrapServers: "kafka.data-streaming.svc.cluster.local:9092"
+
+groupId: "1"
+configStorageTopic: "connect-configs"
+offsetStorageTopic: "connect-offsets"
+statusStorageTopic: "connect-status"
+
+connector:
+  name: "cafe-infos-debezium-connector"
+  database:
+    hostname: "postgres"
+    port: "5432"
+    user: ""
+    password: ""
+    dbname: ""
+  serverName: "dbserver"
+  tableIncludeList: "public.CafeInfo,public.RegionCategory"
+
+service:
+  type: ClusterIP
+  port: 8083
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+

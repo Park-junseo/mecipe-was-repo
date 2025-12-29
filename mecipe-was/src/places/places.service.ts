@@ -1,13 +1,12 @@
 import { ForbiddenException, Injectable, Type } from '@nestjs/common';
 import { CreateCafeInfoDto } from './dto/create-place.dto';
 import { UpdateCafeInoDto } from './dto/update-place.dto';
-import { PrismaService } from 'src/global/prisma.service';
-import { Prisma } from 'prisma/basic';
-import { RawimageuploadService } from 'src/rawimageupload/rawimageupload.service';
-import { PaginationArgs, findPaginationBasedCursor } from 'src/common/graphql';
+import { PrismaService } from '../global/prisma.service';
+import { Prisma } from '../../prisma/basic';
+import { RawimageuploadService } from '../rawimageupload/rawimageupload.service';
+import { PaginationArgs, findPaginationBasedCursor } from '../common/graphql';
 import { CafeInfoConnectionType } from './graphql/types/cafe-info-connection.type';
-import { SelectQuery } from 'src/util/models';
-import { PrismaModelDelegate } from 'src/util/prisma';
+import { SelectQuery } from '../util/models';
 
 @Injectable()
 export class PlacesService {

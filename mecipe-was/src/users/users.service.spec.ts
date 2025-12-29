@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
-import { PrismaService } from 'src/global/prisma.service';
-import { PrismaServiceMock } from 'src/global/prisma.service.mock';
+import { PrismaService } from '../global/prisma.service';
+import { PrismaServiceMock } from '../global/prisma.service.mock';
 
 /**
  * 예시: 복잡한 비즈니스 로직이 있는 경우에만 작성하는 테스트

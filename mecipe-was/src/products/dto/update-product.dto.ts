@@ -5,7 +5,7 @@ import {
   IsOptional,
   IsString,
 } from 'class-validator';
-import { Prisma } from 'prisma/basic';
+import { Prisma } from '../../../prisma/basic';
 import { CreateProductImageDto } from './create-product.dto';
 import { Transform } from 'class-transformer';
 

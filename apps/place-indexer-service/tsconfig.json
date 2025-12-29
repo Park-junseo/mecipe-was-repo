@@ -1,34 +1,24 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "module": "commonjs",
+    "outDir": "../../dist/out-tsc",
     "esModuleInterop": true,
-    "isolatedModules": true,
-    "declaration": true,
-    "removeComments": true,
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
-    "target": "esnext",
-    "sourceMap": true,
-    "types": ["node", "jest"],
-    "outDir": "./dist",
-    "baseUrl": "./",
-    "incremental": true,
-    "skipLibCheck": true,
-    "strictNullChecks": true,
-    "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
+    "useDefineForClassFields": false,
   },
-  // 이 앱이 포함할 파일 경로 정의 (루트 tsconfig.base.json과 중복될 수 있으므로 주의)
-  // "include": [
-  //   "src/**/*.ts",
-  //   "src/**/*.d.ts",
-  //   "test/**/*.ts",
-  // ],
+  "files": [],
+  "include": [],
+  "references": [
+    {
+      "path": "./tsconfig.app.json"
+    },
+    {
+      "path": "./tsconfig.spec.json"
+    }
+  ],
   "exclude": [
     "node_modules",
     "dist"
-  ] // 빌드에서 제외할 경로
+  ]
 }

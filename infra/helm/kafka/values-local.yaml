@@ -1,0 +1,40 @@
+# Local development values for Kafka
+# Usage: helm install kafka ./infra/helm/kafka -f ./infra/helm/kafka/values-local.yaml
+
+name: kafka
+namespace: data-streaming
+
+replicas: 1
+
+image:
+  application: confluentinc/cp-server:7.6.0
+  init: confluentinc/confluent-init-container:2.7.0
+
+dataVolumeCapacity: 10Gi
+
+nodeSelector:
+  node-role: local
+
+# Listeners configuration - 로컬 환경에서는 인증 없이 사용
+# listeners를 null로 설정하여 기본 values.yaml의 listeners 설정을 오버라이드
+listeners: null
+
+# Zookeeper dependency (deployed independently)
+# Zookeeper should be deployed separately using: helm install kafka-zookeeper ./infra/helm/kafka-zookeeper -f ./infra/helm/kafka-zookeeper/values-local.yaml
+dependencies:
+  zookeeper:
+    name: kafka-zookeeper  # Zookeeper release name (independent deployment)
+    namespace: data-streaming  # Zookeeper가 배포된 네임스페이스
+
+service:
+  enabled: false
+  type: ClusterIP
+  port: 9092
+  targetPort: 9092
+
+configOverrides:
+  server:
+    - offsets.topic.replication.factor=1
+    - transaction.state.log.replication.factor=1
+    - transaction.state.log.min.isr=1
+    - auto.create.topics.enable=true

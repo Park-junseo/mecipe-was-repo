@@ -1,0 +1,243 @@
+name: Deploy Infrastructure
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - 'infra/helm/**'
+      - '.github/workflows/infra-deploy.yml'
+    paths-ignore:
+      - 'infra/helm/apps/**'
+      - 'helm/cert-manager/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set kubeconfig
+      run: |
+        mkdir -p ~/.kube
+        echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+        chmod 600 ~/.kube/config
+
+    - name: Install Helm
+      uses: azure/setup-helm@v3
+      with:
+        version: 'latest'
+
+    - name: Add Helm Repositories
+      run: |
+        helm repo add confluentinc https://packages.confluent.io/helm 2>/dev/null || true
+        helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx 2>/dev/null || true
+        helm repo update
+
+    # Phase 1: Confluent Operator 배포 (data-streaming namespace)
+    - name: Deploy Confluent Operator
+      run: |
+        echo "🚀 Deploying Confluent Operator..."
+        helm upgrade --install confluent-operator confluentinc/confluent-for-kubernetes \
+          --namespace data-streaming \
+          --create-namespace \
+          --wait \
+          --timeout 10m \
+          --set nodeSelector.node-role=stream
+        
+        echo "⏳ Waiting for Confluent Operator to be ready..."
+        kubectl wait --for=condition=available deployment -l app=confluent-operator -n data-streaming --timeout=5m || echo "⚠️  Operator may still be starting"
+
+    # Phase 2: Zookeeper 독립 배포 (data-streaming namespace, node-role: stream)
+    - name: Deploy Zookeeper
+      run: |
+        echo "🚀 Deploying Zookeeper independently..."
+        helm upgrade --install kafka-zookeeper ./infra/helm/kafka-zookeeper \
+          --namespace data-streaming \
+          --create-namespace \
+          --wait \
+          --timeout 15m \
+          --set nodeSelector.node-role=stream \
+          -f ./infra/helm/kafka-zookeeper/values.yaml
+        
+        echo "⏳ Waiting for Zookeeper to be ready..."
+        kubectl wait --for=condition=ready pod -l platform.confluent.io/type=zookeeper -n data-streaming --timeout=10m || echo "⚠️  Zookeeper may still be starting"
+
+    # Phase 3: Kafka 배포 (data-streaming namespace, node-role: stream)
+    - name: Deploy Kafka
+      run: |
+        echo "🚀 Deploying Kafka..."
+        # Zookeeper가 배포되어 있는지 확인
+        if ! kubectl get zookeeper kafka-zookeeper -n data-streaming &>/dev/null; then
+          echo "❌ Error: Zookeeper not found. Please deploy Zookeeper first."
+          exit 1
+        fi
+        
+        helm upgrade --install kafka ./infra/helm/kafka \
+          --namespace data-streaming \
+          --create-namespace \
+          --wait \
+          --timeout 15m \
+          --set nodeSelector.node-role=stream \
+          -f ./infra/helm/kafka/values.yaml
+        
+        echo "⏳ Waiting for Kafka to be ready..."
+        kubectl wait --for=condition=ready pod -l platform.confluent.io/type=kafka -n data-streaming --timeout=10m || echo "⚠️  Kafka may still be starting"
+
+    # Phase 4: Kafka UI 배포 (data-streaming namespace, node-role: stream)
+    - name: Deploy Kafka UI
+      run: |
+        echo "🚀 Deploying Kafka UI..."
+        helm upgrade --install kafka-ui ./infra/helm/kafka-ui \
+          --namespace data-streaming \
+          --create-namespace \
+          --wait \
+          --timeout 10m \
+          --set nodeSelector.node-role=stream \
+          --set kafka.brokers="kafka.data-streaming.svc.cluster.local:9092"
+
+    # Phase 5: KSQLDB 배포 (data-streaming namespace, node-role: stream)
+    - name: Deploy KSQLDB
+      run: |
+        echo "🚀 Deploying KSQLDB..."
+        # Kafka가 준비될 때까지 대기
+        echo "⏳ Waiting for Kafka to be ready before deploying KSQLDB..."
+        kubectl wait --for=condition=ready pod -l platform.confluent.io/type=kafka -n data-streaming --timeout=10m || echo "⚠️  Kafka may still be starting"
+        
+        cd ./infra/helm/ksqldb
+        helm dependency update
+        cd ../../..
+        
+        helm upgrade --install ksqldb ./infra/helm/ksqldb \
+          --namespace data-streaming \
+          --create-namespace \
+          --wait \
+          --timeout 10m \
+          --set nodeSelector.node-role=stream \
+          --set kafka.bootstrapServers="kafka.data-streaming.svc.cluster.local:9092"
+
+    # Phase 6: Storage 인프라 배포 (data-storage namespace, node-role: storage)
+    - name: Deploy PostgreSQL (Optional)
+      run: |
+        POSTGRES_DEPLOY="${{ secrets.POSTGRES_DEPLOY || 'true' }}"
+        if [ "$POSTGRES_DEPLOY" = "false" ]; then
+          echo "⏭️  PostgreSQL deployment disabled (using external database)"
+          POSTGRES_CONNECTION_HOST="${{ secrets.POSTGRES_HOST }}"
+          POSTGRES_CONNECTION_PORT="${{ secrets.POSTGRES_PORT || '5432' }}"
+        else
+          echo "🚀 Deploying PostgreSQL..."
+          helm upgrade --install postgres ./infra/helm/postgres \
+            --namespace data-storage \
+            --create-namespace \
+            --wait \
+            --timeout 10m \
+            --set nodeSelector.node-role=storage \
+            --set auth.postgresPassword="${{ secrets.POSTGRES_PASSWORD }}" \
+            --set auth.username="${{ secrets.POSTGRES_USER || 'postgres' }}" \
+            --set auth.database="${{ secrets.POSTGRES_DB || 'virtualcafe' }}"
+          
+          POSTGRES_CONNECTION_HOST="postgres.data-storage.svc.cluster.local"
+          POSTGRES_CONNECTION_PORT="5432"
+        fi
+        
+        # PostgreSQL 연결 정보 관리 (항상 배포)
+        echo "📦 Deploying PostgreSQL connection configuration..."
+        helm upgrade --install postgres-connection ./infra/helm/postgres-connection \
+          --namespace data-storage \
+          --create-namespace \
+          --wait \
+          --timeout 5m \
+          --set nodeSelector.node-role=storage \
+          --set connection.host="${POSTGRES_CONNECTION_HOST}" \
+          --set connection.port="${POSTGRES_CONNECTION_PORT}" \
+          --set connection.username="${{ secrets.POSTGRES_USER || 'postgres' }}" \
+          --set connection.password="${{ secrets.POSTGRES_PASSWORD }}" \
+          --set connection.database="${{ secrets.POSTGRES_DB || 'virtualcafe' }}" \
+          --set service.enabled="$([ "$POSTGRES_DEPLOY" = "false" ] && echo "false" || echo "true")"
+
+    - name: Deploy Elasticsearch
+      run: |
+        echo "🚀 Deploying Elasticsearch..."
+        helm upgrade --install elasticsearch ./infra/helm/elasticsearch \
+          --namespace data-storage \
+          --create-namespace \
+          --wait \
+          --timeout 10m \
+          --set nodeSelector.node-role=storage \
+          --set secrets.password="${{ secrets.ELASTICSEARCH_SUPERUSER_PASSWORD }}" \
+          --set users.kibana.password="${{ secrets.ELASTICSEARCH_KIBANA_PASSWORD }}" \
+          --set users.producer.password="${{ secrets.ELASTICSEARCH_PRODUCER_USER_PASS }}" \
+          --set users.producer.username="${{ secrets.ELASTICSEARCH_PRODUCER_USER_NAME }}" \
+          --set users.app.password="${{ secrets.ELASTICSEARCH_APP_USER_PASS }}" \
+          --set users.app.username="${{ secrets.ELASTICSEARCH_APP_USER_NAME }}"
+        
+        echo "⏳ Waiting for Elasticsearch to be ready..."
+        kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=elasticsearch -n data-storage --timeout=10m || echo "⚠️  Elasticsearch may still be starting"
+
+    - name: Deploy Kibana
+      run: |
+        echo "🚀 Deploying Kibana..."
+        helm upgrade --install kibana ./infra/helm/kibana \
+          --namespace data-storage \
+          --create-namespace \
+          --wait \
+          --timeout 10m \
+          --set nodeSelector.node-role=storage \
+          --set elasticsearch.hosts="http://elasticsearch.data-storage.svc.cluster.local:9200" \
+          --set secrets.kibanaPassword="${{ secrets.ELASTICSEARCH_KIBANA_PASSWORD }}"
+
+    # Phase 7: Debezium 배포 (data-storage namespace, node-role: storage)
+    - name: Deploy Debezium
+      run: |
+        echo "🚀 Deploying Debezium..."
+        POSTGRES_DEPLOY="${{ secrets.POSTGRES_DEPLOY || 'true' }}"
+        if [ "$POSTGRES_DEPLOY" = "false" ]; then
+          DEBEZIUM_POSTGRES_HOST="${{ secrets.POSTGRES_HOST }}"
+          DEBEZIUM_POSTGRES_PORT="${{ secrets.POSTGRES_PORT || '5432' }}"
+        else
+          DEBEZIUM_POSTGRES_HOST="postgres.data-storage.svc.cluster.local"
+          DEBEZIUM_POSTGRES_PORT="5432"
+        fi
+        
+        DEBEZIUM_KAFKA_BOOTSTRAP_SERVERS="kafka.data-streaming.svc.cluster.local:9092"
+        echo "   Kafka: ${DEBEZIUM_KAFKA_BOOTSTRAP_SERVERS}"
+        echo "   PostgreSQL: ${DEBEZIUM_POSTGRES_HOST}:${DEBEZIUM_POSTGRES_PORT}"
+        
+        helm upgrade --install debezium ./infra/helm/debezium \
+          --namespace data-storage \
+          --create-namespace \
+          --wait \
+          --timeout 10m \
+          --set nodeSelector.node-role=storage \
+          --set kafka.bootstrapServers="${DEBEZIUM_KAFKA_BOOTSTRAP_SERVERS}" \
+          --set connector.database.hostname="${DEBEZIUM_POSTGRES_HOST}" \
+          --set connector.database.port="${DEBEZIUM_POSTGRES_PORT}" \
+          --set connector.database.user="${{ secrets.POSTGRES_USER || 'postgres' }}" \
+          --set connector.database.password="${{ secrets.POSTGRES_PASSWORD }}" \
+          --set connector.database.dbname="${{ secrets.POSTGRES_DB || 'virtualcafe' }}"
+
+    # Phase 8: Ingress Nginx 배포 (infra namespace, node-role: ingress)
+    - name: Deploy Ingress Nginx
+      run: |
+        echo "🚀 Deploying ingress-nginx..."
+        helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+          --namespace infra \
+          --create-namespace \
+          --wait \
+          --timeout 10m \
+          --set controller.nodeSelector."node-role"=ingress
+
+    # Verification
+    - name: Verify Deployment
+      run: |
+        echo "🔍 Verifying infrastructure deployment..."
+        echo ""
+        echo "=== Data Streaming Namespace ==="
+        kubectl get pods -n data-streaming -o wide
+        echo ""
+        echo "=== Data Storage Namespace ==="
+        kubectl get pods -n data-storage -o wide
+        echo ""
+        echo "=== Infra Namespace ==="
+        kubectl get pods -n infra -o wide

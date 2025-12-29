@@ -1,6 +1,6 @@
 import { PipeTransform, Injectable, Logger } from '@nestjs/common';
 import { ClassConstructor, plainToInstance } from 'class-transformer';
-import { extractEntityFields } from 'src/elasticsearch/libs';
+import { extractEntityFields } from '../../elasticsearch/libs/utils';
 
 /**
  * 범용 Transform 파이프

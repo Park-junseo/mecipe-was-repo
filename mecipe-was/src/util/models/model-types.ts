@@ -1,4 +1,4 @@
-import { Prisma } from 'prisma/basic';
+import { Prisma } from '../../../prisma/basic';
 
 export type ModelName = Prisma.ModelName;
 

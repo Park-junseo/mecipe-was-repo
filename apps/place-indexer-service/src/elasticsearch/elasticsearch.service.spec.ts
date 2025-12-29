@@ -1,5 +1,5 @@
-import { createMockElasticsearchService } from 'src/test-utils';
-import { IndexDocument } from './libs';
+import { createMockElasticsearchService } from '../test-utils';
+import { IndexDocument } from './libs/utils';
 import { CAFEINFO_INDEX_NAME } from './libs/indices';
 
 describe('ElasticsearchService', () => {

@@ -1,26 +1,16 @@
-// jest.config.ts
-import type { Config } from 'jest';
-
-const config: Config = {
-  moduleFileExtensions: ['js', 'json', 'ts'],
-  rootDir: '.',
+export default {
+  displayName: 'place-indexer-service',
+  preset: '../../jest.preset.js',
   testEnvironment: 'node',
-  testRegex: '.spec.ts$',
+  setupFilesAfterEnv: ['<rootDir>/src/test-utils/setup.ts'],
   transform: {
-    '^.+\\.(t|j)s$': [
+    '^.+\\.[tj]s$': [
       'ts-jest',
       {
-        tsconfig: {
-          experimentalDecorators: true,
-          emitDecoratorMetadata: true,
-        },
+        tsconfig: '<rootDir>/tsconfig.spec.json',
       },
     ],
   },
-  moduleNameMapper: {
-    '^src/(.*)$': '<rootDir>/src/$1',
-  },
-  setupFiles: ['<rootDir>/src/test-utils/setup.ts'],
+  moduleFileExtensions: ['ts', 'js', 'html'],
+  coverageDirectory: '../../coverage/place-indexer-service'
 };
-
-export default config;

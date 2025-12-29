@@ -10,8 +10,8 @@ import { UpdateMetaViewerMapDto } from './dto/update-meta-viewer-map.dto';
 import { CreateMetaViewerActiveMapDto } from './dto/create-meta-viewer-active-map.dto';
 import { UpdateMetaViewerActiveMapDto } from './dto/update-meta-viewer-active-map.dto';
 import { SearchMetaViewerInfoDto } from './dto/search-meta-viewer-info.dto';
-import { PrismaService } from 'src/global/prisma.service';
-import { MetaMapType, Prisma } from 'prisma/basic';
+import { PrismaService } from '../global/prisma.service';
+import { MetaMapType, Prisma } from '../../prisma/basic';
 
 @Injectable()
 export class MetaViewerInfosService {

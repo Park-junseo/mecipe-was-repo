@@ -1,0 +1,56 @@
+# Default values for place-indexer-service
+global:
+  dockerRegistry: ""
+  imagePullSecrets: []
+
+name: place-indexer-service
+namespace: app
+
+nodeSelector:
+  node-role: app
+
+image:
+  repository: ""
+  tag: "latest"
+  pullPolicy: Always
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 3000
+
+env:
+  nodeEnv: production
+  elasticsearchHosts: "http://elasticsearch.data-storage.svc.cluster.local:9200"
+  elasticsearchUsername: ""
+  elasticsearchPassword: ""
+  kafkaBrokers: "kafka.data-streaming.svc.cluster.local:9092"
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 3000
+  initialDelaySeconds: 60
+  periodSeconds: 30
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 3000
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+# Secrets (should be set via --set or values file)
+secrets:
+  elasticsearchUsername: ""
+  elasticsearchPassword: ""
+

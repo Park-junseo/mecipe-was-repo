@@ -8,7 +8,7 @@ import {
   IsBoolean,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
-import { Prisma } from 'prisma/basic';
+import { Prisma } from '../../../prisma/basic';
 
 export enum BoardType {
   BTALK = 'BTALK',

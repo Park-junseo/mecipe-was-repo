@@ -1,16 +1,17 @@
 // scripts/test-db-setup.ts
 
 /**
- * npm run start:test-- --start-app
+ * pnpm run start:test-- --start-app
  * nestjs 앱 실행
- */
-/**
- * npm run start:test-db -- --start-app --start-prisma-studio
+ * 
+ * pnpm run start:test-db -- --start-app --start-prisma-studio
  * nestjs 앱 실행하고 prisma studio 실행
- */
-/**
- * npm run start:test-db --seed:cafeinfo-big-data:100
+ * 
+ * pnpm run start:test-db -- --seed:cafeinfo-big-data:100
  * cafeinfo-big-data 시딩 100개
+ * 
+ * pnpm run start:test-db -- --seed:cafeinfo-big-data:100 --start-app --start-prisma-studio
+ * cafeinfo-big-data 시딩 100개하고 nestjs 앱 실행하고 prisma studio 실행
  */
 
 import { GenericContainer, StartedTestContainer } from 'testcontainers';
@@ -27,8 +28,8 @@ let isStartCleanUp: boolean = false;
 async function startPrismaStudio(connectionString: string, isWindows: boolean = process.platform === 'win32') {
   console.log('🚀 Starting Prisma Studio...');
   const prismaCliPath = isWindows
-    ? path.resolve(process.cwd(), './node_modules/.bin/prisma.cmd')
-    : path.resolve(process.cwd(), './node_modules/.bin/prisma');
+    ? path.resolve(__dirname, '../../node_modules/.bin/prisma.cmd')
+    : path.resolve(__dirname, '../../node_modules/.bin/prisma');
   studioProcess = spawn(prismaCliPath, ['studio', '--browser', 'true'], {
     env: {
       DATABASE_URL: connectionString,
@@ -84,9 +85,9 @@ async function setupTestDatabase() {
     // Windows와 Unix 모두에서 작동하도록 경로 처리
     const isWindows = process.platform === 'win32';
     const prismaCliPath = isWindows
-      ? path.resolve(process.cwd(), './node_modules/.bin/prisma.cmd')
-      : path.resolve(process.cwd(), './node_modules/.bin/prisma');
-    const schemaPath = path.resolve(process.cwd(), './prisma/schema.prisma'); // 스키마 파일 경로
+      ? path.resolve(__dirname, '../../node_modules/.bin/prisma.cmd')
+      : path.resolve(__dirname, '../../node_modules/.bin/prisma');
+    const schemaPath = path.resolve(__dirname, '../../prisma/schema.prisma'); // 스키마 파일 경로
 
     const execOptions: any = {
       env: { ...process.env, DATABASE_URL: connectionString }
@@ -140,18 +141,27 @@ async function seedTestDatabase(connectionString: string, argv: string[], isWind
 
   // 3. 시딩 스크립트 실행
   const tsNodePath = isWindows
-    ? path.resolve(process.cwd(), './node_modules/.bin/ts-node.cmd')
-    : path.resolve(process.cwd(), './node_modules/.bin/ts-node');
-  const seedScriptPath = path.resolve(process.cwd(), './scripts/prisma/seed.dev/index.ts');
+    ? path.resolve(__dirname, '../../node_modules/.bin/ts-node.cmd')
+    : path.resolve(__dirname, '../../node_modules/.bin/ts-node');
 
   console.log('🌱 Starting seeding script...', connectionString);
 
   // 시딩 스크립트가 시작될 때도 DATABASE_URL을 명시적으로 전달
-  const seedProcess = spawn(tsNodePath, ['-r', 'tsconfig-paths/register', './scripts/prisma/seed.dev/index.ts', connectionString, ...argv], {
-    stdio: 'inherit',
-    shell: isWindows,
-    cwd: path.resolve(process.cwd()),
-  });
+  const seedProcess = spawn(tsNodePath, [
+      '--transpile-only',
+      '-r', 'tsconfig-paths/register', 
+      '--project',
+      path.resolve(__dirname, '../../tsconfig.scripts.json'), 
+      path.resolve(__dirname, './seed.dev/index.ts'),
+      connectionString, 
+      ...argv
+    ], {
+      stdio: 'inherit',
+      shell: isWindows,
+      cwd: path.resolve(process.cwd()),
+      env: { ...process.env, DATABASE_URL: connectionString },
+    }
+  );
 
   await new Promise((resolve, reject) => {
     seedProcess.on('close', (code) => {
@@ -200,13 +210,18 @@ if (require.main === module) {
       }
 
       if (shouldStartApp) {
-        console.log('🚀 Starting NestJS application...');
-        const nestCliPath = isWindows
-          ? path.resolve(process.cwd(), './node_modules/.bin/nest.cmd')
-          : path.resolve(process.cwd(), './node_modules/.bin/nest');
+        console.log('🚀 Starting NestJS application via Nx...');
+        const nxCliPath = isWindows
+          ? path.resolve(__dirname, '../../../node_modules/.bin/nx.cmd')
+          : path.resolve(__dirname, '../../../node_modules/.bin/nx');
 
-        // NestJS 앱을 spawn으로 시작 (환경변수는 이미 process.env에 설정됨)
-        const nestProcess = spawn(nestCliPath, ['start', shouldStartAppWithWatch ? '--watch' : ''], {
+        // Nx를 통해 NestJS 앱 실행 (환경변수는 이미 process.env에 설정됨)
+        // watch 모드의 경우 development configuration 사용
+        const nxArgs = shouldStartAppWithWatch
+          ? ['serve', 'mecipe-was', '--configuration=development']
+          : ['serve', 'mecipe-was'];
+
+        const nxProcess = spawn(nxCliPath, nxArgs, {
           env: process.env,
           shell: isWindows,
           stdio: 'inherit', // 부모 프로세스의 stdio를 상속
@@ -214,13 +229,13 @@ if (require.main === module) {
         });
 
         // NestJS 앱이 종료되면 컨테이너도 종료
-        nestProcess.on('exit', async (code) => {
+        nxProcess.on('exit', async (code) => {
           await stopPrismaStudio();
           await teardownTestDatabase();
           process.exit(String(code) || 0);
         });
 
-        nestProcess.on('error', async (error) => {
+        nxProcess.on('error', async (error) => {
           console.error('❌ Failed to start NestJS application:', error);
           cleanUp(1);
         });

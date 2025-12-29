@@ -3,6 +3,10 @@ name: Deploy with Self-Hosted Runner (Docker Compose)
 on:
   push:
     branches: ["main"]
+    paths-ignore:
+      - 'helm/**'
+      - '.github/workflows/deploy-helm.yml'
+      - 'apps/place-indexer-service/**'
   workflow_dispatch:  # 수동 실행 가능
 
 jobs:

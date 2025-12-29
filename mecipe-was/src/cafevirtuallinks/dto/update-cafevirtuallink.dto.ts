@@ -1,5 +1,5 @@
-import { PrimitiveOnly } from 'src/util/types';
-import { Prisma } from 'prisma/basic';
+import { PrimitiveOnly } from '../../util/types';
+import { Prisma } from '../../../prisma/basic';
 
 export type UpdateCafevirtuallinkDto =
   PrimitiveOnly<Prisma.CafeVirtualLinkUpdateInput>;

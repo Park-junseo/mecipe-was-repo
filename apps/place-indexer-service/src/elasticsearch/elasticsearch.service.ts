@@ -1,6 +1,6 @@
 // apps/place-indexer-service/src/elasticSearch/elasticsearch.service.ts
 import { Injectable, Logger } from '@nestjs/common';
-import { IndexType, INDEX_TYPE_MAP, IndexDocument } from './libs';
+import { IndexType, INDEX_TYPE_MAP, IndexDocument } from './libs/utils/index.type';
 import { ElasticsearchService as ESService } from '@nestjs/elasticsearch';
 
 @Injectable()

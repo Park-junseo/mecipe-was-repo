@@ -1,0 +1,67 @@
+{
+  "name": "place-indexer-service",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/place-indexer-service/src",
+  "projectType": "application",
+  "tags": ["app", "nestjs"],
+  "targets": {
+    "build": {
+      "executor": "@nx/webpack:webpack",
+      "outputs": [
+        "{options.outputPath}"
+      ],
+      "options": {
+        "outputPath": "dist/apps/place-indexer-service",
+        "main": "apps/place-indexer-service/src/main.ts",
+        "tsConfig": "apps/place-indexer-service/tsconfig.app.json",
+        "target": "node",
+        "compiler": "tsc",
+        "webpackConfig": "apps/place-indexer-service/webpack.config.js",
+        "deleteOutputPath": true
+      },
+      "configurations": {
+        "production": {
+          "optimization": true,
+          "extractLicenses": true,
+          "inspect": false
+        }
+      }
+    },
+    "serve": {
+      "executor": "@nx/js:node",
+      "options": {
+        "buildTarget": "place-indexer-service:build",
+        "watch": true,
+        "inspect": true
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "place-indexer-service:build:development"
+        },
+        "production": {
+          "buildTarget": "place-indexer-service:build:production",
+          "watch": false,
+          "inspect": false
+        }
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["apps/place-indexer-service/**/*.ts"]
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": [
+        "{workspaceRoot}/coverage/place-indexer-service"
+      ],
+      "options": {
+        "jestConfig": "apps/place-indexer-service/jest.config.ts",
+        "passWithNoTests": true
+      }
+    }
+  }
+}
+
