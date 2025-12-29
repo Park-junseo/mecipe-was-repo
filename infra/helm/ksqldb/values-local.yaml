@@ -1,0 +1,32 @@
+# Local development values for KSQLDB
+# Usage: helm install ksqldb ./infra/helm/ksqldb -f ./infra/helm/ksqldb/values-local.yaml
+
+name: ksqldb
+namespace: data-streaming
+
+replicas: 1
+
+image:
+  application: confluentinc/cp-ksqldb-server:8.1.0
+  init: confluentinc/confluent-init-container:2.7.0
+
+dataVolumeCapacity: 5Gi
+
+nodeSelector:
+  node-role: local
+
+dependencies:
+  kafka:
+    bootstrapEndpoint: kafka.data-streaming.svc.cluster.local:9092
+
+configOverrides:
+  server:
+    - ksql.streams.auto.offset.reset=earliest
+    - ksql.schema.registry.url=http://localhost:8081
+    - ksql.streams.replication.factor=1
+
+service:
+  enabled: false
+  type: ClusterIP
+  port: 8088
+  targetPort: 8088

@@ -1,0 +1,93 @@
+{{- if .Values.connector }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "common.fullname" . }}-connector-register
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-failed
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "common.selectorLabels" . | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: register
+          image: curlimages/curl:8.5.0
+          env:
+            - name: DEBEZIUM_SERVICE
+              value: {{ include "common.fullname" . }}:{{ .Values.service.port }}
+            - name: CONNECTOR_NAME
+              value: {{ .Values.connector.name | quote }}
+          volumeMounts:
+            - name: connector-config
+              mountPath: /config
+              readOnly: true
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              
+              DEBEZIUM_URL="http://$DEBEZIUM_SERVICE"
+              
+              echo "⏳ Waiting for Debezium Connect to be ready..."
+              MAX_WAIT=60
+              WAIT_COUNT=0
+              while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
+                if curl -s -f "$DEBEZIUM_URL/connectors" > /dev/null 2>&1; then
+                  echo "✅ Debezium Connect is ready."
+                  break
+                fi
+                WAIT_COUNT=$((WAIT_COUNT + 1))
+                echo "  Debezium Connect not ready yet... Retrying in 2s. ($WAIT_COUNT/$MAX_WAIT)"
+                sleep 2
+              done
+              
+              if [ $WAIT_COUNT -eq $MAX_WAIT ]; then
+                echo "❌ Debezium Connect readiness timeout"
+                exit 1
+              fi
+              
+              echo "📋 Checking existing connector: $CONNECTOR_NAME"
+              EXISTING=$(curl -s "$DEBEZIUM_URL/connectors/$CONNECTOR_NAME" 2>/dev/null || echo "")
+              if [ -n "$EXISTING" ] && [ "$EXISTING" != "Not Found" ] && ! echo "$EXISTING" | grep -q "error_code"; then
+                echo "🗑️  Deleting existing connector..."
+                curl -s -X DELETE "$DEBEZIUM_URL/connectors/$CONNECTOR_NAME" > /dev/null 2>&1 || true
+                sleep 2
+              fi
+              
+              echo "📝 Registering connector: $CONNECTOR_NAME"
+              CONNECTOR_CONFIG=$(cat /config/connector-config.json)
+              
+              REGISTER_RESULT=$(curl -s -w "\n%{http_code}" -X POST \
+                -H "Content-Type: application/json" \
+                -d "$CONNECTOR_CONFIG" \
+                "$DEBEZIUM_URL/connectors" 2>&1)
+              
+              HTTP_CODE=$(echo "$REGISTER_RESULT" | tail -n1)
+              BODY=$(echo "$REGISTER_RESULT" | sed '$d')
+              
+              if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
+                echo "❌ Connector registration failed (HTTP $HTTP_CODE):"
+                echo "$BODY"
+                exit 1
+              fi
+              
+              echo "✅ Connector registered successfully: $CONNECTOR_NAME"
+              sleep 3
+              echo "📋 Connector status:"
+              curl -s "$DEBEZIUM_URL/connectors/$CONNECTOR_NAME/status" || echo "Status check failed"
+      volumes:
+        - name: connector-config
+          configMap:
+            name: {{ include "common.fullname" . }}-connector-config
+{{- end }}
+

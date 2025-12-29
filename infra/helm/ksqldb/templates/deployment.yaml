@@ -1,56 +1,57 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: platform.confluent.io/v1beta1
+kind: KsqlDB
 metadata:
-  name: ksqldb
-  namespace: {{ .Release.Namespace }}
+  name: {{ include "ksqldb.name" . }}
+  namespace: {{ include "ksqldb.namespace" . }}
   labels:
-    {{- include "common.labels" . | nindent 4 }}
+    {{- include "ksqldb.labels" . | nindent 4 }}
 spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      {{- include "common.selectorLabels" . | nindent 6 }}
-  template:
-    metadata:
-      labels:
-        {{- include "common.selectorLabels" . | nindent 8 }}
-    spec:
-      {{- include "common.nodeSelector" . }}
-      containers:
-      - name: ksqldb-server
-        image: {{ include "common.image" (dict "Values" .Values "repository" .Values.image.repository "tag" .Values.image.tag) }}
-        imagePullPolicy: IfNotPresent
-        ports:
-        - name: http
-          containerPort: 8088
-          protocol: TCP
-        env:
-        - name: KSQL_BOOTSTRAP_SERVERS
-          value: {{ .Values.kafka.brokers | quote }}
-        - name: KSQL_LISTENERS
-          value: "http://0.0.0.0:8088"
-        - name: KSQL_KSQL_SERVICE_ID
-          value: "mecipe-ksqldb-service"
-        - name: KSQL_KSQL_STREAMS_AUTO_OFFSET_RESET
-          value: {{ .Values.streamsAutoOffsetReset | quote }}
-        - name: KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE
-          value: "true"
-        - name: KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE
-          value: "true"
-        {{- with .Values.resources }}
-        resources:
-          {{- toYaml . | nindent 10 }}
-        {{- end }}
-        livenessProbe:
-          httpGet:
-            path: /info
-            port: 8088
-          initialDelaySeconds: 60
-          periodSeconds: 30
-        readinessProbe:
-          httpGet:
-            path: /info
-            port: 8088
-          initialDelaySeconds: 30
-          periodSeconds: 10
+  replicas: {{ .Values.replicas }}
+
+  image:
+    application: {{ include "ksqldb.image" (dict "Values" .Values "image" .Values.image.application) }}
+    init: {{ include "ksqldb.image" (dict "Values" .Values "image" .Values.image.init) }}
+
+  {{- if .Values.nodeSelector }}
+  podTemplate:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+              {{- range $key, $value := .Values.nodeSelector }}
+              - key: {{ $key | quote }}
+                operator: In
+                values:
+                - {{ $value | quote }}
+              {{- end }}
+  {{- end }}
+
+  dataVolumeCapacity: {{ .Values.dataVolumeCapacity }}
+
+  dependencies:
+    kafka:
+      bootstrapEndpoint: {{ .Values.dependencies.kafka.bootstrapEndpoint }}
+
+  {{- if .Values.configOverrides }}
+  configOverrides:
+    {{- if .Values.configOverrides.server }}
+    server:
+      {{- range .Values.configOverrides.server }}
+      - {{ . }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.configOverrides.ksql }}
+    ksql:
+      {{- range .Values.configOverrides.ksql }}
+      - {{ . }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+
+  {{- if .Values.resources }}
+  resources:
+    {{- toYaml .Values.resources | nindent 4 }}
+  {{- end }}
+
 

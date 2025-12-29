@@ -6,12 +6,12 @@
 infra/helm/
 ├── nginx/              # Instance A (node-role=app)
 ├── cert-manager/       # Instance A (node-role=app)
-├── kafka/              # Instance A (node-role=app) - Bitnami dependency
-├── kafka-ui/           # Instance A (node-role=app)
-├── ksqldb/             # Instance A (node-role=app)
+├── kafka/              # Instance A (node-role=app) ✅ 완료
+├── kafka-ui/           # Instance A (node-role=app) ✅ 완료
+├── ksqldb/             # Instance A (node-role=app) ✅ 완료
 ├── postgres/           # Instance B (node-role=data) ✅ 완료
-├── elasticsearch/      # Instance B (node-role=data)
-├── debezium/           # Instance B (node-role=data)
+├── elasticsearch/      # Instance B (node-role=data) ✅ 완료
+├── debezium/           # Instance B (node-role=data) ✅ 완료
 ├── kibana/             # Instance B (node-role=data)
 └── apps/
     ├── mecipe-was/     # Instance A (node-role=app)

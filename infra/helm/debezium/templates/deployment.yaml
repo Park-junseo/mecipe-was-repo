@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: debezium-connect
+  name: {{ include "common.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "common.labels" . | nindent 4 }}
@@ -49,39 +49,3 @@ spec:
             port: 8083
           initialDelaySeconds: 30
           periodSeconds: 10
----
-{{- if .Values.connector }}
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ include "common.fullname" . }}-debezium-connector-config
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "common.labels" . | nindent 4 }}
-data:
-  connector-config.json: |
-    {
-      "name": {{ .Values.connector.name | quote }},
-      "config": {
-        "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
-        "plugin.name": "pgoutput",
-        "tasks.max": "1",
-        "database.hostname": {{ .Values.connector.database.hostname | quote }},
-        "database.port": {{ .Values.connector.database.port | quote }},
-        "database.user": {{ .Values.connector.database.user | quote }},
-        "database.password": {{ .Values.connector.database.password | quote }},
-        "database.dbname": {{ .Values.connector.database.dbname | quote }},
-        "database.server.name": {{ .Values.connector.serverName | quote }},
-        "topic.prefix": {{ .Values.connector.serverName | quote }},
-        "table.include.list": {{ .Values.connector.tableIncludeList | quote }},
-        "publication.autocreate.mode": "all_tables",
-        "slot.name": "debezium_slot",
-        "heartbeat.interval.ms": "5000",
-        "value.converter": "org.apache.kafka.connect.json.JsonConverter",
-        "value.converter.schemas.enable": "false",
-        "key.converter": "org.apache.kafka.connect.json.JsonConverter",
-        "key.converter.schemas.enable": "false"
-      }
-    }
-{{- end }}
-

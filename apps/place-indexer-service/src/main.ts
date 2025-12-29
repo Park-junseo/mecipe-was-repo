@@ -67,7 +67,8 @@ async function bootstrap() {
       );
     }
 
-    await app.listen(3002); // HTTP 엔드포인트도 필요하다면 (health check 등)
+    const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+    await app.listen(port); // HTTP 엔드포인트도 필요하다면 (health check 등)
     console.log(`Search Indexer Service is running on: ${await app.getUrl()}`);
   } catch (error) {
     console.error('Failed to start application:', error);

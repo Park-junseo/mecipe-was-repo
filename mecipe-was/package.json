@@ -10,7 +10,6 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
-    "prebuild": "rimraf dist",
     "build": "nx build mecipe-was",
     "copy:prisma": "node scripts/prisma/copy-prisma-to-dist.js mecipe-was",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -48,7 +47,7 @@
     "@nestjs/core": "^11.1.8",
     "@nestjs/graphql": "^13.2.0",
     "@nestjs/jwt": "^11.0.1",
-    "@nestjs/mapped-types": "*",
+    "@nestjs/mapped-types": "^2.0.5",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.1.8",
     "@nestjs/platform-socket.io": "^11.1.8",

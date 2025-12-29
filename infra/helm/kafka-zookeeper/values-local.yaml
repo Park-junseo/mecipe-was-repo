@@ -1,0 +1,44 @@
+# Local development values for Kafka Zookeeper
+# Usage: helm install kafka-zookeeper ./infra/helm/kafka-zookeeper -f ./infra/helm/kafka-zookeeper/values-local.yaml
+
+name: kafka-zookeeper
+namespace: data-streaming
+
+replicas: 1
+
+image:
+  application: confluentinc/cp-zookeeper:7.6.0
+  init: confluentinc/confluent-init-container:2.7.0
+
+dataVolumeCapacity: 5Gi
+logVolumeCapacity: 5Gi
+
+nodeSelector:
+  node-role: local
+
+service:
+  enabled: false  # Set to true if you need a custom Service
+  type: ClusterIP
+  port: 2181
+  targetPort: 2181
+
+prometheus:
+  jmx:
+    enabled: false
+    port: 9404
+
+# Additional Zookeeper configuration overrides
+configOverrides:
+  server:
+    # Example:
+    # - zookeeper.tickTime=2000
+    # - zookeeper.clientPort=2181
+
+# Resources (optional)
+# resources:
+#   requests:
+#     cpu: "500m"
+#     memory: "1Gi"
+#   limits:
+#     cpu: "1"
+#     memory: "2Gi"

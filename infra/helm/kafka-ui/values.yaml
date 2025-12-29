@@ -3,9 +3,11 @@ global:
   dockerRegistry: ""
   imagePullSecrets: []
 
-# Node selector - Instance A (app node)
+name: kafka-ui
+namespace: data-streaming
+
 nodeSelector:
-  node-role: app
+  node-role: stream
 
 image:
   repository: provectuslabs/kafka-ui
@@ -15,8 +17,20 @@ kafka:
   brokers: "kafka:9092"
 
 service:
-  type: ClusterIP
-  port: 8080
+  type: NodePort
+  port: 8080  # 내부 포트 (컨테이너 포트)
+  nodePort: 30080  # 외부 접속 포트 (8080이 아닌 다른 포트 사용, 30000-32767 범위)
+
+ingress:
+  enabled: false
+  hosts:
+    - host: kafka-ui.localhost
+      path: /
+  annotations: {}
+  # tls:
+  #   - secretName: kafka-ui-tls
+  #     hosts:
+  #       - kafka-ui.localhost
 
 resources:
   limits:

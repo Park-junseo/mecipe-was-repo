@@ -18,6 +18,12 @@ spec:
         {{- include "common.selectorLabels" . | nindent 8 }}
     spec:
       {{- include "common.nodeSelector" . }}
+      {{- if .Values.config.postgresqlConf }}
+      volumes:
+      - name: postgresql-config
+        configMap:
+          name: {{ include "common.fullname" . }}-postgresql-config
+      {{- end }}
       containers:
       - name: postgres
         image: {{ include "common.image" (dict "Values" .Values "repository" .Values.image.repository "tag" .Values.image.tag) }}
@@ -36,9 +42,23 @@ spec:
         {{- end }}
         - name: POSTGRES_DB
           value: {{ .Values.auth.database | quote }}
+        {{- if .Values.config.walLevel }}
+        - name: POSTGRES_INITDB_ARGS
+          value: "-c wal_level={{ .Values.config.walLevel }}"
+        {{- end }}
         volumeMounts:
         - name: postgres-data
           mountPath: /var/lib/postgresql/data
+        {{- if .Values.config.postgresqlConf }}
+        - name: postgresql-config
+          mountPath: /var/lib/postgresql/data/postgresql.conf
+          subPath: postgresql.conf
+          readOnly: true
+        command:
+        - postgres
+        - -c
+        - config_file=/var/lib/postgresql/data/postgresql.conf
+        {{- end }}
         {{- with .Values.resources }}
         resources:
           {{- toYaml . | nindent 10 }}

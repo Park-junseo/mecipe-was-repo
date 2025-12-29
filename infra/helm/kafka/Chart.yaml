@@ -1,12 +1,8 @@
 apiVersion: v2
 name: kafka
-description: Kafka for Mecipe
+description: Kafka for Mecipe (Confluent Platform)
 type: application
-version: 0.1.0
-appVersion: "7.5.0"
-dependencies:
-  - name: kafka
-    version: "~22.1.0"
-    repository: "https://charts.bitnami.com/bitnami"
-    condition: kafka.enabled
-
+version: 0.2.0
+appVersion: "7.6.0"
+# Dependencies removed - Zookeeper should be deployed independently
+# Zookeeper is referenced via dependencies.zookeeper.name and namespace in values.yaml

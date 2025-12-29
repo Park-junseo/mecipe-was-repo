@@ -8,9 +8,11 @@ global:
 # Kubernetes 내부 배포 시: enabled: true
 enabled: true
 
-# Node selector - Instance B (data node)
+name: postgres
+namespace: data-storage
+
 nodeSelector:
-  node-role: data
+  node-role: storage
 
 # PostgreSQL Configuration
 image:
@@ -42,4 +44,13 @@ resources:
 # Secrets (should be set via --set or values file)
 secrets:
   postgresPassword: ""
+
+# PostgreSQL Configuration
+config:
+  # Debezium을 위한 wal_level 설정
+  walLevel: "logical"
+  # postgresql.conf 추가 설정 (선택사항)
+  postgresqlConf: |
+    # wal_level은 위의 walLevel로 설정됨
+    # 추가 설정이 필요하면 여기에 작성
 

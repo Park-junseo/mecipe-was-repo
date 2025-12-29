@@ -3,12 +3,14 @@ global:
   dockerRegistry: ""
   imagePullSecrets: []
 
-# Node selector - Instance A (app node)
+name: mecipe-was
+namespace: app
+
 nodeSelector:
   node-role: app
 
 image:
-  repository: ""
+  repository: "mecipe-api-server"
   tag: "latest"
   pullPolicy: Always
 
@@ -17,7 +19,14 @@ replicaCount: 1
 ingress:
   enabled: true
   host: ""
+  tls:
+    enabled: true
   tlsSecret: "mecipe-was-tls"
+  annotationsSettings:
+    certManager.enabled: true
+    https.redirect.enabled: true
+    securityHeaders.enabled: true
+    websocket.enabled: true
 
 service:
   type: ClusterIP

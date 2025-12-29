@@ -31,20 +31,24 @@ jobs:
         echo "🚀 Deploying cert-manager..."
 
         # cert-manager (최초 1회 or 변경 시)
+        # cert-manager는 자체 namespace를 사용합니다 (cert-manager)
         helm repo add jetstack https://charts.jetstack.io
         helm repo update
         helm upgrade --install cert-manager jetstack/cert-manager \
           --namespace cert-manager \
           --create-namespace \
+          --set 'nodeSelector.node-role=ingress' \
           --set installCRDs=true \
           --wait \
           --timeout 10m
 
         # ClusterIssuer (cert-manager가 준비될 때까지 대기)
+        # ClusterIssuer는 infra namespace에 배포 (ClusterScoped 리소스이지만 chart는 infra namespace에 배포)
         echo "⏳ Waiting for cert-manager to be ready..."
         kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=cert-manager -n cert-manager --timeout=5m || echo "⚠️  cert-manager may still be starting, but continuing..."
         
         helm upgrade --install cert-manager-bootstrap ./infra/helm/cert-manager \
-          --namespace cert-manager \
+          --namespace infra \
           --create-namespace \
+          --set 'nodeSelector.node-role=ingress' \
           --set email="${{ secrets.SSL_EMAIL }}"

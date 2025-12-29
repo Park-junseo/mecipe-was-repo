@@ -1,0 +1,77 @@
+apiVersion: platform.confluent.io/v1beta1
+kind: Kafka
+metadata:
+  name: {{ include "kafka.name" . }}
+  namespace: {{ include "kafka.namespace" . }}
+  labels:
+    {{- include "kafka.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas }}
+  
+  image:
+    application: {{ include "kafka.image" (dict "Values" .Values "image" .Values.image.application) }}
+    init: {{ include "kafka.image" (dict "Values" .Values "image" .Values.image.init) }}
+
+  dataVolumeCapacity: {{ .Values.dataVolumeCapacity }}
+
+  {{- if .Values.nodeSelector }}
+  podTemplate:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+              {{- range $key, $value := .Values.nodeSelector }}
+              - key: {{ $key | quote }}
+                operator: In
+                values:
+                - {{ $value | quote }}
+              {{- end }}
+  {{- end }}
+
+  {{- if .Values.listeners }}
+  listeners:
+    {{- if .Values.listeners.internal }}
+    internal:
+      authentication:
+        type: {{ .Values.listeners.internal.authentication.type }}
+    {{- end }}
+    {{- if .Values.listeners.external }}
+    external:
+      authentication:
+        type: {{ .Values.listeners.external.authentication.type }}
+    {{- end }}
+  {{- end }}
+
+  {{- if .Values.dependencies.zookeeper }}
+  dependencies:
+    zookeeper:
+      discovery:
+        name: {{ .Values.dependencies.zookeeper.name }}
+        {{- if .Values.dependencies.zookeeper.namespace }}
+        namespace: {{ .Values.dependencies.zookeeper.namespace }}
+        {{- end }}
+  {{- end }}
+
+  {{- if .Values.configOverrides }}
+  configOverrides:
+    {{- if .Values.configOverrides.server }}
+    server:
+      {{- range .Values.configOverrides.server }}
+      - {{ . }}
+      {{- end }}
+    {{- end }}
+    {{- if .Values.configOverrides.jvm }}
+    jvm:
+      {{- range .Values.configOverrides.jvm }}
+      - {{ . }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+
+  {{- if .Values.resources }}
+  resources:
+    {{- toYaml .Values.resources | nindent 4 }}
+  {{- end }}
+
+

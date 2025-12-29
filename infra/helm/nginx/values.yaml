@@ -3,9 +3,11 @@ global:
   dockerRegistry: ""
   imagePullSecrets: []
 
-# Node selector - Instance A (app node)
+name: nginx
+namespace: infra
+
 nodeSelector:
-  node-role: app
+  node-role: ingress
 
 image:
   repository: ""

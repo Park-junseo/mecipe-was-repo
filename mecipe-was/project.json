@@ -20,11 +20,17 @@
         "target": "node",
         "compiler": "tsc",
         "webpackConfig": "mecipe-was/webpack.config.js",
+        "deleteOutputPath": true,
         "assets": [
           {
             "glob": "**/*",
             "input": "mecipe-was/prisma/basic",
             "output": "prisma/basic"
+          },
+          {
+            "glob": "**/*.gql",
+            "input": "mecipe-was/src",
+            "output": ""
           }
         ]
       },

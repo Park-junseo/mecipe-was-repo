@@ -2,6 +2,9 @@
 # This chart manages connection information for external PostgreSQL
 # It does NOT deploy PostgreSQL itself
 
+name: postgres-connection
+namespace: data-storage
+
 # PostgreSQL Connection Information
 connection:
   host: ""  # External PostgreSQL host (IP or FQDN)
@@ -18,6 +21,6 @@ connection:
 service:
   enabled: false
   name: "postgres"
-  namespace: "data"
+  namespace: "data-storage"
   port: 5432
 

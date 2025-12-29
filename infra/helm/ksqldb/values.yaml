@@ -1,26 +1,52 @@
-# Default values for ksqldb
+# Default values for KSQLDB (Confluent Platform)
+# This chart deploys KSQLDB using Confluent Platform Operator CRD
+
+# Global settings
 global:
   dockerRegistry: ""
   imagePullSecrets: []
 
-# Node selector - Instance A (app node)
-nodeSelector:
-  node-role: app
+# Metadata
+name: ksqldb
+namespace: data-streaming
+
+# KSQLDB configuration
+replicas: 1
 
 image:
-  repository: confluentinc/ksqldb-server
-  tag: latest
+  application: confluentinc/cp-ksqldb-server:8.1.0
+  init: confluentinc/confluent-init-container:2.7.0
 
-kafka:
-  brokers: "kafka:9092"
+dataVolumeCapacity: 5Gi
 
-streamsAutoOffsetReset: "earliest"
+nodeSelector:
+  node-role: stream
 
-resources:
-  limits:
-    cpu: 1000m
-    memory: 1Gi
-  requests:
-    cpu: 500m
-    memory: 512Mi
+# Kafka dependency
+dependencies:
+  kafka:
+    bootstrapEndpoint: kafka.data-streaming.svc.cluster.local:9092
 
+# Config overrides for KSQLDB server
+configOverrides:
+  server:
+    - ksql.streams.auto.offset.reset=earliest
+    - ksql.schema.registry.url=http://localhost:8081
+    - ksql.logging.processing.topic.replication.factor=1
+  # Additional configs can be added as a list:
+  # - ksql.logging.processing.topic.replication.factor=1
+
+# Resources (optional)
+# resources:
+#   requests:
+#     cpu: "500m"
+#     memory: "1Gi"
+#   limits:
+#     cpu: "1"
+#     memory: "2Gi"
+
+service:
+  enabled: false
+  type: ClusterIP
+  port: 8088
+  targetPort: 8088

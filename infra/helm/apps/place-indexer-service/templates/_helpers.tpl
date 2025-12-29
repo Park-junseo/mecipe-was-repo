@@ -73,7 +73,8 @@ Node selector
 */}}
 {{- define "common.nodeSelector" -}}
 {{- if .Values.nodeSelector }}
-{{- toYaml .Values.nodeSelector | nindent 6 }}
+      nodeSelector:
+{{- toYaml .Values.nodeSelector | nindent 8 }}
 {{- end }}
 {{- end }}
 

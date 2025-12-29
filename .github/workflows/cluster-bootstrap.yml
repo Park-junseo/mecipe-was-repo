@@ -22,22 +22,36 @@ jobs:
         chmod 600 ~/.kube/config
 
     # 🔖 Node Label 설정 (클러스터 최초 1회 작업)
+    # 노드 이름은 클러스터 환경에 따라 다를 수 있으므로, 필요한 노드에 라벨을 설정하세요
     - name: Label Nodes
       run: |
         echo "🏷️  Setting node labels (one-time cluster setup)..."
-        # Instance A (app node)
-        kubectl label node instance-a node-role=app --overwrite || echo "⚠️  Node instance-a may not exist"
-        # Instance B (data node)
-        kubectl label node instance-b node-role=data --overwrite || echo "⚠️  Node instance-b may not exist"
-        
+        echo "⚠️  Note: Adjust node names according to your cluster setup"
+        echo ""
+        echo "Node role labels required:"
+        echo "  - node-role=ingress (for ingress-nginx)"
+        echo "  - node-role=app (for mecipe-was, place-indexer-service)"
+        echo "  - node-role=stream (for kafka, ksqldb, zookeeper)"
+        echo "  - node-role=storage (for postgres, elasticsearch, debezium)"
+        echo ""
+        echo "Example labels (adjust node names as needed):"
+        echo "  kubectl label node <node-name> node-role=ingress --overwrite"
+        echo "  kubectl label node <node-name> node-role=app --overwrite"
+        echo "  kubectl label node <node-name> node-role=stream --overwrite"
+        echo "  kubectl label node <node-name> node-role=storage --overwrite"
+        echo ""
         echo "📋 Current node labels:"
         kubectl get nodes --show-labels
 
     # 📦 Namespace 생성
     - name: Create Namespaces
       run: |
+        echo "📦 Creating namespaces..."
+        kubectl create namespace infra --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create namespace data-storage --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create namespace data-streaming --dry-run=client -o yaml | kubectl apply -f -
         kubectl create namespace app --dry-run=client -o yaml | kubectl apply -f -
-        kubectl create namespace data --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create namespace cert-manager --dry-run=client -o yaml | kubectl apply -f -
         echo "✅ Namespaces created/verified"
 
     # ✅ 검증
@@ -49,7 +63,11 @@ jobs:
         kubectl get nodes --show-labels
         echo ""
         echo "📊 Namespaces:"
-        kubectl get namespaces | grep -E "app|data|default"
+        kubectl get namespaces | grep -E "infra|data-storage|data-streaming|app|cert-manager|default|kube-system"
         echo ""
         echo "✅ Bootstrap complete!"
+        echo ""
+        echo "Next steps:"
+        echo "1. Label your nodes with appropriate node-role labels (ingress, app, stream, storage)"
+        echo "2. Deploy infrastructure using infra-deploy.yml workflow"
 

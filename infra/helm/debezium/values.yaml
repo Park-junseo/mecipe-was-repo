@@ -3,18 +3,19 @@ global:
   dockerRegistry: ""
   imagePullSecrets: []
 
-# Node selector - Instance B (data node)
+name: debezium
+namespace: data-storage
+
 nodeSelector:
-  node-role: data
+  node-role: storage
 
 image:
   repository: debezium/connect
   tag: "2.6"
 
 kafka:
-  # Kafka는 app namespace에 있으므로 FQDN 사용
-  # 같은 namespace면 "kafka:9092", 다른 namespace면 "kafka.app.svc.cluster.local:9092"
-  bootstrapServers: "kafka.app.svc.cluster.local:9092"
+  # Kafka는 data-streaming namespace에 있으므로 FQDN 사용
+  bootstrapServers: "kafka.data-streaming.svc.cluster.local:9092"
 
 groupId: "1"
 configStorageTopic: "connect-configs"

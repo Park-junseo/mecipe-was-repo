@@ -3,9 +3,11 @@ global:
   dockerRegistry: ""
   imagePullSecrets: []
 
-# Node selector - Instance B (data node)
+name: kibana
+namespace: data-storage
+
 nodeSelector:
-  node-role: data
+  node-role: storage
 
 image:
   repository: docker.elastic.co/kibana/kibana
@@ -17,8 +19,20 @@ elasticsearch:
   password: ""
 
 service:
-  type: ClusterIP
+  type: NodePort
   port: 5601
+  nodePort: 30561  # 외부 접속 포트 (30000-32767 범위)
+
+ingress:
+  enabled: false
+  hosts:
+    - host: kibana.localhost
+      path: /
+  annotations: {}
+  # tls:
+  #   - secretName: kibana-tls
+  #     hosts:
+  #       - kibana.localhost
 
 resources:
   limits:

@@ -3,7 +3,7 @@ ingress-nginx:
     replicaCount: 1
 
     nodeSelector:
-      node-role: app
+      node-role: ingress
 
     tolerations: []
 
@@ -16,4 +16,4 @@ ingress-nginx:
     admissionWebhooks:
       patch:
         nodeSelector:
-          node-role: app
+          node-role: ingress

@@ -11,12 +11,13 @@
         "{options.outputPath}"
       ],
       "options": {
-        "outputPath": "dist/place-indexer-service",
+        "outputPath": "dist/apps/place-indexer-service",
         "main": "apps/place-indexer-service/src/main.ts",
         "tsConfig": "apps/place-indexer-service/tsconfig.app.json",
         "target": "node",
         "compiler": "tsc",
-        "webpackConfig": "apps/place-indexer-service/webpack.config.js"
+        "webpackConfig": "apps/place-indexer-service/webpack.config.js",
+        "deleteOutputPath": true
       },
       "configurations": {
         "production": {

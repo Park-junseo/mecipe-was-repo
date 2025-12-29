@@ -129,12 +129,12 @@ jobs:
         RETRY_COUNT=0
         
         while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-          # Kafka 확인 (app namespace)
-          KAFKA_READY=$(kubectl get pods -n app -l app.kubernetes.io/name=kafka -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "False")
-          # Elasticsearch 확인 (data namespace)
-          ES_READY=$(kubectl get pods -n data -l app.kubernetes.io/name=elasticsearch -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "False")
-          # PostgreSQL 확인 (data namespace 또는 외부)
-          POSTGRES_READY=$(kubectl get pods -n data -l app.kubernetes.io/name=postgres -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+          # Kafka 확인 (data-streaming namespace)
+          KAFKA_READY=$(kubectl get pods -n data-streaming -l platform.confluent.io/type=kafka -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "False")
+          # Elasticsearch 확인 (data-storage namespace)
+          ES_READY=$(kubectl get pods -n data-storage -l app.kubernetes.io/name=elasticsearch -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "False")
+          # PostgreSQL 확인 (data-storage namespace 또는 외부)
+          POSTGRES_READY=$(kubectl get pods -n data-storage -l app.kubernetes.io/name=postgres -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
           
           echo "📊 Infrastructure status:"
           echo "  Kafka: $KAFKA_READY"
@@ -162,15 +162,15 @@ jobs:
     - name: Deploy Apps
       run: |
         echo "🚀 Deploying applications to app namespace..."
-
+        
         POSTGRES_DEPLOY_FLAG="${{ secrets.POSTGRES_DEPLOY || 'true' }}"
         if [ "$POSTGRES_DEPLOY_FLAG" = "false" ]; then
           echo "⏭️  PostgreSQL deployment disabled (external database)"
           POSTGRES_CONNECTION_HOST="${{ secrets.POSTGRES_HOST || 'localhost' }}"
           POSTGRES_CONNECTION_PORT="${{ secrets.POSTGRES_PORT || '5432' }}"
         else
-          echo "📦 Deploying PostgreSQL in Kubernetes..."
-          POSTGRES_CONNECTION_HOST="postgres.data.svc.cluster.local"
+          echo "📦 Using Kubernetes PostgreSQL service..."
+          POSTGRES_CONNECTION_HOST="postgres.data-storage.svc.cluster.local"
           POSTGRES_CONNECTION_PORT="5432"
         fi
         
@@ -180,6 +180,7 @@ jobs:
           --create-namespace \
           --wait \
           --timeout 10m \
+          --set nodeSelector.node-role=app \
           --set global.dockerRegistry="${{ secrets.DOCKER_USERNAME }}" \
           --set image.repository="${{ secrets.DOCKER_USERNAME }}/mecipe-api-server" \
           --set image.tag="${{ github.sha }}" \
@@ -188,9 +189,10 @@ jobs:
           --set postgres.password="${{ secrets.POSTGRES_PASSWORD }}" \
           --set postgres.database="${{ secrets.POSTGRES_DB }}" \
           --set postgres.hosts="${POSTGRES_CONNECTION_HOST}:${POSTGRES_CONNECTION_PORT}" \
-          --set elasticsearch.hosts="http://elasticsearch.data.svc.cluster.local:9200" \
+          --set elasticsearch.hosts="http://elasticsearch.data-storage.svc.cluster.local:9200" \
           --set elasticsearch.username="${{ secrets.ELASTICSEARCH_APP_USER_NAME }}" \
           --set elasticsearch.password="${{ secrets.ELASTICSEARCH_APP_USER_PASS }}" \
+          --set kafka.bootstrapServers="kafka.data-streaming.svc.cluster.local:9092" \
           --set env.port="${{ secrets.PORT }}" \
           --set env.socketPort="${{ secrets.SOCKET_PORT }}" \
           --set secrets.jwtSecret="${{ secrets.JWT_SECRET }}" \
@@ -209,12 +211,14 @@ jobs:
           --create-namespace \
           --wait \
           --timeout 10m \
+          --set nodeSelector.node-role=app \
           --set global.dockerRegistry="${{ secrets.DOCKER_USERNAME }}" \
           --set image.repository="${{ secrets.DOCKER_USERNAME }}/place-indexer-service" \
           --set image.tag="${{ github.sha }}" \
-          --set env.elasticsearchHosts="http://elasticsearch.data.svc.cluster.local:9200" \
+          --set env.elasticsearchHosts="http://elasticsearch.data-storage.svc.cluster.local:9200" \
           --set secrets.elasticsearchUsername="${{ secrets.ELASTICSEARCH_PRODUCER_USER_NAME }}" \
-          --set secrets.elasticsearchPassword="${{ secrets.ELASTICSEARCH_PRODUCER_USER_PASS }}"
+          --set secrets.elasticsearchPassword="${{ secrets.ELASTICSEARCH_PRODUCER_USER_PASS }}" \
+          --set kafka.bootstrapServers="kafka.data-streaming.svc.cluster.local:9092"
 
     - name: Run database migrations
       run: |
@@ -223,6 +227,8 @@ jobs:
     - name: Health check
       run: |
         echo "🔍 Final verification..."
+        echo "=== App Namespace Pods ==="
         kubectl get pods -n app -o wide
+        echo ""
+        echo "=== App Namespace Services ==="
         kubectl get svc -n app
-

@@ -1,0 +1,19 @@
+{{- if and .Values.enabled .Values.config.postgresqlConf }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.fullname" . }}-postgresql-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+data:
+  postgresql.conf: |
+    # Debezium을 위한 설정
+    wal_level = logical
+    max_replication_slots = 4
+    max_wal_senders = 4
+    {{- if .Values.config.postgresqlConf }}
+    {{- .Values.config.postgresqlConf | nindent 4 }}
+    {{- end }}
+{{- end }}
+

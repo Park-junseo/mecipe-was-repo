@@ -19,14 +19,37 @@ export class HttpBodyLoggerInterceptor implements NestInterceptor {
 
       return next.handle().pipe(
         tap((data) => {
-          // if (process.env.EN.NODE_ENV.toLocaleLowerCase() === 'development') {
+          // if (process.env.NODE_ENV?.toLowerCase() === 'development') {
+          // Limit body logging to prevent huge outputs (e.g., webpack bundles)
+          const MAX_LOG_LENGTH = 1000;
+          
+          let bodyStr: string;
+          try {
+            const bodyJson = typeof body === 'object' ? JSON.stringify(body) : String(body);
+            bodyStr = bodyJson.length > MAX_LOG_LENGTH 
+              ? bodyJson.substring(0, MAX_LOG_LENGTH) + '... (truncated)' 
+              : bodyJson;
+          } catch (e) {
+            bodyStr = '[Unable to stringify body]';
+          }
+          
+          let dataStr: string;
+          try {
+            const dataJson = typeof data === 'object' ? JSON.stringify(data) : String(data);
+            dataStr = dataJson.length > MAX_LOG_LENGTH 
+              ? dataJson.substring(0, MAX_LOG_LENGTH) + '... (truncated)' 
+              : dataJson;
+          } catch (e) {
+            dataStr = '[Unable to stringify data]';
+          }
+          
           this.logger.verbose(
-            body,
+            bodyStr,
             'Request Body - ' + method + ' ' + originalUrl,
           );
 
           this.logger.verbose(
-            data,
+            dataStr,
             'Response Body - ' + method + ' ' + originalUrl,
           );
           // }

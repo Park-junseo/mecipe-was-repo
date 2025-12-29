@@ -1,17 +1,19 @@
+{{- if .Values.service.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: ksqldb
-  namespace: {{ .Release.Namespace }}
+  name: {{ include "ksqldb.fullname" . }}
+  namespace: {{ include "ksqldb.namespace" . }}
   labels:
-    {{- include "common.labels" . | nindent 4 }}
+    {{- include "ksqldb.labels" . | nindent 4 }}
 spec:
-  type: ClusterIP
+  type: {{ .Values.service.type | default "ClusterIP" }}
   ports:
-    - port: 8088
-      targetPort: 8088
+    - name: http
       protocol: TCP
-      name: http
+      port: {{ .Values.service.port | default 8088 }}
+      targetPort: {{ .Values.service.targetPort | default 8088 }}
   selector:
-    {{- include "common.selectorLabels" . | nindent 4 }}
-
+    app.kubernetes.io/name: {{ include "ksqldb.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

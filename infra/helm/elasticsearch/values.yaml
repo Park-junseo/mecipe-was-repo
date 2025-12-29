@@ -3,9 +3,11 @@ global:
   dockerRegistry: ""
   imagePullSecrets: []
 
-# Node selector - Instance B (data node)
+name: elasticsearch
+namespace: data-storage
+
 nodeSelector:
-  node-role: data
+  node-role: storage
 
 image:
   repository: docker.elastic.co/elasticsearch/elasticsearch
@@ -38,16 +40,22 @@ resources:
     memory: 1Gi
 
 secrets:
-  superuser:
-    username: "elastic"
-    password: ""
+  password: ""
+
+users:
   kibana:
     username: "kibana_system"
     password: ""
-  producerUser:
+    roles:
+      - kibana_admin
+  producer:
     username: "producer_user"
     password: ""
-  appUser:
+    roles:
+      - producer_role
+  app:
     username: "app_user"
     password: ""
+    roles:
+      - app_read_write_role
 

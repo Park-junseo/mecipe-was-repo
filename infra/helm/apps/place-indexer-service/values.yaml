@@ -3,7 +3,9 @@ global:
   dockerRegistry: ""
   imagePullSecrets: []
 
-# Node selector - Instance A (app node)
+name: place-indexer-service
+namespace: app
+
 nodeSelector:
   node-role: app
 
@@ -20,10 +22,10 @@ service:
 
 env:
   nodeEnv: production
-  elasticsearchHosts: "http://elasticsearch:9200"
+  elasticsearchHosts: "http://elasticsearch.data-storage.svc.cluster.local:9200"
   elasticsearchUsername: ""
   elasticsearchPassword: ""
-  kafkaBrokers: "kafka:9092"
+  kafkaBrokers: "kafka.data-streaming.svc.cluster.local:9092"
 
 resources:
   limits:

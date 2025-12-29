@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mecipe-was
+  name: {{ include "common.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "common.labels" . | nindent 4 }}
@@ -21,7 +21,7 @@ spec:
         {{- toYaml .Values.global.imagePullSecrets | nindent 8 }}
       {{- end }}
       containers:
-      - name: mecipe-was
+      - name: {{ include "common.fullname" . }}
         image: {{ include "common.image" (dict "Values" .Values "repository" .Values.image.repository "tag" .Values.image.tag) }}
         imagePullPolicy: {{ .Values.image.pullPolicy | default "Always" }}
         ports:
@@ -38,13 +38,11 @@ spec:
           value: {{ .Values.env.port | quote }}
         - name: SOCKET_PORT
           value: {{ .Values.env.socketPort | quote }}
-        {{- if .Values.postgres.url }}
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
               name: {{ include "common.fullname" . }}-secrets
               key: database-url
-        {{- end }}
         {{- if .Values.elasticsearch.hosts }}
         - name: ELASTICSEARCH_HOSTS
           valueFrom:

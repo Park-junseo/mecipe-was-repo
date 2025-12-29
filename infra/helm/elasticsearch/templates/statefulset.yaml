@@ -34,7 +34,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: {{ include "common.fullname" . }}-secrets
-              key: ELASTIC_SUPERPASS
+              key: ELASTIC_SUPERUSER_PASSWORD
         - name: ES_JAVA_OPTS
           value: {{ .Values.javaOpts | quote }}
         volumeMounts:
@@ -44,6 +44,28 @@ spec:
         resources:
           {{- toYaml . | nindent 10 }}
         {{- end }}
+        {{- if .Values.security.enabled }}
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - |
+              curl -f -u elastic:${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health || exit 1
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - |
+              curl -f -u elastic:${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health || exit 1
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        {{- else }}
         livenessProbe:
           httpGet:
             path: /_cluster/health
@@ -58,6 +80,7 @@ spec:
             scheme: HTTP
           initialDelaySeconds: 30
           periodSeconds: 10
+        {{- end }}
   {{- if .Values.persistence.enabled }}
   volumeClaimTemplates:
   - metadata:

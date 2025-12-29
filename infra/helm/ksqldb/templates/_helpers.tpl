@@ -1,22 +1,18 @@
 {{/*
-Common helper templates for all Helm charts
-*/}}
-
-{{/*
 Expand the name of the chart.
 */}}
-{{- define "common.name" -}}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- define "ksqldb.name" -}}
+{{- default .Chart.Name .Values.name | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Create a default fully qualified app name.
 */}}
-{{- define "common.fullname" -}}
+{{- define "ksqldb.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
-{{- $name := default .Chart.Name .Values.nameOverride }}
+{{- $name := default .Chart.Name .Values.name }}
 {{- if contains $name .Release.Name }}
 {{- .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -28,16 +24,16 @@ Create a default fully qualified app name.
 {{/*
 Create chart name and version as used by the chart label.
 */}}
-{{- define "common.chart" -}}
+{{- define "ksqldb.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "common.labels" -}}
-helm.sh/chart: {{ include "common.chart" . }}
-{{ include "common.selectorLabels" . }}
+{{- define "ksqldb.labels" -}}
+helm.sh/chart: {{ include "ksqldb.chart" . }}
+{{ include "ksqldb.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -47,33 +43,47 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{/*
 Selector labels
 */}}
-{{- define "common.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "common.name" . }}
+{{- define "ksqldb.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "ksqldb.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
-Image registry and repository
-Usage: {{ include "common.image" (dict "Values" .Values "repository" "image/repo" "tag" "tag") }}
+Image registry helper
+Usage: {{ include "ksqldb.image" (dict "Values" .Values "image" "confluentinc/cp-ksqldb-server:8.1.0") }}
 */}}
-{{- define "common.image" -}}
+{{- define "ksqldb.image" -}}
 {{- $values := index . "Values" }}
-{{- $registry := index $values "global" "dockerRegistry" | default "" }}
-{{- $repository := index . "repository" }}
-{{- $tag := index . "tag" }}
+{{- $registry := "" }}
+{{- if $values.global }}
+{{- $registry = $values.global.dockerRegistry | default "" }}
+{{- end }}
+{{- $image := index . "image" }}
 {{- if and $registry (ne $registry "") }}
-{{- printf "%s/%s:%s" $registry $repository $tag }}
+{{- printf "%s/%s" $registry $image }}
 {{- else }}
-{{- printf "%s:%s" $repository $tag }}
+{{- $image }}
 {{- end }}
 {{- end }}
 
 {{/*
-Node selector
+Namespace
 */}}
-{{- define "common.nodeSelector" -}}
-{{- if .Values.nodeSelector }}
-{{- toYaml .Values.nodeSelector | nindent 6 }}
+{{- define "ksqldb.namespace" -}}
+{{- .Values.namespace | default .Release.Namespace }}
+{{- end }}
+
+{{/*
+Kafka bootstrap endpoint
+*/}}
+{{- define "ksqldb.kafkaBootstrapEndpoint" -}}
+{{- if .Values.dependencies.kafka.bootstrapEndpoint }}
+{{- .Values.dependencies.kafka.bootstrapEndpoint }}
+{{- else if and .Values.dependencies.kafka.name .Values.dependencies.kafka.namespace }}
+{{- printf "%s.%s.svc.cluster.local:9071" .Values.dependencies.kafka.name .Values.dependencies.kafka.namespace }}
+{{- else }}
+{{- printf "kafka.%s.svc.cluster.local:9071" (include "ksqldb.namespace" .) }}
 {{- end }}
 {{- end }}
+
 
