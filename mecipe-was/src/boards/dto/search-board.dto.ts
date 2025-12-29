@@ -38,7 +38,7 @@ export class SearchBoardDto {
 
   @IsOptional()
   @Transform(({ value }) => parseInt(value))
-  @IsNumber()
+  @IsNumber({},{message: ({value})=> `limit는 숫자여야 합니다. ${value}는 숫자가 아닙니다. ${typeof value} 입니다.`})
   limit?: number = 10;
 
   @IsOptional()

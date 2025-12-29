@@ -58,6 +58,9 @@ type BoardWithUserAndCafeInfo = Omit<Board, 'BoardReplies'>;
     whitelist: true,
     forbidNonWhitelisted: true,
     transform: true,
+    transformOptions: {
+      enableImplicitConversion: true,
+    },
   }),
 )
 export class BoardsController {

@@ -29,6 +29,9 @@ import { RequireBuildApiKey } from '../auth/api-key.decorator';
     whitelist: true,
     forbidNonWhitelisted: true,
     transform: true,
+    transformOptions: {
+      enableImplicitConversion: true,
+    },
   }),
 )
 export class MetaViewerInfosController {
