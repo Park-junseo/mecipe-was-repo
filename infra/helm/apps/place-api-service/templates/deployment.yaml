@@ -1,0 +1,132 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "common.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "common.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "common.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- include "common.nodeSelector" . }}
+      {{- if and .Values.global.imagePullSecrets (gt (len .Values.global.imagePullSecrets) 0) }}
+      imagePullSecrets:
+        {{- toYaml .Values.global.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: {{ include "common.fullname" . }}
+        image: {{ include "common.image" (dict "Values" .Values "repository" .Values.image.repository "tag" .Values.image.tag) }}
+        imagePullPolicy: {{ .Values.image.pullPolicy | default "Always" }}
+        ports:
+        - name: http
+          containerPort: 4000
+          protocol: TCP
+        - name: socket
+          containerPort: 4100
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: {{ .Values.env.nodeEnv | quote }}
+        - name: PORT
+          value: {{ .Values.env.port | quote }}
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "common.fullname" . }}-secrets
+              key: database-url
+        {{- if and .Values.elasticsearch .Values.elasticsearch.hosts }}
+        - name: ELASTICSEARCH_HOSTS
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "common.fullname" . }}-secrets
+              key: elasticsearch-hosts
+        {{- end }}
+        {{- if and .Values.elasticsearch .Values.elasticsearch.username }}
+        - name: ELASTICSEARCH_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "common.fullname" . }}-secrets
+              key: elasticsearch-username
+        {{- end }}
+        {{- if and .Values.elasticsearch .Values.elasticsearch.password }}
+        - name: ELASTICSEARCH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "common.fullname" . }}-secrets
+              key: elasticsearch-password
+        {{- end }}
+        {{- if .Values.secrets.jwtSecret }}
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "common.fullname" . }}-secrets
+              key: jwt-secret
+        {{- end }}
+        {{- if .Values.secrets.secretLoginCrypto }}
+        - name: SECRET_LOGIN_CRYPTO
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "common.fullname" . }}-secrets
+              key: secret-login-crypto
+        {{- end }}
+        {{- if .Values.secrets.apiKey }}
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "common.fullname" . }}-secrets
+              key: api-key
+              optional: true
+        {{- end }}
+        {{- if .Values.secrets.buildApiKey }}
+        - name: BUILD_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "common.fullname" . }}-secrets
+              key: build-api-key
+              optional: true
+        {{- end }}
+        {{- if .Values.secrets.couponSecret }}
+        - name: COUPON_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "common.fullname" . }}-secrets
+              key: coupon-secret
+        {{- end }}
+        {{- if .Values.secrets.productSecret }}
+        - name: PRODUCT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "common.fullname" . }}-secrets
+              key: product-secret
+        {{- end }}
+        {{- if .Values.persistence.enabled }}
+        volumeMounts:
+        - name: media-storage
+          mountPath: /app/media
+        {{- end }}
+        {{- with .Values.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .Values.livenessProbe }}
+        livenessProbe:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .Values.readinessProbe }}
+        readinessProbe:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      {{- if .Values.persistence.enabled }}
+      volumes:
+      - name: media-storage
+        persistentVolumeClaim:
+          claimName: {{ include "common.fullname" . }}-media-pvc
+      {{- end }}
+

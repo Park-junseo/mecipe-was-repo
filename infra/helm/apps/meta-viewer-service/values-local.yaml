@@ -1,0 +1,64 @@
+# Default values for meta-viewer-service
+global:
+  dockerRegistry: "local"
+  imagePullSecrets: []
+
+name: meta-viewer-service
+namespace: app
+
+nodeSelector:
+  node-role: local
+
+image:
+  repository: "meta-viewer-service"
+  tag: "latest"
+  pullPolicy: Always
+
+replicaCount: 1
+
+ingress:
+  enabled: true
+  host: ""
+  tls:
+    enabled: false  # 로컬 환경에서는 TLS 비활성화 (Let's Encrypt 인증서 발급 불가)
+  tlsSecret: "mecipe-tls"
+  annotationsSettings:
+    certManager.enabled: false  # 로컬 환경에서는 cert-manager 비활성화
+    certManager.clusterIssuer: letsencrypt-staging
+    https.redirect.enabled: false  # 로컬에서는 HTTPS 리다이렉트 비활성화
+    securityHeaders.enabled: false  # 로컬에서는 HSTS 비활성화 (브라우저가 HTTPS로 강제하는 것 방지)
+
+service:
+  type: ClusterIP
+  ports:
+    http: 4100
+
+env:
+  nodeEnv: development
+  port: "4100"
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+livenessProbe:
+  httpGet:
+    path: /hello
+    port: 4100
+  initialDelaySeconds: 60
+  periodSeconds: 30
+
+readinessProbe:
+  httpGet:
+    path: /hello
+    port: 4100
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+# Secrets (should be set via --set or values file)
+secrets:
+  jwtSecret: ""

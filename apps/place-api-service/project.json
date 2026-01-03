@@ -1,0 +1,112 @@
+{
+  "name": "place-api-service",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "place-api-service/src",
+  "projectType": "application",
+  "tags": [
+    "app",
+    "nestjs"
+  ],
+  "targets": {
+    "build": {
+      "executor": "@nx/webpack:webpack",
+      "outputs": [
+        "{options.outputPath}"
+      ],
+      "options": {
+        "outputPath": "dist/apps/place-api-service",
+        "main": "apps/place-api-service/src/main.ts",
+        "tsConfig": "apps/place-api-service/tsconfig.app.json",
+        "target": "node",
+        "compiler": "tsc",
+        "externalDependencies": "all",
+        "webpackConfig": "apps/place-api-service/webpack.config.js",
+        "deleteOutputPath": true,
+        "assets": [
+          {
+            "glob": "**/*",
+            "input": "apps/place-api-service/prisma/basic",
+            "output": "prisma/basic"
+          },
+          {
+            "glob": "**/*.gql",
+            "input": "apps/place-api-service/src",
+            "output": ""
+          }
+        ]
+      },
+      "configurations": {
+        "production": {
+          "optimization": true,
+          "extractLicenses": true,
+          "inspect": false
+        }
+      }
+    },
+    "serve": {
+      "executor": "@nx/js:node",
+      "options": {
+        "buildTarget": "place-api-service:build",
+        "watch": true,
+        "inspect": true
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "place-api-service:build:development"
+        },
+        "production": {
+          "buildTarget": "place-api-service:build:production",
+          "watch": false,
+          "inspect": false
+        }
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": [
+        "{options.outputFile}"
+      ],
+      "options": {
+        "lintFilePatterns": [
+          "apps/place-api-service/**/*.ts"
+        ]
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": [
+        "{workspaceRoot}/coverage/apps/place-api-service"
+      ],
+      "options": {
+        "jestConfig": "apps/place-api-service/jest.config.ts",
+        "passWithNoTests": true
+      }
+    },
+    "prisma": {
+      "executor": "@nx/node:run-commands",
+      "options": {
+        "command": "pnpm --filter place-api-service prisma",
+        "cwd": "apps/place-api-service"
+      }
+    },
+    "prisma:migrate": {
+      "executor": "@nx/node:run-commands",
+      "options": {
+        "command": "pnpm --filter place-api-service prisma:migrate",
+        "cwd": "apps/place-api-service"
+      }
+    },
+    "test:env": {
+      "executor": "@nx/node:run-commands",
+      "options": {
+        "command": "ts-node -r tsconfig-paths/register apps/place-api-service/scripts/prisma/test-db-setup.dev.ts --start-app",
+        "cwd": "{workspaceRoot}"
+      },
+      "configurations": {
+        "watch": {
+          "command": "ts-node -r tsconfig-paths/register apps/place-api-service/scripts/prisma/test-db-setup.dev.ts --start-app --watch"
+        }
+      }
+    }
+  }
+}

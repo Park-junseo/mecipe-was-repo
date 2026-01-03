@@ -18,9 +18,14 @@
     "paths": {
       "@virtualcafe/common": ["libs/common/src/index.ts"],
       "@virtualcafe/database": ["libs/database/src/index.ts"],
-      "@virtualcafe/mecipe-was": ["mecipe-was/src/index.ts"],
       "@virtualcafe/place-indexer-service": [
         "apps/place-indexer-service/src/index.ts"
+      ],
+      "@virtualcafe/place-api-service": [
+        "apps/place-api-service/src/index.ts"
+      ],
+      "@virtualcafe/meta-viewer-service": [
+        "apps/meta-viewer-service/src/index.ts"
       ]
     }
   },

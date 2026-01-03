@@ -16,6 +16,7 @@
         "tsConfig": "apps/place-indexer-service/tsconfig.app.json",
         "target": "node",
         "compiler": "tsc",
+        "externalDependencies": "all",
         "webpackConfig": "apps/place-indexer-service/webpack.config.js",
         "deleteOutputPath": true
       },
@@ -55,7 +56,7 @@
     "test": {
       "executor": "@nx/jest:jest",
       "outputs": [
-        "{workspaceRoot}/coverage/place-indexer-service"
+        "{workspaceRoot}/coverage/apps/place-indexer-service"
       ],
       "options": {
         "jestConfig": "apps/place-indexer-service/jest.config.ts",

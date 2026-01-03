@@ -1,12 +1,14 @@
 #!/bin/bash
 
 # 로컬에서 GitHub Actions와 동일한 방식으로 Helm 배포 테스트
-# 사용법: ./scripts/dev/local-deploy-test.sh [infra|apps|all]
+# 사용법: ./scripts/dev/local-deploy-test.sh [infra|apps|all] [--ex:build:service-name ...]
 # 
 # 예시:
 #   ./scripts/dev/local-deploy-test.sh infra    # 인프라만 배포
 #   ./scripts/dev/local-deploy-test.sh apps     # 앱만 배포 (인프라가 이미 배포된 경우)
 #   ./scripts/dev/local-deploy-test.sh all      # 전체 배포
+#   ./scripts/dev/local-deploy-test.sh all --ex:build:place-api-service  # place-api-service 빌드 제외
+#   ./scripts/dev/local-deploy-test.sh all --ex:build:place-api-service --ex:build:meta-viewer-service  # 여러 서비스 제외
 
 set -e
 set -o pipefail
@@ -41,7 +43,32 @@ readonly MAX_RETRIES_INFRA=30
 # 중단 플래그 (Ctrl+C 시 설정됨)
 INTERRUPTED=false
 
-DEPLOY_TYPE="${1:-all}"
+# 빌드에서 제외할 서비스 목록
+EXCLUDE_BUILD_SERVICES=()
+
+# 매개변수 파싱
+DEPLOY_TYPE="all"
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        infra|apps|all)
+            DEPLOY_TYPE="$1"
+            shift
+            ;;
+        --ex:build:*)
+            # --ex:build:service-name 형식 파싱
+            service_name="${1#--ex:build:}"
+            EXCLUDE_BUILD_SERVICES+=("$service_name")
+            log_info "ℹ️  빌드에서 제외: $service_name"
+            shift
+            ;;
+        *)
+            log_error "알 수 없는 매개변수: $1"
+            echo "사용법: $0 [infra|apps|all] [--ex:build:service-name ...]"
+            echo "예시: $0 all --ex:build:place-api-service --ex:build:meta-viewer-service"
+            exit 1
+            ;;
+    esac
+done
 
 # ============================================================================
 # 색상 및 로깅 함수
@@ -283,7 +310,9 @@ cleanup_helm_releases() {
     log_info "📦 Helm release 삭제 중..."
     
     # app namespace
-    helm uninstall mecipe-was -n "${LOCAL_APP_NS}" 2>/dev/null || true
+    helm uninstall place-api-service -n "${LOCAL_APP_NS}" 2>/dev/null || true
+    helm uninstall meta-viewer-service -n "${LOCAL_APP_NS}" 2>/dev/null || true
+    helm uninstall api-gateway -n "${LOCAL_APP_NS}" 2>/dev/null || true
     helm uninstall place-indexer-service -n "${LOCAL_APP_NS}" 2>/dev/null || true
     
     # data-storage namespace
@@ -550,22 +579,70 @@ build_docker_images() {
         log_warning "⚠️  이미지를 수동으로 minikube에 로드하거나 imagePullPolicy: Never를 사용하세요."
     fi
     
-    log_info "📦 mecipe-api-server 이미지 빌드..."
-    docker build --no-cache -f mecipe-was/Dockerfile -t "${DOCKER_USERNAME}/mecipe-api-server:${IMAGE_TAG}" . || {
-        log_error "❌ mecipe-api-server 이미지 빌드 실패"
-        exit 1
+    # 특정 서비스가 제외 목록에 있는지 확인하는 함수
+    should_skip_build() {
+        local service=$1
+        for excluded in "${EXCLUDE_BUILD_SERVICES[@]}"; do
+            if [ "$excluded" = "$service" ]; then
+                return 0  # 제외됨
+            fi
+        done
+        return 1  # 빌드 필요
     }
     
-    log_info "📦 place-indexer-service 이미지 빌드..."
-    docker build --no-cache -f apps/place-indexer-service/Dockerfile -t "${DOCKER_USERNAME}/place-indexer-service:${IMAGE_TAG}" . || {
-        log_error "❌ place-indexer-service 이미지 빌드 실패"
-        exit 1
-    }
+    SUCCESS_PLACE_API_SERVICE=true
+    if should_skip_build "place-api-service"; then
+        log_warning "⏭️  place-api-service 이미지 빌드를 건너뜁니다 (--ex:build:place-api-service)"
+    else
+        log_info "📦 place-api-service 이미지 빌드..."
+        docker build -f apps/place-api-service/Dockerfile -t "${DOCKER_USERNAME}/place-api-service:${IMAGE_TAG}" . || {
+            log_error "❌ place-api-service 이미지 빌드 실패"
+            SUCCESS_PLACE_API_SERVICE=false
+        }
+    fi
+
+    SUCCESS_META_VIEWER_SERVICE=true
+    if should_skip_build "meta-viewer-service"; then
+        log_warning "⏭️  meta-viewer-service 이미지 빌드를 건너뜁니다 (--ex:build:meta-viewer-service)"
+    else
+        log_info "📦 meta-viewer-service 이미지 빌드..."
+        docker build -f apps/meta-viewer-service/Dockerfile -t "${DOCKER_USERNAME}/meta-viewer-service:${IMAGE_TAG}" . || {
+            log_error "❌ meta-viewer-service 이미지 빌드 실패"
+            SUCCESS_META_VIEWER_SERVICE=false
+        }
+    fi
+
+    SUCCESS_API_GATEWAY=true
+    if should_skip_build "api-gateway"; then
+        log_warning "⏭️  api-gateway 이미지 빌드를 건너뜁니다 (--ex:build:api-gateway)"
+    else
+        log_info "📦 api-gateway 이미지 빌드..."
+        docker build -f apps/api-gateway/Dockerfile -t "${DOCKER_USERNAME}/api-gateway:${IMAGE_TAG}" . || {
+            log_error "❌ api-gateway 이미지 빌드 실패"
+            SUCCESS_API_GATEWAY=false
+        }
+    fi
+    
+    SUCCESS_PLACE_INDEXER_SERVICE=true
+    if should_skip_build "place-indexer-service"; then
+        log_warning "⏭️  place-indexer-service 이미지 빌드를 건너뜁니다 (--ex:build:place-indexer-service)"
+    else
+        log_info "📦 place-indexer-service 이미지 빌드..."
+        docker build -f apps/place-indexer-service/Dockerfile -t "${DOCKER_USERNAME}/place-indexer-service:${IMAGE_TAG}" . || {
+            log_error "❌ place-indexer-service 이미지 빌드 실패"
+            SUCCESS_PLACE_INDEXER_SERVICE=false
+        }
+    fi
     
     if command -v minikube &> /dev/null; then
         log_success "✅ 이미지가 minikube Docker 데몬에 빌드되었습니다"
         log_info "📋 빌드된 이미지 확인:"
-        docker images | grep -E "${DOCKER_USERNAME}/(mecipe-api-server|place-indexer-service)" || true
+        docker images | grep -E "${DOCKER_USERNAME}/(place-api-service|meta-viewer-service|api-gateway|place-indexer-service)" || true
+    fi
+
+    if [ "$SUCCESS_PLACE_API_SERVICE" = "false" ] || [ "$SUCCESS_META_VIEWER_SERVICE" = "false" ] || [ "$SUCCESS_API_GATEWAY" = "false" ] || [ "$SUCCESS_PLACE_INDEXER_SERVICE" = "false" ]; then
+        log_error "❌ 일부 이미지 빌드에 실패했습니다."
+        exit 1
     fi
     
     log_success "✅ Docker 이미지 빌드 완료"
@@ -1193,15 +1270,14 @@ deploy_applications() {
         POSTGRES_CONNECTION_PORT="5432"
     fi
     
-    log_info "📦 Mecipe WAS 배포..."
-    helm_deploy "mecipe-was" "./infra/helm/apps/mecipe-was" "${LOCAL_APP_NS}" "$HELM_TIMEOUT_MEDIUM" \
-        -f ./infra/helm/apps/mecipe-was/values-local.yaml \
+    log_info "📦 Place API Service 배포..."
+    helm_deploy "place-api-service" "./infra/helm/apps/place-api-service" "${LOCAL_APP_NS}" "$HELM_TIMEOUT_MEDIUM" \
+        -f ./infra/helm/apps/place-api-service/values-local.yaml \
         --set 'nodeSelector.node-role=local' \
         --set global.dockerRegistry="${DOCKER_USERNAME}" \
-        --set image.repository="mecipe-api-server" \
+        --set image.repository="place-api-service" \
         --set image.tag="${IMAGE_TAG}" \
         --set image.pullPolicy="Never" \
-        --set env.nodeEnv="production" \
         --set postgres.username="${POSTGRES_USER}" \
         --set postgres.password="${POSTGRES_PASSWORD}" \
         --set postgres.database="${POSTGRES_DB}" \
@@ -1210,16 +1286,40 @@ deploy_applications() {
         --set elasticsearch.username="${ELASTICSEARCH_APP_USER_NAME}" \
         --set elasticsearch.password="${ELASTICSEARCH_APP_USER_PASS}" \
         --set env.port="${PORT}" \
-        --set env.socketPort="${SOCKET_PORT}" \
         --set secrets.jwtSecret="${JWT_SECRET:-local-test-secret}" \
         --set secrets.secretLoginCrypto="${SECRET_LOGIN_CRYPTO:-local-crypto}" \
         --set secrets.apiKey="${API_KEY:-}" \
         --set secrets.buildApiKey="${BUILD_API_KEY:-}" \
         --set secrets.couponSecret="${COUPON_SECRET:-local-coupon}" \
         --set secrets.productSecret="${PRODUCT_SECRET:-local-product}" \
-        --set ingress.enabled=true \
-        --set ingress.tlsSecret="mecipe-was-tls" || {
-        log_warning "⚠️  Mecipe WAS 배포가 타임아웃되었습니다."
+        --set ingress.enabled=true || {
+        log_warning "⚠️  Place API Service 배포가 타임아웃되었습니다."
+    }
+
+    log_info "📦 Meta Viewer Service 배포..."
+    helm_deploy "meta-viewer-service" "./infra/helm/apps/meta-viewer-service" "${LOCAL_APP_NS}" "$HELM_TIMEOUT_MEDIUM" \
+        -f ./infra/helm/apps/meta-viewer-service/values-local.yaml \
+        --set 'nodeSelector.node-role=local' \
+        --set global.dockerRegistry="${DOCKER_USERNAME}" \
+        --set image.repository="meta-viewer-service" \
+        --set image.tag="${IMAGE_TAG}" \
+        --set image.pullPolicy="Never" \
+        --set env.port="${SOCKET_PORT}" \
+        --set secrets.jwtSecret="${JWT_SECRET:-local-test-secret}" || {
+        log_warning "⚠️  Meta Viewer Service 배포가 타임아웃되었습니다."
+    }
+
+    log_info "📦 API Gateway 배포..."
+    helm_deploy "api-gateway" "./infra/helm/apps/api-gateway" "${LOCAL_APP_NS}" "$HELM_TIMEOUT_MEDIUM" \
+        -f ./infra/helm/apps/api-gateway/values-local.yaml \
+        --set 'nodeSelector.node-role=local' \
+        --set global.dockerRegistry="${DOCKER_USERNAME}" \
+        --set image.repository="api-gateway" \
+        --set secrets.jwtPublicKey="${JWT_PUBLIC_KEY}" \
+        --set env.placeApiServiceUrl="http://place-api-service:${PORT}" \
+        --set image.tag="${IMAGE_TAG}" \
+        --set image.pullPolicy="Never" || {
+        log_warning "⚠️  API Gateway 배포가 타임아웃되었습니다."
     }
     
     log_info "📦 Place Indexer Service 배포..."
@@ -1238,10 +1338,8 @@ deploy_applications() {
         log_warning "⚠️  Place Indexer Service 배포가 타임아웃되었습니다."
     }
     
-    log_info "📦 데이터베이스 마이그레이션 실행..."
-    kubectl exec -n "${LOCAL_APP_NS}" deployment/mecipe-was -- npx prisma migrate deploy || {
-        log_warning "⚠️  마이그레이션 실패 또는 적용할 마이그레이션이 없습니다."
-    }
+    # 마이그레이션은 Dockerfile의 CMD에서 자동으로 실행되므로 여기서는 제거
+    # 컨테이너가 시작될 때마다 자동으로 prisma migrate deploy가 실행됩니다.
     
     echo ""
     log_success "✅ 애플리케이션 배포 완료"

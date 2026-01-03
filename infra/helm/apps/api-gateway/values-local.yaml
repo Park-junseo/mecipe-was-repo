@@ -1,0 +1,52 @@
+# Default values for api-gateway
+global:
+  dockerRegistry: "local"
+  imagePullSecrets: []
+
+name: api-gateway
+namespace: app
+
+nodeSelector:
+  node-role: local
+
+image:
+  repository: "api-gateway"
+  tag: "latest"
+  pullPolicy: Always
+
+replicaCount: 1
+
+ingress:
+  enabled: true
+  host: ""
+  tls:
+    enabled: false  # 로컬 환경에서는 TLS 비활성화 (Let's Encrypt 인증서 발급 불가)
+  tlsSecret: "mecipe-tls"
+  annotationsSettings:
+    certManager.enabled: false  # 로컬 환경에서는 cert-manager 비활성화
+    certManager.clusterIssuer: letsencrypt-staging
+    https.redirect.enabled: false  # 로컬에서는 HTTPS 리다이렉트 비활성화
+    securityHeaders.enabled: false  # 로컬에서는 HSTS 비활성화 (브라우저가 HTTPS로 강제하는 것 방지)
+
+service:
+  type: ClusterIP
+  ports:
+    http: 4000
+
+env:
+  nodeEnv: development
+  port: "4000"
+  placeApiServiceUrl: "http://place-api-service:4000"
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+# Secrets (should be set via --set or values file)
+secrets:
+  jwtSecret: ""
+

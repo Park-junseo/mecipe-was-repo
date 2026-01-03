@@ -1,0 +1,455 @@
+{
+  "GET /hello": {
+    "type": "public"
+  },
+  "POST /login": {
+    "type": "public"
+  },
+  "GET /testpw/:password": {
+    "type": "public"
+  },
+  "POST /signup": {
+    "type": "public"
+  },
+  "GET /auth/me": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "GET /": {
+    "type": "public"
+  },
+  "GET /examples/test": {
+    "type": "public"
+  },
+  "GET /users/duplicate": {
+    "type": "public"
+  },
+  "GET /users/find/id": {
+    "type": "public"
+  },
+  "GET /users/admin": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "GET /users/checkLogin/:id": {
+    "type": "public"
+  },
+  "GET /users/admin/general/list": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "PATCH /users/admin/user/:userId": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "PATCH /users/:userId/updatepw": {
+    "type": "public"
+  },
+  "POST /users/admin": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "DELETE /users/admin": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "PATCH /places/admin/update/:id": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "PATCH /places/admin/disable/:id": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "DELETE /places/admin/delete/:id": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "POST /places/admin/create": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "GET /places/admin/pagination": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "GET /places/admin/:id": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "GET /places/admin": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "GET /places/search": {
+    "type": "public"
+  },
+  "GET /places/ids": {
+    "type": "public"
+  },
+  "GET /places/:id": {
+    "type": "public"
+  },
+  "POST /rawimageupload/upload": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "PATCH /regioncategories/admin/update/:id": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "PATCH /regioncategories/admin/disable/:id": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "POST /regioncategories/admin/create": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "GET /regioncategories/admin/child": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "GET /regioncategories/ancestor/:categoryId": {
+    "type": "public"
+  },
+  "GET /regioncategories/closure": {
+    "type": "public"
+  },
+  "GET /regioncategories/:id": {
+    "type": "public"
+  },
+  "GET /imageupload/direct": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "POST /cafethumbnailimages/admin/upload/:cafeId": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "GET /cafethumbnailimages/admin": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "POST /cafevirtualimages/admin/upload/:cafeId": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "GET /cafevirtualimages/admin": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "POST /caferealimages/admin/upload/:cafeId": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "GET /caferealimages/admin": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "PATCH /cafevirtuallinks/admin/update/image/:imageId": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "POST /cafevirtuallinks/admin/create/list/:cafeId": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "POST /cafevirtuallinks/admin/create/:cafeId": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "PATCH /cafevirtuallinks/admin/update/:id": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "GET /cafevirtuallinks/admin": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "POST /coupons/create-coupon": {
+    "type": "public"
+  },
+  "POST /coupons/create-coupon-qrcode": {
+    "type": "public"
+  },
+  "POST /coupons/find/group-code/member-id": {
+    "type": "public"
+  },
+  "POST /coupons/use-coupon/serial-number/actor-id": {
+    "type": "public"
+  },
+  "GET /coupons/test-qr": {
+    "type": "public"
+  },
+  "POST /boards/create": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "GET /boards/": {
+    "type": "public"
+  },
+  "GET /boards/admin": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "PATCH /boards/:id": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "DELETE /boards/:id": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "POST /boards/:id/images": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "PATCH /boards/images/:imageId": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "DELETE /boards/images/:imageId": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "POST /boards/:id/replies": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "PATCH /boards/replies/:replyId": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "DELETE /boards/replies/:replyId": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "POST /products/create": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "GET /products/": {
+    "type": "public"
+  },
+  "GET /products/cafe-info-code/:cafeInfoCode": {
+    "type": "public"
+  },
+  "GET /products/admin": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "PATCH /products/:id": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "DELETE /products/:id": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "POST /meta-viewer-infos/admin/:metaViewerInfoId/maps": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "PATCH /meta-viewer-infos/admin/maps/:mapId": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "DELETE /meta-viewer-infos/admin/maps/:mapId": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "GET /meta-viewer-infos/admin/:metaViewerInfoId/maps": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "POST /meta-viewer-infos/admin/active-maps": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "PATCH /meta-viewer-infos/admin/active-maps/:activeMapId": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "DELETE /meta-viewer-infos/admin/active-maps/:activeMapId": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "POST /meta-viewer-infos/admin": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "PATCH /meta-viewer-infos/admin/:id": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "GET /meta-viewer-infos/admin": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "GET /meta-viewer-infos/admin/:id": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "DELETE /meta-viewer-infos/admin/:id": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "GET /meta-viewer-infos/ssg/codes": {
+    "type": "public"
+  },
+  "GET /meta-viewer-infos/code/:code": {
+    "type": "public"
+  },
+  "PATCH /productcategories/admin/update/:id": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "PATCH /productcategories/admin/disable/:id": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "POST /productcategories/admin/create": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "GET /productcategories/admin/duplicate-code": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "GET /productcategories/admin/child": {
+    "type": "role",
+    "roles": [
+      "ADMIN"
+    ]
+  },
+  "GET /productcategories/ancestor/:categoryId": {
+    "type": "public"
+  },
+  "GET /productcategories/closure": {
+    "type": "public"
+  },
+  "GET /productcategories/:id": {
+    "type": "public"
+  }
+}

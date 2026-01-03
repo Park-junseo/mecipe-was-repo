@@ -1,0 +1,54 @@
+{{ if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "common.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+  {{- $as := .Values.ingress.annotationsSettings | default dict }}
+  annotations:
+    # /meta-viewers는 Socket.IO path와 일치해야 하므로 rewrite하지 않음
+    # 다른 경로는 rewrite-target 적용하지 않음 (각 경로를 명시적으로 처리)
+    {{- if index $as "certManager.enabled" }}
+    cert-manager.io/cluster-issuer: {{ index $as "certManager.clusterIssuer" | default "letsencrypt-prod" }}
+    {{- end }}
+    nginx.ingress.kubernetes.io/ssl-redirect: {{ index $as "https.redirect.enabled" | quote }}
+    nginx.ingress.kubernetes.io/force-ssl-redirect: {{ index $as "https.redirect.enabled" | quote }}
+    {{- if index $as "securityHeaders.enabled" }}
+    nginx.ingress.kubernetes.io/hsts: "true"
+    nginx.ingress.kubernetes.io/hsts-max-age: "31536000"
+    nginx.ingress.kubernetes.io/hsts-include-subdomains: "true"
+    nginx.ingress.kubernetes.io/hsts-preload: "true"
+    nginx.ingress.kubernetes.io/x-frame-options: "SAMEORIGIN"
+    nginx.ingress.kubernetes.io/x-content-type-options: "nosniff"
+    nginx.ingress.kubernetes.io/x-xss-protection: "1; mode=block"
+    nginx.ingress.kubernetes.io/referrer-policy: "no-referrer-when-downgrade"
+    {{- end }}
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "86400"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "86400"
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/enable-websocket: "true"
+spec:
+  ingressClassName: nginx
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ .Values.ingress.tlsSecret }}
+  {{- end }}
+  rules:
+    {{- if and .Values.ingress.host (ne .Values.ingress.host "") }}
+    - host: {{ .Values.ingress.host }}
+    {{- end }}
+    - http:
+        paths:
+          # WebSocket (meta-viewers) - rewrite하지 않음 (Socket.IO path와 일치해야 함)
+          - path: /meta-viewers
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "common.fullname" . }}
+                port:
+                  number: {{ .Values.service.ports.http }}
+{{ end }}

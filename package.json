@@ -15,7 +15,10 @@
     "deploy:local": "bash ./scripts/dev/local-deploy-test.sh",
     "deploy:local:apps": "bash ./scripts/dev/local-deploy-test.sh apps",
     "deploy:local:infra": "bash ./scripts/dev/local-deploy-test.sh infra",
-    "deploy:local:all": "bash ./scripts/dev/local-deploy-test.sh all"
+    "deploy:local:all": "bash ./scripts/dev/local-deploy-test.sh all",
+    "export:policy": "nx run api-gateway:export-policy",
+    "export:policy:separate": "ts-node apps/api-gateway/src/scripts/export-route-policy.ts --separate",
+    "export:policy:merge": "ts-node apps/api-gateway/src/scripts/export-route-policy.ts --merge"
   },
   "devDependencies": {
     "@nestjs/schematics": "^11.0.9",
@@ -32,6 +35,7 @@
     "@swc-node/register": "~1.9.1",
     "@swc/core": "~1.5.7",
     "@swc/helpers": "~0.5.11",
+    "@types/express": "^4.17.21",
     "@types/jest": "^30.0.0",
     "@types/node": "^20.0.0",
     "eslint": "^9.0.0",
@@ -52,7 +56,10 @@
   "dependencies": {
     "@nestjs/common": "^11.1.8",
     "@nestjs/core": "^11.1.8",
+    "@nestjs/microservices": "^11.1.8",
     "@nestjs/platform-express": "^11.1.8",
+    "@nestjs/axios": "^4.0.1",
+    "express": "^4.21.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "tslib": "^2.3.0"

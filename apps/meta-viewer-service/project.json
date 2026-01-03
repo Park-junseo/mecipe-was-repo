@@ -1,0 +1,100 @@
+{
+  "name": "meta-viewer-service",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "meta-viewer-service/src",
+  "projectType": "application",
+  "tags": [
+    "app",
+    "nestjs"
+  ],
+  "targets": {
+    "build": {
+      "executor": "@nx/webpack:webpack",
+      "outputs": [
+        "{options.outputPath}"
+      ],
+      "options": {
+        "outputPath": "dist/apps/meta-viewer-service",
+        "main": "apps/meta-viewer-service/src/main.ts",
+        "tsConfig": "apps/meta-viewer-service/tsconfig.app.json",
+        "target": "node",
+        "compiler": "tsc",
+        "externalDependencies": "all",
+        "webpackConfig": "apps/meta-viewer-service/webpack.config.js",
+        "deleteOutputPath": true
+      },
+      "configurations": {
+        "production": {
+          "optimization": true,
+          "extractLicenses": true,
+          "inspect": false
+        }
+      }
+    },
+    "serve": {
+      "executor": "@nx/js:node",
+      "options": {
+        "buildTarget": "meta-viewer-service:build",
+        "watch": true,
+        "inspect": true
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "meta-viewer-service:build:development"
+        },
+        "production": {
+          "buildTarget": "meta-viewer-service:build:production",
+          "watch": false,
+          "inspect": false
+        }
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": [
+        "{options.outputFile}"
+      ],
+      "options": {
+        "lintFilePatterns": [
+          "apps/meta-viewer-service/**/*.ts"
+        ]
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": [
+        "{workspaceRoot}/coverage/apps/meta-viewer-service"
+      ],
+      "options": {
+        "jestConfig": "apps/meta-viewer-service/jest.config.ts",
+        "passWithNoTests": true
+      }
+    },
+    "prisma": {
+      "executor": "@nx/node:run-commands",
+      "options": {
+        "command": "pnpm --filter meta-viewer-service prisma",
+        "cwd": "apps/meta-viewer-service"
+      }
+    },
+    "prisma:migrate": {
+      "executor": "@nx/node:run-commands",
+      "options": {
+        "command": "pnpm --filter meta-viewer-service prisma:migrate",
+        "cwd": "apps/meta-viewer-service"
+      }
+    },
+    "test:env": {
+      "executor": "@nx/node:run-commands",
+      "options": {
+        "command": "ts-node -r tsconfig-paths/register apps/meta-viewer-service/scripts/prisma/test-db-setup.dev.ts --start-app",
+        "cwd": "{workspaceRoot}"
+      },
+      "configurations": {
+        "watch": {
+          "command": "ts-node -r tsconfig-paths/register apps/meta-viewer-service/scripts/prisma/test-db-setup.dev.ts --start-app --watch"
+        }
+      }
+    }
+  }
+}

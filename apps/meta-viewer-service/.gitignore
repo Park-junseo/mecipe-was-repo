@@ -1,0 +1,28 @@
+node_modules
+# Keep environment variables out of version control
+.env
+media/
+# prisma/migrations/
+dist/
+**/.DS_Store
+
+yarn-error.log/
+vendor/
+tmp/
+.idea
+tmp-resolvers
+# package-lock.json을 gitignore에 넣으면 안 됩니다!
+# 배포 환경과 개발 환경에서 동일한 의존성 버전을 보장하기 위해 반드시 git에 포함해야 합니다.
+# package-lock.json
+flow-typed
+# yarn을 사용하지 않으므로 yarn.lock은 무시
+yarn.lock
+javascript/**/migrations/
+typescript/**/migrations/
+misc/**/migrations/
+databases/**/migrations/
+experimental/**/*.db
+.next
+.vscode/
+.nuxt
+dev.db

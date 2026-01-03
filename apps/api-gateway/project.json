@@ -1,0 +1,93 @@
+{
+  "name": "api-gateway",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "api-gateway/src",
+  "projectType": "application",
+  "tags": [
+    "app",
+    "nestjs",
+    "gateway"
+  ],
+  "targets": {
+    "export-policy": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "ts-node -r tsconfig-paths/register --project tsconfig.app.json --transpile-only scripts/export-route-policy.ts",
+        "cwd": "apps/api-gateway"
+      }
+    },
+    "build": {
+      "executor": "@nx/webpack:webpack",
+      "outputs": [
+        "{options.outputPath}"
+      ],
+      "options": {
+        "outputPath": "dist/apps/api-gateway",
+        "main": "apps/api-gateway/src/main.ts",
+        "tsConfig": "apps/api-gateway/tsconfig.app.json",
+        "target": "node",
+        "compiler": "tsc",
+        "externalDependencies": "all",
+        "webpackConfig": "apps/api-gateway/webpack.config.js",
+        "deleteOutputPath": true,
+        "assets": [
+          {
+            "glob": "route-policy.json",
+            "input": "apps/api-gateway/config",
+            "output": "config"
+          }
+        ]
+      },
+      "configurations": {
+        "production": {
+          "optimization": true,
+          "extractLicenses": true,
+          "inspect": false
+        }
+      }
+    },
+    "serve": {
+      "executor": "@nx/js:node",
+      "options": {
+        "buildTarget": "api-gateway:build",
+        "watch": true,
+        "inspect": true
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "api-gateway:build:development"
+        },
+        "production": {
+          "buildTarget": "api-gateway:build:production",
+          "watch": false,
+          "inspect": false
+        }
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": [
+        "{options.outputFile}"
+      ],
+      "options": {
+        "lintFilePatterns": [
+          "apps/api-gateway/**/*.ts"
+        ]
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": [
+        "{workspaceRoot}/coverage/apps/api-gateway"
+      ],
+      "options": {
+        "jestConfig": "apps/api-gateway/jest.config.ts",
+        "passWithNoTests": true
+      }
+    }
+  }
+}
+
+
+
+

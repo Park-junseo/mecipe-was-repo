@@ -1,0 +1,7 @@
+apiVersion: v2
+name: api-gateway
+description: API Gateway Application
+type: application
+version: 0.1.0
+appVersion: "latest"
+

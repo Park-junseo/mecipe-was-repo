@@ -1,0 +1,51 @@
+# Default values for api-gateway
+global:
+  dockerRegistry: ""
+  imagePullSecrets: []
+
+name: api-gateway
+namespace: app
+
+nodeSelector:
+  node-role: app
+
+image:
+  repository: "api-gateway"
+  tag: "latest"
+  pullPolicy: Always
+
+replicaCount: 1
+
+ingress:
+  enabled: true
+  host: ""
+  tls:
+    enabled: true
+  tlsSecret: "mecipe-tls"
+  annotationsSettings:
+    certManager.enabled: true
+    https.redirect.enabled: true
+    securityHeaders.enabled: true
+
+service:
+  type: ClusterIP
+  ports:
+    http: 4000
+
+env:
+  nodeEnv: production
+  port: "4000"
+  placeApiServiceUrl: "http://place-api-service:4000"
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+# Secrets (should be set via --set or values file)
+secrets:
+  jwtSecret: ""
+

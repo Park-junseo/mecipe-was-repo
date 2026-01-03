@@ -1,0 +1,74 @@
+# Default values for place-api-service
+global:
+  dockerRegistry: "local"
+  imagePullSecrets: []
+
+name: place-api-service
+namespace: app
+
+nodeSelector:
+  node-role: local
+
+image:
+  repository: "place-api-service"
+  tag: "latest"
+  pullPolicy: Always
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  ports:
+    http: 4000
+
+env:
+  nodeEnv: development
+  port: "4000"
+
+postgres:
+  username: ""
+  password: ""
+  database: ""
+  hosts: ""
+
+elasticsearch:
+  hosts: ""
+  username: ""
+  password: ""
+
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClass: ""
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+livenessProbe:
+  httpGet:
+    path: /hello
+    port: 4000
+  initialDelaySeconds: 60
+  periodSeconds: 30
+
+readinessProbe:
+  httpGet:
+    path: /hello
+    port: 4000
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+# Secrets (should be set via --set or values file)
+secrets:
+  jwtSecret: ""
+  secretLoginCrypto: ""
+  apiKey: ""
+  buildApiKey: ""
+  couponSecret: ""
+  productSecret: ""
+

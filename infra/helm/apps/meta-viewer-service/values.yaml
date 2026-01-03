@@ -1,0 +1,64 @@
+# Default values for meta-viewer-service
+global:
+  dockerRegistry: ""
+  imagePullSecrets: []
+
+name: meta-viewer-service
+namespace: app
+
+nodeSelector:
+  node-role: app
+
+image:
+  repository: "meta-viewer-service"
+  tag: "latest"
+  pullPolicy: Always
+
+replicaCount: 1
+
+ingress:
+  enabled: true
+  host: ""
+  tls:
+    enabled: true
+  tlsSecret: "mecipe-tls"
+  annotationsSettings:
+    certManager.enabled: true
+    https.redirect.enabled: true
+    securityHeaders.enabled: true
+
+service:
+  type: ClusterIP
+  ports:
+    http: 4100
+
+env:
+  nodeEnv: production
+  port: "4100"
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+livenessProbe:
+  httpGet:
+    path: /hello
+    port: 4100
+  initialDelaySeconds: 60
+  periodSeconds: 30
+
+readinessProbe:
+  httpGet:
+    path: /hello
+    port: 4100
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+# Secrets (should be set via --set or values file)
+secrets:
+  jwtSecret: ""
+

@@ -1,0 +1,261 @@
+#!/usr/bin/env ts-node
+/**
+ * Route Policy Export Script
+ * 
+ * 이 스크립트는 모든 컨트롤러에서 @Public() 및 @RequireRole() 데코레이터를 수집하여
+ * route-policy.json 파일을 생성합니다.
+ * 
+ * 사용법:
+ *   # 모든 서비스 통합 정책 생성
+ *   ts-node apps/api-gateway/src/scripts/export-route-policy.ts
+ *   nx run api-gateway:export-policy
+ * 
+ *   # 특정 서비스만
+ *   ts-node apps/api-gateway/src/scripts/export-route-policy.ts --service place-api-service
+ * 
+ *   # 서비스별 개별 파일 생성
+ *   ts-node apps/api-gateway/src/scripts/export-route-policy.ts --separate
+ * 
+ *   # 통합 파일 생성 (기본값)
+ *   ts-node apps/api-gateway/src/scripts/export-route-policy.ts --merge
+ */
+
+import { exportPolicy } from '../../../libs/common/src/auth/export-policy';
+import { RoutePoilcy } from '../../../libs/common/src/auth/authorization.guard';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { join, dirname } from 'path';
+
+// 서비스 설정
+interface ServiceConfig {
+  name: string;
+  modulePath: string;
+  displayName: string;
+}
+
+// 서비스 목록 정의
+// modulePath는 workspace root 기준 경로
+const SERVICES: ServiceConfig[] = [
+  {
+    name: 'place-api-service',
+    modulePath: 'apps/place-api-service/src/app.module',
+    displayName: 'Place API Service',
+  },
+  // 다른 서비스 추가 예시:
+  // {
+  //   name: 'user-api-service',
+  //   modulePath: '../../user-api-service/src/app.module',
+  //   displayName: 'User API Service',
+  // },
+  // {
+  //   name: 'meta-viewer-service',
+  //   modulePath: '../../meta-viewer-service/src/app.module',
+  //   displayName: 'Meta Viewer Service',
+  // },
+];
+
+/**
+ * 서비스 모듈 동적 로드
+ */
+async function loadServiceModule(modulePath: string): Promise<any> {
+  try {
+    // process.cwd()는 nx run-commands의 cwd 옵션에 따라 설정됨
+    // cwd: "apps/api-gateway"이므로, workspace root로 이동
+    const cwd = process.cwd();
+    const workspaceRoot = join(cwd, '../..');
+    
+    // 상대 경로를 절대 경로로 변환
+    const absoluteModulePath = join(workspaceRoot, modulePath);
+    
+    // .ts 확장자 제거
+    const modulePathWithoutExt = absoluteModulePath.replace(/\.ts$/, '');
+    
+    // 빌드된 .js 파일 우선 시도, 없으면 .ts 파일 사용
+    let finalPath = `${modulePathWithoutExt}.js`;
+    if (!existsSync(finalPath)) {
+      finalPath = `${modulePathWithoutExt}.ts`;
+      if (!existsSync(finalPath)) {
+        throw new Error(`Module file not found: ${finalPath}`);
+      }
+    }
+    
+    console.log(`📦 Loading module from: ${finalPath}`);
+    
+    // ts-node는 CommonJS 모드이므로 require() 사용
+    // 동적 import는 file:// URL 문제가 있으므로 require() 사용
+    const module = require(finalPath);
+    return module.AppModule || module.default || module;
+  } catch (error: any) {
+    throw new Error(
+      `Failed to load module from ${modulePath}: ${error.message}`,
+    );
+  }
+}
+
+/**
+ * 여러 정책 파일 병합
+ */
+function mergePolicyFiles(
+  policyFiles: Array<{ service: string; path: string }>,
+): Record<string, RoutePoilcy> {
+  const merged: Record<string, RoutePoilcy> = {};
+
+  for (const { service, path } of policyFiles) {
+    if (!existsSync(path)) {
+      console.warn(`⚠️  Policy file not found: ${path} (${service})`);
+      continue;
+    }
+
+    try {
+      const content = readFileSync(path, 'utf-8');
+      const policies = JSON.parse(content) as Record<string, RoutePoilcy>;
+
+      // 키 충돌 확인 및 병합
+      Object.entries(policies).forEach(([key, value]) => {
+        if (merged[key]) {
+          console.warn(
+            `⚠️  Route conflict: ${key} exists in multiple services. Using first occurrence.`,
+          );
+        } else {
+          merged[key] = value;
+        }
+      });
+
+      console.log(`✅ Merged ${Object.keys(policies).length} routes from ${service}`);
+    } catch (error) {
+      console.error(`❌ Failed to read policy file ${path}: ${error.message}`);
+    }
+  }
+
+  return merged;
+}
+
+async function main() {
+  // 데이터베이스 연결을 건너뛰기 위한 환경 변수 설정
+  // 정책 수집에는 데이터베이스 연결이 필요하지 않음
+  // Prisma가 연결을 시도하지 않도록 더미 URL 설정
+  if (!process.env.DATABASE_URL) {
+    process.env.DATABASE_URL = 'postgresql://skip:skip@localhost:5432/skip';
+  }
+  // Prisma 연결 시도 방지
+  process.env.SKIP_PRISMA_CONNECT = 'true';
+  
+  const args = process.argv.slice(2);
+  const separate = args.includes('--separate');
+  const merge = args.includes('--merge') || (!separate && !args.includes('--service'));
+  const serviceArg = args.find((arg) => arg.startsWith('--service='));
+  const serviceName = serviceArg ? serviceArg.split('=')[1] : null;
+  
+  // process.cwd()는 nx run-commands의 cwd 옵션에 따라 설정됨
+  // cwd: "apps/api-gateway"이므로, workspace root로 이동
+  const cwd = process.cwd();
+  const workspaceRoot = join(cwd, '../..');
+  
+  // 빌드 전에 생성하므로, 빌드 시 삭제되지 않도록 config 디렉토리에 생성
+  // 빌드 후 assets로 복사됨
+  const configDir = join(cwd, 'config');
+  const defaultOutputPath = join(configDir, 'route-policy.json');
+  const outputPath = args.find((arg) => !arg.startsWith('--')) || defaultOutputPath;
+
+  console.log('🚀 Starting route policy export...\n');
+
+  // 특정 서비스만 처리
+  if (serviceName) {
+    const service = SERVICES.find((s) => s.name === serviceName);
+    if (!service) {
+      console.error(`❌ Service not found: ${serviceName}`);
+      console.error(`Available services: ${SERVICES.map((s) => s.name).join(', ')}`);
+      process.exit(1);
+    }
+
+    console.log(`📦 Processing: ${service.displayName}`);
+    try {
+      const AppModule = await loadServiceModule(service.modulePath);
+      await exportPolicy(AppModule, outputPath);
+      console.log(`✅ Route policy exported to: ${outputPath}`);
+      process.exit(0);
+    } catch (error) {
+      console.error(`❌ Failed to export route policy: ${error.message}`);
+      process.exit(1);
+    }
+  }
+
+  // 서비스별 개별 파일 생성
+  if (separate) {
+    console.log('📦 Exporting policies for each service separately...\n');
+    const results: Array<{ service: string; path: string }> = [];
+
+    for (const service of SERVICES) {
+      try {
+        console.log(`Processing: ${service.displayName}...`);
+        const AppModule = await loadServiceModule(service.modulePath);
+        const serviceOutputPath = join(
+          configDir,
+          `route-policy-${service.name}.json`,
+        );
+        await exportPolicy(AppModule, serviceOutputPath);
+        results.push({ service: service.name, path: serviceOutputPath });
+        console.log(`✅ Exported: ${serviceOutputPath}\n`);
+      } catch (error) {
+        console.error(
+          `❌ Failed to export policy for ${service.name}: ${error.message}\n`,
+        );
+      }
+    }
+
+    console.log(`\n✅ Exported ${results.length} policy files`);
+    process.exit(0);
+  }
+
+  // 통합 정책 파일 생성 (기본값)
+  if (merge) {
+    console.log('📦 Exporting and merging policies from all services...\n');
+    const policyFiles: Array<{ service: string; path: string }> = [];
+
+    // 각 서비스별로 정책 파일 생성
+    for (const service of SERVICES) {
+      try {
+        console.log(`Processing: ${service.displayName}...`);
+        const AppModule = await loadServiceModule(service.modulePath);
+        const tempPath = join(configDir, `.temp-route-policy-${service.name}.json`);
+        await exportPolicy(AppModule, tempPath);
+        policyFiles.push({ service: service.name, path: tempPath });
+        console.log(`✅ Exported: ${tempPath}\n`);
+      } catch (error) {
+        console.error(
+          `❌ Failed to export policy for ${service.name}: ${error.message}\n`,
+        );
+      }
+    }
+
+    // 정책 파일 병합
+    console.log('🔀 Merging policies...');
+    const mergedPolicies = mergePolicyFiles(policyFiles);
+
+    // 통합 파일 저장 (디렉토리 생성)
+    const outputDir = dirname(outputPath);
+    mkdirSync(outputDir, { recursive: true });
+
+    writeFileSync(
+      outputPath,
+      JSON.stringify(mergedPolicies, null, 2),
+      'utf-8',
+    );
+
+    // 임시 파일 삭제
+    const { unlinkSync } = require('fs');
+    policyFiles.forEach(({ path }) => {
+      try {
+        unlinkSync(path);
+      } catch (error) {
+        // 무시
+      }
+    });
+
+    console.log(`\n✅ Merged route policy exported to: ${outputPath}`);
+    console.log(`📊 Total routes: ${Object.keys(mergedPolicies).length}`);
+    process.exit(0);
+  }
+}
+
+main();
+
