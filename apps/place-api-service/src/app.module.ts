@@ -6,13 +6,13 @@ import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { join } from 'path';
-import { HttpLoggerMiddleware } from './util/middleware/http-logger.middleware';
-import { HttpBodyLoggerInterceptor } from './util/interceptor/http-body-logger.interceptor';
 import { ApiKeyGuard } from './auth/api-key.guard';
 import {
   CommonAuthModule,
   UserHeaderMiddleware,
   AuthorizationGuard,
+  HttpLoggerMiddleware,
+  HttpBodyLoggerInterceptor,
 } from '@virtualcafe/common';
 import { UsersModule } from './users/users.module';
 import { GlobalModule } from './global/global.module';

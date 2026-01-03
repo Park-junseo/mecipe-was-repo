@@ -9,4 +9,4 @@ export * from './kafka';
 export * from './clients';
 export * from './auth';
 export * from './middleware';
-
+export * from './interceptor';

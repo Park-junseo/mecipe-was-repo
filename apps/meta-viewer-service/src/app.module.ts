@@ -5,14 +5,13 @@ import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { join } from 'path';
-import { HttpLoggerMiddleware } from './util/middleware/http-logger.middleware';
-import { HttpBodyLoggerInterceptor } from './util/interceptor/http-body-logger.interceptor';
 import {
   CommonAuthModule,
   UserHeaderMiddleware,
   AuthorizationGuard,
+  HttpLoggerMiddleware,
+  HttpBodyLoggerInterceptor,
 } from '@virtualcafe/common'; 
-import { AuthModule } from './auth/auth.module';
 import { MetaVeiwersModule } from './meta-veiwers/meta-veiwers.module';
 
 @Module({
@@ -26,7 +25,6 @@ import { MetaVeiwersModule } from './meta-veiwers/meta-veiwers.module';
       },
     }),
     CommonAuthModule, // Gateway 방식: 공통 모듈 사용 
-    AuthModule,
     MetaVeiwersModule,
   ],
   controllers: [AppController],
