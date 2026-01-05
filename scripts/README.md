@@ -55,7 +55,7 @@ chmod +x scripts/backup-db.sh
 ```
 
 **기능:**
-- MySQL 데이터베이스 덤프
+- PostgreSQL 데이터베이스 덤프
 - Gzip 압축
 - 타임스탬프 파일명
 - 30일 이상 오래된 백업 자동 삭제
@@ -74,6 +74,62 @@ gunzip backups/db_backup_YYYYMMDD_HHMMSS.sql.gz
 docker compose exec -T db psql \
   -U $POSTGRES_USER \
   -d $POSTGRES_DB < backups/db_backup_YYYYMMDD_HHMMSS.sql
+```
+
+### 4. scripts/dev/migrate-db-to-k8s.sh
+레거시 DB(로컬/도커)에서 쿠버네티스 PostgreSQL로 데이터 복제 스크립트
+
+**사용법:**
+```bash
+chmod +x scripts/dev/migrate-db-to-k8s.sh
+
+# 로컬 PostgreSQL에서 복제
+./scripts/dev/migrate-db-to-k8s.sh \
+  --source local \
+  --source-db mydb \
+  --source-user myuser \
+  --source-password mypass \
+  --target-ns data-storage \
+  --target-service postgres \
+  --target-db mydb \
+  --target-password k8s_password
+
+# Docker 컨테이너에서 복제
+./scripts/dev/migrate-db-to-k8s.sh \
+  --source docker \
+  --source-container my-db-container \
+  --source-db mydb \
+  --target-ns data-storage \
+  --target-service postgres \
+  --target-db mydb \
+  --target-password k8s_password
+
+# URL로 직접 연결
+./scripts/dev/migrate-db-to-k8s.sh \
+  --source url \
+  --source-url "postgresql://user:pass@localhost:5432/mydb" \
+  --target-ns data-storage \
+  --target-service postgres \
+  --target-db mydb \
+  --target-password k8s_password
+```
+
+**기능:**
+- 로컬 PostgreSQL, Docker PostgreSQL, 또는 URL을 통한 소스 DB 지원
+- pg_dump를 사용한 데이터 덤프
+- kubectl port-forward를 통한 Kubernetes DB 접근
+- pg_restore를 사용한 데이터 복원
+- 자동 포트 포워딩 및 정리
+
+**사전 요구사항:**
+- `kubectl` 설치 및 Kubernetes 클러스터 접근 권한
+- `pg_dump`, `pg_restore`, `psql` (PostgreSQL 클라이언트 도구)
+- 소스 및 타겟 DB 접근 권한
+
+**상세한 사용법:**
+```bash
+# 도움말 보기
+./scripts/dev/migrate-db-to-k8s.sh --help
 ```
 
 ## 자동화
