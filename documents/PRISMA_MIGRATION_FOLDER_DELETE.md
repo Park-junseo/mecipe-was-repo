@@ -251,3 +251,4 @@ migrations 폴더를 삭제하기 전에 확인:
 - [Prisma Migrate Troubleshooting](https://www.prisma.io/docs/guides/migrate/troubleshooting-development)
 - [Prisma Baseline Migrations](https://www.prisma.io/docs/guides/migrate/production-troubleshooting#baseline-your-production-environment)
 
+

@@ -869,7 +869,11 @@ deploy_postgresql() {
             --set enabled=true \
             --set secrets.postgresPassword="${POSTGRES_PASSWORD}" \
             --set auth.username="${POSTGRES_USER}" \
-            --set auth.database="${POSTGRES_DB}" || {
+            --set auth.database="${POSTGRES_DB}" \
+            --set 'resources.requests.cpu=250m' \
+            --set 'resources.requests.memory=256Mi' \
+            --set 'resources.limits.cpu=500m' \
+            --set 'resources.limits.memory=512Mi' || {
         log_warning "⚠️  PostgreSQL 배포가 타임아웃되었습니다."
         }
     
@@ -877,6 +881,9 @@ deploy_postgresql() {
         POSTGRES_CONNECTION_PORT="5432"
     
     log_info "📦 PostgreSQL 연결 정보 관리..."
+    # POSTGRES_DEPLOY=true일 때는 postgres Service가 이미 존재하므로 postgres-connection의 Service는 비활성화
+    # POSTGRES_DEPLOY=false일 때는 외부 DB를 위한 ExternalName Service 필요
+    POSTGRES_CONNECTION_SERVICE_ENABLED="$([ "$POSTGRES_DEPLOY" = "false" ] && echo "true" || echo "false")"
     helm_deploy "postgres-connection" "./infra/helm/postgres-connection" "${LOCAL_DATA_STORAGE_NS}" "$HELM_TIMEOUT_SHORT" \
         --set 'nodeSelector.node-role=local' \
         --set connection.host="${POSTGRES_CONNECTION_HOST}" \
@@ -885,7 +892,7 @@ deploy_postgresql() {
         --set connection.password="${POSTGRES_PASSWORD}" \
         --set connection.database="${POSTGRES_DB}" \
         --set connection.url="${DATABASE_URL:-postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_CONNECTION_HOST}:${POSTGRES_CONNECTION_PORT}/${POSTGRES_DB}?schema=public}" \
-        --set service.enabled="$([ "$POSTGRES_DEPLOY" = "false" ] && echo "false" || echo "true")" || {
+        --set service.enabled="${POSTGRES_CONNECTION_SERVICE_ENABLED}" || {
         log_warning "⚠️  postgres-connection 배포 실패"
     }
 }

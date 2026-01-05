@@ -31,6 +31,8 @@ spec:
         - containerPort: 5432
           name: postgres
         env:
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
         - name: POSTGRES_USER
           value: {{ .Values.auth.username | quote }}
         {{- if .Values.secrets.postgresPassword }}
@@ -49,16 +51,6 @@ spec:
         volumeMounts:
         - name: postgres-data
           mountPath: /var/lib/postgresql/data
-        {{- if .Values.config.postgresqlConf }}
-        - name: postgresql-config
-          mountPath: /var/lib/postgresql/data/postgresql.conf
-          subPath: postgresql.conf
-          readOnly: true
-        command:
-        - postgres
-        - -c
-        - config_file=/var/lib/postgresql/data/postgresql.conf
-        {{- end }}
         {{- with .Values.resources }}
         resources:
           {{- toYaml . | nindent 10 }}

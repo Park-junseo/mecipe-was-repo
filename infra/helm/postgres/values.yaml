@@ -16,7 +16,7 @@ nodeSelector:
 
 # PostgreSQL Configuration
 image:
-  repository: debezium/postgres
+  repository: postgres
   tag: "16-alpine"
 
 persistence:
@@ -47,10 +47,6 @@ secrets:
 
 # PostgreSQL Configuration
 config:
-  # Debezium을 위한 wal_level 설정
+  # Debezium을 위한 wal_level 설정 (선택사항)
   walLevel: "logical"
-  # postgresql.conf 추가 설정 (선택사항)
-  postgresqlConf: |
-    # wal_level은 위의 walLevel로 설정됨
-    # 추가 설정이 필요하면 여기에 작성
 

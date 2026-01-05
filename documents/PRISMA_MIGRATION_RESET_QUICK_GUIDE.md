@@ -115,3 +115,4 @@ A: `prisma migrate resolve`로 해결하거나, migrations 폴더를 삭제하�
 
 A: migrations 폴더는 삭제하지 말고, Git merge 충돌을 해결하세요.
 
+
