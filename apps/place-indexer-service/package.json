@@ -12,6 +12,10 @@
     "start:dev": "nx serve place-indexer-service --configuration=development",
     "start:debug": "nx serve place-indexer-service --configuration=development --inspect",
     "start:prod": "nx serve place-indexer-service --configuration=production",
+    "daemon": "pnpm build && pm2 start ../../dist/apps/place-indexer-service/main.js -i 1 --name place-indexer-service",
+    "daemon:re": "pnpm build && pm2 stop place-indexer-service && pm2 start ../../dist/apps/place-indexer-service/main.js -i 1 --name place-indexer-service",
+    "daemon:stop": "pm2 stop place-indexer-service",
+    "daemon:log": "pm2 logs place-indexer-service --lines 1000",
     "lint": "nx lint place-indexer-service",
     "test": "nx test place-indexer-service",
     "test:watch": "nx test place-indexer-service --watch",
@@ -34,6 +38,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "kafkajs": "^2.2.4",
+    "pm2": "^6.0.14",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
