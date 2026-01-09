@@ -1,0 +1,68 @@
+# Default values for redis
+global:
+  dockerRegistry: ""
+  imagePullSecrets: []
+
+# Redis 배포 여부
+# 외부 Redis 사용 시: enabled: false
+# Kubernetes 내부 배포 시: enabled: true
+enabled: true
+
+name: redis
+namespace: data-stream
+
+nodeSelector:
+  node-role: stream
+
+# Redis Configuration
+image:
+  repository: redis
+  tag: "7.2-alpine"
+
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClass: ""
+
+auth:
+  # Redis 비밀번호 (비어있으면 비밀번호 없음)
+  password: ""
+  # requirepass 설정 여부
+  requirePass: false
+
+service:
+  type: ClusterIP
+  port: 6379
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+# Secrets (should be set via --set or values file)
+secrets:
+  password: ""
+
+# Redis Configuration
+config:
+  # maxmemory 설정 (예: "2gb")
+  maxmemory: ""
+  # maxmemory-policy (예: "allkeys-lru", "volatile-lru", "noeviction")
+  maxmemoryPolicy: "allkeys-lru"
+  # appendonly (AOF 활성화)
+  appendonly: "yes"
+  # appendfsync (예: "everysec", "always", "no")
+  appendfsync: "everysec"
+  # save 설정 (RDB 스냅샷)
+  save: "900 1 300 10 60 10000"
+  # tcp-keepalive
+  tcpKeepalive: 300
+  # timeout (초, 0은 비활성화)
+  timeout: 0
+  # databases 개수
+  databases: 16
+
+

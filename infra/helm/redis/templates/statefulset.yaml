@@ -2,12 +2,12 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: postgres
+  name: {{ include "common.fullname" . }}
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "common.labels" . | nindent 4 }}
 spec:
-  serviceName: postgres
+  serviceName: {{ include "common.fullname" . }}
   replicas: 1
   selector:
     matchLabels:
@@ -18,69 +18,86 @@ spec:
         {{- include "common.selectorLabels" . | nindent 8 }}
     spec:
       {{- include "common.nodeSelector" . }}
-      {{- if .Values.config.postgresqlConf }}
-      volumes:
-      - name: postgresql-config
-        configMap:
-          name: {{ include "common.fullname" . }}-postgresql-config
+      {{- if and .Values.global.imagePullSecrets (gt (len .Values.global.imagePullSecrets) 0) }}
+      imagePullSecrets:
+        {{- toYaml .Values.global.imagePullSecrets | nindent 8 }}
       {{- end }}
       containers:
-      - name: postgres
+      - name: redis
         image: {{ include "common.image" (dict "Values" .Values "repository" .Values.image.repository "tag" .Values.image.tag) }}
+        imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
         ports:
-        - containerPort: 5432
-          name: postgres
+        - containerPort: 6379
+          name: redis
+          protocol: TCP
+        command:
+        - redis-server
+        - /etc/redis/redis.conf
+        {{- if or .Values.secrets.password .Values.auth.password }}
+        - --requirepass
+        - $(REDIS_PASSWORD)
+        {{- end }}
         env:
-        - name: PGDATA
-          value: /var/lib/postgresql/data/pgdata
-        - name: POSTGRES_USER
-          value: {{ .Values.auth.username | quote }}
-        {{- if .Values.secrets.postgresPassword }}
-        - name: POSTGRES_PASSWORD
+        {{- if or .Values.secrets.password .Values.auth.password }}
+        - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
               name: {{ include "common.fullname" . }}-secrets
-              key: postgres-password
-        {{- end }}
-        - name: POSTGRES_DB
-          value: {{ .Values.auth.database | quote }}
-        {{- if .Values.config.walLevel }}
-        - name: POSTGRES_INITDB_ARGS
-          value: "-c wal_level={{ .Values.config.walLevel }}"
+              key: redis-password
         {{- end }}
         volumeMounts:
-        - name: postgres-data
-          mountPath: /var/lib/postgresql/data
+        - name: redis-data
+          mountPath: /data
+        - name: redis-config
+          mountPath: /etc/redis
         {{- with .Values.resources }}
         resources:
           {{- toYaml . | nindent 10 }}
         {{- end }}
         livenessProbe:
+          {{- if or .Values.secrets.password .Values.auth.password }}
           exec:
             command:
-            - pg_isready
-            - -U
-            - {{ .Values.auth.username }}
+            - /bin/sh
+            - -c
+            - redis-cli -a "$REDIS_PASSWORD" ping
+          {{- else }}
+          exec:
+            command:
+            - redis-cli
+            - ping
+          {{- end }}
           initialDelaySeconds: 60
           periodSeconds: 10
           timeoutSeconds: 10
           successThreshold: 1
           failureThreshold: 3
         readinessProbe:
+          {{- if or .Values.secrets.password .Values.auth.password }}
           exec:
             command:
-            - pg_isready
-            - -U
-            - {{ .Values.auth.username }}
+            - /bin/sh
+            - -c
+            - redis-cli -a "$REDIS_PASSWORD" ping
+          {{- else }}
+          exec:
+            command:
+            - redis-cli
+            - ping
+          {{- end }}
           initialDelaySeconds: 30
           periodSeconds: 5
           timeoutSeconds: 10
           successThreshold: 1
           failureThreshold: 3
+      volumes:
+      - name: redis-config
+        configMap:
+          name: {{ include "common.fullname" . }}-config
   {{- if .Values.persistence.enabled }}
   volumeClaimTemplates:
   - metadata:
-      name: postgres-data
+      name: redis-data
     spec:
       accessModes:
       - ReadWriteOnce

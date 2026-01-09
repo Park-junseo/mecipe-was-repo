@@ -327,6 +327,7 @@ cleanup_helm_releases() {
     helm uninstall kafka -n "${LOCAL_DATA_STREAMING_NS}" 2>/dev/null || true
     helm uninstall kafka-ui -n "${LOCAL_DATA_STREAMING_NS}" 2>/dev/null || true
     helm uninstall ksqldb -n "${LOCAL_DATA_STREAMING_NS}" 2>/dev/null || true
+    helm uninstall redis -n "${LOCAL_DATA_STREAMING_NS}" 2>/dev/null || true
     helm uninstall debezium -n "${LOCAL_DATA_STORAGE_NS}" 2>/dev/null || true
     
     # infra namespace
@@ -911,6 +912,46 @@ deploy_elasticsearch() {
     }
 }
 
+# Redis 배포
+deploy_redis() {
+    log_info "📦 Redis 배포..."
+    
+    local redis_deploy_args=(
+        --set 'nodeSelector.node-role=local'
+        --set namespace="${LOCAL_DATA_STREAMING_NS}"
+        --set enabled=true
+        --set 'resources.requests.cpu=250m'
+        --set 'resources.requests.memory=256Mi'
+        --set 'resources.limits.cpu=500m'
+        --set 'resources.limits.memory=512Mi'
+    )
+    
+    # Redis 비밀번호가 설정된 경우 추가
+    if [ -n "${REDIS_PASSWORD:-}" ]; then
+        redis_deploy_args+=(
+            --set "secrets.password=${REDIS_PASSWORD}"
+            --set "auth.password=${REDIS_PASSWORD}"
+            --set 'auth.requirePass=true'
+        )
+    fi
+    
+    helm_deploy_with_debug "redis" "./infra/helm/redis" "${LOCAL_DATA_STREAMING_NS}" "$HELM_TIMEOUT_MEDIUM" \
+        "app.kubernetes.io/name=redis" "Redis" \
+        "${redis_deploy_args[@]}" || {
+        log_warning "⚠️  Redis 배포가 타임아웃되었습니다. 위의 로그를 확인하세요."
+    }
+    
+    log_info "📋 Redis 연결 정보:"
+    log_info "   Service: redis.${LOCAL_DATA_STREAMING_NS}.svc.cluster.local:6379"
+    if [ -n "${REDIS_PASSWORD:-}" ]; then
+        log_info "   URL: redis://:${REDIS_PASSWORD}@redis.${LOCAL_DATA_STREAMING_NS}.svc.cluster.local:6379"
+        log_info "   Password: 설정됨"
+    else
+        log_info "   URL: redis://redis.${LOCAL_DATA_STREAMING_NS}.svc.cluster.local:6379"
+        log_info "   Password: 없음"
+    fi
+}
+
 # Debezium 배포
 deploy_debezium() {
     if [ "$POSTGRES_DEPLOY" = "false" ]; then
@@ -1179,6 +1220,10 @@ deploy_infrastructure() {
     deploy_kibana
     
     echo ""
+    log_info "📦 Redis 배포 (${LOCAL_DATA_STREAMING_NS} namespace)..."
+    deploy_redis
+    
+    echo ""
     log_info "📦 Kafka UI 및 KSQLDB 배포 (${LOCAL_DATA_STREAMING_NS} namespace)..."
     deploy_kafka_ui
     deploy_ksqldb
@@ -1304,6 +1349,10 @@ deploy_applications() {
     }
 
     log_info "📦 Meta Viewer Service 배포..."
+    local redis_url="redis://redis.${LOCAL_DATA_STREAMING_NS}.svc.cluster.local:6379"
+    if [ -n "${REDIS_PASSWORD}" ]; then
+        redis_url="redis://:${REDIS_PASSWORD}@redis.${LOCAL_DATA_STREAMING_NS}.svc.cluster.local:6379"
+    fi
     helm_deploy "meta-viewer-service" "./infra/helm/apps/meta-viewer-service" "${LOCAL_APP_NS}" "$HELM_TIMEOUT_MEDIUM" \
         -f ./infra/helm/apps/meta-viewer-service/values-local.yaml \
         --set 'nodeSelector.node-role=local' \
@@ -1312,6 +1361,8 @@ deploy_applications() {
         --set image.tag="${IMAGE_TAG}" \
         --set image.pullPolicy="Never" \
         --set env.port="${SOCKET_PORT}" \
+        --set env.socketPort="${SOCKET_PORT}" \
+        --set env.redisUrl="${redis_url}" \
         --set secrets.jwtSecret="${JWT_SECRET:-local-test-secret}" || {
         log_warning "⚠️  Meta Viewer Service 배포가 타임아웃되었습니다."
     }

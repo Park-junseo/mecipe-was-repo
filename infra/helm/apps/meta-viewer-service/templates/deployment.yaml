@@ -32,7 +32,11 @@ spec:
         - name: NODE_ENV
           value: {{ .Values.env.nodeEnv | quote }}
         - name: SOCKET_PORT
-          value: {{ .Values.env.port | quote }}
+          value: {{ .Values.env.socketPort | default .Values.env.port | quote }}
+        {{- if .Values.env.redisUrl }}
+        - name: REDIS_URL
+          value: {{ .Values.env.redisUrl | quote }}
+        {{- end }}
         {{- if .Values.secrets.jwtSecret }}
         - name: JWT_SECRET
           valueFrom:
