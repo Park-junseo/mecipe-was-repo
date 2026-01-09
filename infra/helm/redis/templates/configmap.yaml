@@ -1,0 +1,46 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+data:
+  redis.conf: |
+    # Redis Configuration
+    {{- if .Values.config.maxmemory }}
+    maxmemory {{ .Values.config.maxmemory }}
+    {{- end }}
+    {{- if .Values.config.maxmemoryPolicy }}
+    maxmemory-policy {{ .Values.config.maxmemoryPolicy }}
+    {{- end }}
+    {{- if .Values.config.appendonly }}
+    appendonly {{ .Values.config.appendonly }}
+    {{- end }}
+    {{- if .Values.config.appendfsync }}
+    appendfsync {{ .Values.config.appendfsync }}
+    {{- end }}
+    {{- if .Values.config.save }}
+    save {{ .Values.config.save }}
+    {{- end }}
+    {{- if .Values.config.tcpKeepalive }}
+    tcp-keepalive {{ .Values.config.tcpKeepalive }}
+    {{- end }}
+    {{- if .Values.config.timeout }}
+    timeout {{ .Values.config.timeout }}
+    {{- end }}
+    {{- if .Values.config.databases }}
+    databases {{ .Values.config.databases }}
+    {{- end }}
+    # Network
+    bind 0.0.0.0
+    protected-mode no
+    port 6379
+    # Logging
+    loglevel notice
+    # Persistence
+    dir /data
+{{- end }}
+
+

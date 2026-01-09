@@ -38,6 +38,7 @@ env:
   nodeEnv: production
   port: "4000"
   socketPort: "4100"
+  redisUrl: "redis://redis-master.app.svc.cluster.local:6379"
 
 postgres:
   username: ""

@@ -12,7 +12,8 @@ import {
   HttpLoggerMiddleware,
   HttpBodyLoggerInterceptor,
 } from '@virtualcafe/common'; 
-import { MetaVeiwersModule } from './meta-veiwers/meta-veiwers.module';
+import { MetaViewersRedisModule } from './meta-viewers-redis/meta-viewers-redis.module';
+// import { MetaVeiwersModule } from './meta-veiwers/meta-veiwers.module';
 
 @Module({
   imports: [
@@ -25,7 +26,7 @@ import { MetaVeiwersModule } from './meta-veiwers/meta-veiwers.module';
       },
     }),
     CommonAuthModule, // Gateway 방식: 공통 모듈 사용 
-    MetaVeiwersModule,
+    MetaViewersRedisModule,
   ],
   controllers: [AppController],
   providers: [

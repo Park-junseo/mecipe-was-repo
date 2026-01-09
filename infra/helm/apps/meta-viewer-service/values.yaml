@@ -35,6 +35,8 @@ service:
 env:
   nodeEnv: production
   port: "4100"
+  socketPort: "4100"
+  redisUrl: "redis://redis.data-stream.svc.cluster.local:6379"
 
 resources:
   limits:

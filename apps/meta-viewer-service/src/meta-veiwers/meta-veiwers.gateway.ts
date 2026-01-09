@@ -12,7 +12,7 @@ import { ClientToServerListenerType } from './interface/socket-event-type';
   cors: {
     origin: '*',
   },
-  path: '/meta-viewers',
+  path: '/meta-viewers-legacy',
 })
 export class MetaVeiwersGateway {
   constructor(private readonly metaVeiwersService: MetaVeiwersService) {}

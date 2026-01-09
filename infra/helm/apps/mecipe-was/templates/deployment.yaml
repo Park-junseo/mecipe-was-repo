@@ -38,6 +38,8 @@ spec:
           value: {{ .Values.env.port | quote }}
         - name: SOCKET_PORT
           value: {{ .Values.env.socketPort | quote }}
+        - name: REDIS_URL
+          value: {{ .Values.env.redisUrl | quote }}
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
