@@ -8,11 +8,6 @@ server {
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
-
-    # 나머지 모든 요청은 HTTPS로 리다이렉트
-    location / {
-        return 301 https://$host$request_uri;
-    }
 }
 
 # HTTPS 서버
@@ -43,9 +38,9 @@ server {
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "no-referrer-when-downgrade" always;
 
-    # API 요청을 NestJS로 프록시
+    # API 요청을 API Gateway로 프록시
     location /api {
-        proxy_pass http://app:${APP_PORT};
+        proxy_pass http://api-gateway:${APP_PORT};
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -61,9 +56,9 @@ server {
         proxy_read_timeout 60s;
     }
 
-    # WebSocket 지원 (socket.io)
+    # WebSocket 지원 (socket.io) - Instance B의 meta-viewer-service로 프록시
     location /socket.io {
-        proxy_pass http://app:${SOCKET_PORT};
+        proxy_pass http://${META_VIEWER_SERVICE_URL};
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -77,9 +72,10 @@ server {
         proxy_read_timeout 86400;
     }
 
-    # WebSocket 지원 (meta-viewers)
+    # WebSocket 지원 (meta-viewers) - Instance B의 meta-viewer-service로 프록시
     location /meta-viewers {
-        proxy_pass http://app:${SOCKET_PORT};
+        # 인스턴스 B의 meta-viewer-service로 프록시 (외부 IP 사용)
+        proxy_pass http://${META_VIEWER_SERVICE_URL};
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -107,9 +103,9 @@ server {
         add_header Content-Type text/plain;
     }
 
-    # 기본 루트 요청도 NestJS로 전달
+    # 기본 루트 요청도 API Gateway로 전달
     location / {
-        proxy_pass http://app:${APP_PORT};
+        proxy_pass http://api-gateway:${APP_PORT};
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';

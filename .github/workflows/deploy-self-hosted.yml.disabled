@@ -1,0 +1,642 @@
+name: Deploy with Self-Hosted Runner (Docker Compose)
+
+on:
+  push:
+    branches: ["main"]
+    paths-ignore:
+      - 'helm/**'
+      - '.github/workflows/deploy-helm.yml'
+  workflow_dispatch:  # 수동 실행 가능
+
+jobs:
+  # 변경된 경로 확인
+  detect_changes:
+    runs-on: ubuntu-latest
+    outputs:
+      apps_changed: ${{ steps.filter.outputs.apps }}
+      infra_changed: ${{ steps.filter.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            apps:
+              - 'apps/**'
+            infra:
+              - 'infra/**'
+              - 'nginx/**'
+              - 'docker-compose*.yml'
+              - 'Dockerfile*'
+
+  # 🧪 1. 테스트 Job
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 20.x
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 9.0.0
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+
+    - name: Generate Prisma Client
+      run: pnpm --filter place-api-service exec prisma generate
+
+    - name: Run linter
+      run: pnpm lint
+
+    - name: Run tests
+      run: pnpm test
+
+    - name: Build applications
+      run: pnpm build
+
+  # 📦 2. Docker 이미지 빌드 및 푸시
+  build_and_push_docker:
+    needs: [test, detect_changes]
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' && 
+      github.ref == 'refs/heads/main' &&
+      (needs.detect_changes.outputs.apps_changed == 'true' || needs.detect_changes.outputs.infra_changed == 'true')
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and push place-api-service image
+      if: needs.detect_changes.outputs.apps_changed == 'true'
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: apps/place-api-service/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/place-api-service:latest
+          ${{ secrets.DOCKER_USERNAME }}/place-api-service:${{ github.sha }}
+        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/place-api-service:latest
+        cache-to: type=inline
+
+    - name: Build and push api-gateway image
+      if: needs.detect_changes.outputs.apps_changed == 'true'
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: apps/api-gateway/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/api-gateway:latest
+          ${{ secrets.DOCKER_USERNAME }}/api-gateway:${{ github.sha }}
+        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/api-gateway:latest
+        cache-to: type=inline
+
+    - name: Build and push meta-viewer-service image
+      if: needs.detect_changes.outputs.apps_changed == 'true'
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: apps/meta-viewer-service/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/meta-viewer-service:latest
+          ${{ secrets.DOCKER_USERNAME }}/meta-viewer-service:${{ github.sha }}
+        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/meta-viewer-service:latest
+        cache-to: type=inline
+
+    - name: Build and push place-indexer-service image
+      if: needs.detect_changes.outputs.apps_changed == 'true'
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: apps/place-indexer-service/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/place-indexer-service:latest
+          ${{ secrets.DOCKER_USERNAME }}/place-indexer-service:${{ github.sha }}
+        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/place-indexer-service:latest
+        cache-to: type=inline
+
+    - name: Build and push Nginx image
+      if: needs.detect_changes.outputs.infra_changed == 'true'
+      uses: docker/build-push-action@v5
+      with:
+        context: ./nginx
+        file: ./nginx/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/mecipe-nginx:latest
+          ${{ secrets.DOCKER_USERNAME }}/mecipe-nginx:${{ github.sha }}
+        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/mecipe-nginx:latest
+        cache-to: type=inline
+
+  # 🚀 3-1.5. 인스턴스 B - Elasticsearch 먼저 배포 (인스턴스 A의 place-api-service가 필요)
+  deploy_instance_b_elasticsearch:
+    needs: [test, build_and_push_docker, detect_changes]
+    runs-on: [self-hosted, Linux, X64, instance-b]
+    if: |
+      always() &&
+      (needs.detect_changes.outputs.apps_changed == 'true' || needs.detect_changes.outputs.infra_changed == 'true')
+    steps:
+    - name: Cleanup workspace
+      run: |
+        echo "Cleaning up workspace..."
+        sudo chown -R $USER:$USER $GITHUB_WORKSPACE || true
+        sudo rm -rf $GITHUB_WORKSPACE/* || true
+        sudo rm -rf $GITHUB_WORKSPACE/.* 2>/dev/null || true
+    
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Create .env file for Instance B (Elasticsearch only)
+      run: |
+        echo "Creating .env file for Instance B (Elasticsearch only)..."
+        cat > .env << 'EOF'
+        # Docker
+        DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+        IMAGE_TAG=${{ github.sha }}
+        ELASTICSEARCH_VERSION=${ELASTICSEARCH_VERSION:-8.11.0}
+        
+        # Elasticsearch
+        ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+        ELASTICSEARCH_SUPERUSER_PASSWORD=${{ secrets.ELASTICSEARCH_SUPERUSER_PASSWORD }}
+        ELASTICSEARCH_KIBANA_PASSWORD=${{ secrets.ELASTICSEARCH_KIBANA_PASSWORD }}
+        ELASTICSEARCH_PRODUCER_USER_NAME=${{ secrets.ELASTICSEARCH_PRODUCER_USER_NAME }}
+        ELASTICSEARCH_PRODUCER_USER_PASS=${{ secrets.ELASTICSEARCH_PRODUCER_USER_PASS }}
+        EOF
+        chmod 600 .env
+
+    - name: Deploy Elasticsearch infrastructure first
+      if: needs.detect_changes.outputs.infra_changed == 'true'
+      run: |
+        echo "Deploying Elasticsearch infrastructure (for Instance A dependency)..."
+        docker compose -f docker-compose.instance-b.yml up -d elasticsearch
+        echo "Waiting for Elasticsearch to be healthy..."
+        timeout 180 bash -c 'until docker compose -f docker-compose.instance-b.yml ps elasticsearch | grep -q "healthy"; do sleep 5; done' || true
+        sleep 15
+        
+        # Verify Elasticsearch is accessible from outside
+        echo "Verifying Elasticsearch is accessible..."
+        if curl -f http://localhost:9200/_cluster/health 2>/dev/null; then
+          echo "✅ Elasticsearch is healthy and accessible"
+        else
+          echo "⚠️ Elasticsearch health check failed, but continuing..."
+        fi
+
+    - name: Initialize Elasticsearch users
+      if: needs.detect_changes.outputs.infra_changed == 'true'
+      run: |
+        echo "Initializing Elasticsearch users..."
+        chmod +x scripts/prod/init-elasticsearch-users.sh
+        # Elasticsearch가 외부에서 접근 가능하도록 환경 변수 설정
+        export ELASTICSEARCH_HOSTS="http://localhost:9200"
+        ./scripts/prod/init-elasticsearch-users.sh || echo "⚠️ Elasticsearch user initialization failed, but continuing..."
+
+    - name: Fix workspace permissions
+      if: always()
+      run: |
+        echo "Fixing workspace permissions..."
+        sudo chown -R $USER:$USER $GITHUB_WORKSPACE || true
+
+  # 🚀 3-1. 인스턴스 A 배포 (place-api-service는 이제 Elasticsearch가 준비된 후 시작)
+  deploy_instance_a:
+    needs: [test, build_and_push_docker, detect_changes, deploy_instance_b_elasticsearch]
+    runs-on: [self-hosted, Linux, X64, instance-a]
+    if: |
+      always() &&
+      (needs.detect_changes.outputs.apps_changed == 'true' || needs.detect_changes.outputs.infra_changed == 'true') &&
+      (needs.deploy_instance_b_elasticsearch.result == 'success' || needs.deploy_instance_b_elasticsearch.result == 'skipped')
+    steps:
+    - name: Cleanup workspace
+      run: |
+        echo "Cleaning up workspace..."
+        sudo chown -R $USER:$USER $GITHUB_WORKSPACE || true
+        sudo rm -rf $GITHUB_WORKSPACE/* || true
+        sudo rm -rf $GITHUB_WORKSPACE/.* 2>/dev/null || true
+    
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Create .env file for Instance A
+      run: |
+        echo "Creating .env file for Instance A..."
+        cat > .env << 'EOF'
+        # Docker
+        DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+        IMAGE_TAG=${{ github.sha }}
+        CP_VERSION=${CP_VERSION:-8.1.0}
+        
+        # Application
+        NODE_ENV=production
+        PORT=${{ secrets.PORT || 4000 }}
+        SOCKET_PORT=${{ secrets.SOCKET_PORT || 4100 }}
+        
+        # Domain
+        DOMAIN_NAME=${{ secrets.DOMAIN_NAME }}
+        SSL_EMAIL=${{ secrets.SSL_EMAIL }}
+        
+        # Database (External PostgreSQL on Instance B)
+        DATABASE_URL=postgresql://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@${{ secrets.POSTGRES_HOST }}:${{ secrets.POSTGRES_PORT }}/${{ secrets.POSTGRES_DB }}?schema=public
+        
+        # JWT
+        JWT_SECRET=${{ secrets.JWT_SECRET }}
+        JWT_PUBLIC_KEY=${{ secrets.JWT_PUBLIC_KEY }}
+
+        # LOGIN CRYPTO
+        SECRET_LOGIN_CRYPTO=${{ secrets.SECRET_LOGIN_CRYPTO }}
+
+        # API Key (optional)
+        API_KEY=${{ secrets.API_KEY }}
+        BUILD_API_KEY=${{ secrets.BUILD_API_KEY }}
+
+        # SECRET Key
+        COUPON_SECRET=${{ secrets.COUPON_SECRET }}
+        PRODUCT_SECRET=${{ secrets.PRODUCT_SECRET }}
+
+        # Elasticsearch (Instance B - external access)
+        # Set INSTANCE_B_IP in GitHub Secrets (e.g., 192.168.1.100)
+        INSTANCE_B_IP=${{ secrets.INSTANCE_B_IP || 'INSTANCE_B_IP' }}
+        ELASTICSEARCH_HOSTS=http://${INSTANCE_B_IP}:9200
+        ELASTICSEARCH_APP_USER_NAME=${{ secrets.ELASTICSEARCH_APP_USER_NAME }}
+        ELASTICSEARCH_APP_USER_PASS=${{ secrets.ELASTICSEARCH_APP_USER_PASS }}
+        
+        # Place API Service
+        PLACE_API_SERVICE_URL=http://place-api-service:4000
+        
+        # Meta Viewer Service (Instance B - external access)
+        # INSTANCE_B_IP는 위에서 설정됨
+        # SOCKET_PORT는 secrets에서 가져오거나 기본값 4100 사용
+        SOCKET_PORT=${{ secrets.SOCKET_PORT || 4100 }}
+        META_VIEWER_SERVICE_URL=${INSTANCE_B_IP}:${SOCKET_PORT}
+        
+        # Kafka advertised host (Instance A)
+        # Set INSTANCE_A_IP in GitHub Secrets (e.g., 192.168.1.10)
+        INSTANCE_A_IP=${{ secrets.INSTANCE_A_IP || 'INSTANCE_A_IP' }}
+        KAFKA_ADVERTISED_HOST=${INSTANCE_A_IP}
+        EOF
+        chmod 600 .env
+
+    - name: Pull latest images from Docker Hub
+      run: |
+        echo "Pulling latest Docker images from Docker Hub..."
+        docker compose -f docker-compose.instance-a.yml pull || echo "Pull failed, will build locally as fallback"
+
+    - name: Deploy Kafka infrastructure first
+      if: needs.detect_changes.outputs.infra_changed == 'true'
+      run: |
+        echo "Deploying Kafka infrastructure..."
+        docker compose -f docker-compose.instance-a.yml up -d zookeeper
+        echo "Waiting for Zookeeper to be healthy..."
+        timeout 120 bash -c 'until docker compose -f docker-compose.instance-a.yml ps zookeeper | grep -q "healthy"; do sleep 2; done' || true
+        sleep 10
+        
+        docker compose -f docker-compose.instance-a.yml up -d kafka
+        echo "Waiting for Kafka to be healthy..."
+        timeout 180 bash -c 'until docker compose -f docker-compose.instance-a.yml ps kafka | grep -q "healthy"; do sleep 3; done' || true
+        sleep 15
+        
+        docker compose -f docker-compose.instance-a.yml up -d schema-registry connect ksqldb
+        echo "Waiting for Kafka ecosystem services..."
+        sleep 30
+        
+        # Initialize KSQLDB queries
+        echo "Initializing KSQLDB queries..."
+        chmod +x scripts/prod/init-ksqldb-queries.sh || true
+        export KSQLDB_URL="http://localhost:8088"
+        ./scripts/prod/init-ksqldb-queries.sh || echo "⚠️ KSQLDB query initialization failed, but continuing..."
+
+    - name: Deploy applications
+      if: needs.detect_changes.outputs.apps_changed == 'true'
+      run: |
+        echo "Deploying applications..."
+        docker compose -f docker-compose.instance-a.yml up -d place-api-service api-gateway
+        echo "Waiting for applications to be healthy..."
+        sleep 30
+
+    - name: Deploy supporting services
+      run: |
+        echo "Deploying supporting services..."
+        docker compose -f docker-compose.instance-a.yml up -d kafka-ui
+        sleep 10
+
+    - name: Setup SSL certificate (if needed)
+      if: needs.detect_changes.outputs.infra_changed == 'true'
+      run: |
+        echo "Checking SSL certificate status..."
+        
+        SSL_EXISTS=$(docker run --rm -v mecipe-certbot-conf:/etc/letsencrypt alpine sh -c "test -f /etc/letsencrypt/live/${{ secrets.DOMAIN_NAME }}/fullchain.pem && echo 'true' || echo 'false'" 2>/dev/null || echo "false")
+        
+        if [ "$SSL_EXISTS" = "true" ]; then
+          echo "✅ SSL certificate already exists"
+        else
+          echo "⚠️ SSL certificate not found - attempting to issue..."
+          
+          if nslookup ${{ secrets.DOMAIN_NAME }} | grep -q "Address"; then
+            echo "✅ DNS is configured"
+            
+            # Start nginx with HTTP only first
+            docker compose -f docker-compose.instance-a.yml up -d nginx
+            sleep 15
+            
+            if curl -f http://localhost/health 2>/dev/null; then
+              echo "✅ HTTP is working, attempting SSL certificate..."
+              
+              docker compose -f docker-compose.instance-a.yml stop nginx
+              
+              docker run --rm \
+                -v mecipe-certbot-conf:/etc/letsencrypt \
+                -v mecipe-certbot-www:/var/www/certbot \
+                -p 80:80 \
+                certbot/certbot certonly \
+                --standalone \
+                --email ${{ secrets.SSL_EMAIL }} \
+                --agree-tos \
+                --no-eff-email \
+                --non-interactive \
+                -d ${{ secrets.DOMAIN_NAME }}
+              
+              if [ $? -eq 0 ]; then
+                echo "✅ SSL certificate issued successfully!"
+                docker compose -f docker-compose.instance-a.yml start nginx
+              else
+                echo "⚠️ SSL issuance failed - starting nginx in HTTP-only mode"
+                docker compose -f docker-compose.instance-a.yml start nginx
+              fi
+            else
+              echo "⚠️ HTTP not working - skipping SSL setup"
+              docker compose -f docker-compose.instance-a.yml up -d nginx
+            fi
+          else
+            echo "⚠️ DNS not configured - skipping SSL setup"
+            docker compose -f docker-compose.instance-a.yml up -d nginx
+          fi
+        fi
+        
+        # Start certbot
+        docker compose -f docker-compose.instance-a.yml up -d certbot
+
+    - name: Run database migrations
+      if: needs.detect_changes.outputs.apps_changed == 'true'
+      run: |
+        echo "Running database migrations..."
+        docker compose -f docker-compose.instance-a.yml exec -T place-api-service sh -c "cd /app/apps/place-api-service && prisma migrate deploy --schema=./prisma/schema.prisma" || echo "Migration failed or no migrations to apply"
+
+    - name: Health check
+      run: |
+        echo "Performing health check..."
+        sleep 20
+        
+        if docker compose -f docker-compose.instance-a.yml ps | grep -q "Up"; then
+          echo "✅ Services are running"
+          
+          if curl -f http://localhost/health 2>/dev/null; then
+            echo "✅ Health check passed"
+          else
+            echo "⚠️ Health endpoint not responding yet"
+          fi
+        else
+          echo "❌ Some services failed to start"
+          docker compose -f docker-compose.instance-a.yml logs --tail=50
+          exit 1
+        fi
+
+    - name: Cleanup old images
+      run: |
+        echo "Cleaning up old Docker images..."
+        docker image prune -f
+    
+    - name: Fix workspace permissions
+      if: always()
+      run: |
+        echo "Fixing workspace permissions..."
+        sudo chown -R $USER:$USER $GITHUB_WORKSPACE || true
+
+  # 🚀 3-3. 인스턴스 B - 나머지 서비스 배포 (meta-viewer-service, place-indexer-service, debezium, kibana, redis)
+  deploy_instance_b_remaining:
+    needs: [test, build_and_push_docker, detect_changes, deploy_instance_b_elasticsearch, deploy_instance_a]
+    runs-on: [self-hosted, Linux, X64, instance-b]
+    if: |
+      always() &&
+      (needs.detect_changes.outputs.apps_changed == 'true' || needs.detect_changes.outputs.infra_changed == 'true') &&
+      (needs.deploy_instance_a.result == 'success' || needs.deploy_instance_a.result == 'skipped')
+    steps:
+    - name: Cleanup workspace
+      run: |
+        echo "Cleaning up workspace..."
+        sudo chown -R $USER:$USER $GITHUB_WORKSPACE || true
+        sudo rm -rf $GITHUB_WORKSPACE/* || true
+        sudo rm -rf $GITHUB_WORKSPACE/.* 2>/dev/null || true
+    
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Create .env file for Instance B (remaining services)
+      run: |
+        echo "Creating .env file for Instance B (remaining services)..."
+        cat > .env << 'EOF'
+        # Docker
+        DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+        IMAGE_TAG=${{ github.sha }}
+        ELASTICSEARCH_VERSION=${ELASTICSEARCH_VERSION:-8.11.0}
+        
+        # Application
+        NODE_ENV=production
+        PORT=${{ secrets.PORT || 4000 }}
+        SOCKET_PORT=${{ secrets.SOCKET_PORT || 4100 }}
+        
+        # JWT
+        JWT_SECRET=${{ secrets.JWT_SECRET }}
+
+        # Redis
+        REDIS_URL=${REDIS_URL:-redis://redis:6379}
+        REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+
+        # Kafka (Instance A - external access)
+        # Set INSTANCE_A_IP in GitHub Secrets (e.g., 192.168.1.10)
+        INSTANCE_A_IP=${{ secrets.INSTANCE_A_IP || 'INSTANCE_A_IP' }}
+        KAFKA_BROKERS=${INSTANCE_A_IP}:9092
+        
+        # Elasticsearch
+        ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+        ELASTICSEARCH_SUPERUSER_PASSWORD=${{ secrets.ELASTICSEARCH_SUPERUSER_PASSWORD }}
+        ELASTICSEARCH_KIBANA_PASSWORD=${{ secrets.ELASTICSEARCH_KIBANA_PASSWORD }}
+        ELASTICSEARCH_PRODUCER_USER_NAME=${{ secrets.ELASTICSEARCH_PRODUCER_USER_NAME }}
+        ELASTICSEARCH_PRODUCER_USER_PASS=${{ secrets.ELASTICSEARCH_PRODUCER_USER_PASS }}
+        
+        # Database (External PostgreSQL on this instance)
+        DATABASE_URL=postgresql://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@${{ secrets.POSTGRES_HOST }}:${{ secrets.POSTGRES_PORT }}/${{ secrets.POSTGRES_DB }}?schema=public
+        POSTGRES_HOST=${{ secrets.POSTGRES_HOST }}
+        POSTGRES_PORT=${{ secrets.POSTGRES_PORT }}
+        POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+        POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+        POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+
+        # Kibana
+        KIBANA_ENCRYPTION_KEY=${{ secrets.KIBANA_ENCRYPTION_KEY || 'a_minimum_32_character_long_secret_key' }}
+        EOF
+        chmod 600 .env
+
+    - name: Pull latest images from Docker Hub
+      run: |
+        echo "Pulling latest Docker images from Docker Hub..."
+        docker compose -f docker-compose.instance-b.yml pull || echo "Pull failed, will build locally as fallback"
+
+    # Elasticsearch는 이미 deploy_instance_b_elasticsearch에서 배포되었으므로 스킵
+    # 하지만 이미 배포되어 있지 않으면 배포
+    - name: Check and deploy Elasticsearch if needed
+      if: needs.detect_changes.outputs.infra_changed == 'true'
+      run: |
+        if ! docker compose -f docker-compose.instance-b.yml ps elasticsearch | grep -q "Up"; then
+          echo "Elasticsearch not running, deploying..."
+          docker compose -f docker-compose.instance-b.yml up -d elasticsearch
+          echo "Waiting for Elasticsearch to be healthy..."
+          timeout 180 bash -c 'until docker compose -f docker-compose.instance-b.yml ps elasticsearch | grep -q "healthy"; do sleep 5; done' || true
+          sleep 15
+        else
+          echo "✅ Elasticsearch is already running"
+        fi
+
+    - name: Deploy Redis
+      if: needs.detect_changes.outputs.infra_changed == 'true'
+      run: |
+        echo "Deploying Redis..."
+        docker compose -f docker-compose.instance-b.yml up -d redis
+        echo "Waiting for Redis to be healthy..."
+        timeout 60 bash -c 'until docker compose -f docker-compose.instance-b.yml ps redis | grep -q "healthy"; do sleep 2; done' || true
+        sleep 5
+
+    - name: Deploy Kibana
+      if: needs.detect_changes.outputs.infra_changed == 'true'
+      run: |
+        echo "Deploying Kibana..."
+        docker compose -f docker-compose.instance-b.yml up -d kibana
+        echo "Waiting for Kibana to start..."
+        sleep 30
+
+    - name: Deploy Debezium
+      if: needs.detect_changes.outputs.infra_changed == 'true'
+      run: |
+        echo "Deploying Debezium..."
+        docker compose -f docker-compose.instance-b.yml up -d debezium
+        echo "Waiting for Debezium to be healthy..."
+        # Debezium은 start_period(60s) + health check 성공까지 시간이 필요
+        # health: starting 상태도 허용 (start_period 동안은 정상)
+        # 최대 180초 대기 (start_period 60s + health check 간격 30s * 4회)
+        MAX_WAIT=180
+        WAIT_COUNT=0
+        while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
+          STATUS=$(docker compose -f docker-compose.instance-b.yml ps debezium --format json 2>/dev/null | grep -o '"Health":"[^"]*"' | cut -d'"' -f4 || echo "")
+          if [ "$STATUS" = "healthy" ]; then
+            echo "✅ Debezium이 healthy 상태입니다"
+            break
+          elif [ "$STATUS" = "starting" ]; then
+            # health: starting은 정상 (start_period 동안)
+            if [ $((WAIT_COUNT % 15)) -eq 0 ]; then
+              echo "  Debezium이 시작 중입니다... (health: starting, ${WAIT_COUNT}s/${MAX_WAIT}s)"
+            fi
+          elif [ -z "$STATUS" ]; then
+            # 상태 정보가 없으면 컨테이너가 아직 시작 중
+            if [ $((WAIT_COUNT % 15)) -eq 0 ]; then
+              echo "  Debezium 컨테이너 시작 중... (${WAIT_COUNT}s/${MAX_WAIT}s)"
+            fi
+          fi
+          
+          if [ $WAIT_COUNT -ge $MAX_WAIT ]; then
+            echo "⚠️ Debezium health check 타임아웃 (${MAX_WAIT}s), 현재 상태: ${STATUS:-unknown}"
+            echo "Debezium 로그 확인:"
+            docker compose -f docker-compose.instance-b.yml logs --tail=20 debezium || true
+            break
+          fi
+          
+          WAIT_COUNT=$((WAIT_COUNT + 3))
+          sleep 3
+        done
+        sleep 5
+        
+        # Initialize Debezium connector
+        echo "Initializing Debezium connector..."
+        chmod +x scripts/prod/init-debezium-connector.sh || true
+        # Debezium은 호스트 포트 8084로 노출됨 (docker-compose.instance-b.yml: "8084:8083")
+        export DEBEZIUM_URL="http://localhost:8084"
+        ./scripts/prod/init-debezium-connector.sh || echo "⚠️ Debezium connector initialization failed, but continuing..."
+
+    - name: Deploy applications
+      if: needs.detect_changes.outputs.apps_changed == 'true'
+      run: |
+        echo "Deploying applications..."
+        docker compose -f docker-compose.instance-b.yml up -d meta-viewer-service place-indexer-service
+        echo "Waiting for applications to start..."
+        sleep 30
+
+    - name: Health check
+      run: |
+        echo "Performing health check..."
+        sleep 20
+        
+        if docker compose -f docker-compose.instance-b.yml ps | grep -q "Up"; then
+          echo "✅ Services are running"
+          
+          # Check Elasticsearch
+          if curl -f http://localhost:9200/_cluster/health 2>/dev/null; then
+            echo "✅ Elasticsearch is healthy"
+          else
+            echo "⚠️ Elasticsearch not responding yet"
+          fi
+          
+          # Check Redis
+          if docker compose -f docker-compose.instance-b.yml exec -T redis redis-cli ping 2>/dev/null | grep -q "PONG"; then
+            echo "✅ Redis is healthy"
+          else
+            echo "⚠️ Redis not responding yet"
+          fi
+        else
+          echo "❌ Some services failed to start"
+          docker compose -f docker-compose.instance-b.yml logs --tail=50
+          exit 1
+        fi
+
+    - name: Cleanup old images
+      run: |
+        echo "Cleaning up old Docker images..."
+        docker image prune -f
+    
+    - name: Fix workspace permissions
+      if: always()
+      run: |
+        echo "Fixing workspace permissions..."
+        sudo chown -R $USER:$USER $GITHUB_WORKSPACE || true

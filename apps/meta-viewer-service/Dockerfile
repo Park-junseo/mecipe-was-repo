@@ -36,12 +36,17 @@ COPY libs/common/package.json ./libs/common/
 # Install production dependencies only
 # This installs root dependencies (@nestjs/common, @nestjs/core, etc.)
 # and meta-viewer-service dependencies (express, socket.io, etc.)
+# pm2 is in dependencies, so it will be installed
 RUN pnpm install --frozen-lockfile --prod
+
+# Install pm2 globally for easier access
+RUN npm install -g pm2
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
 
 ENV NODE_ENV=production
 
-# Start the application
-CMD ["node", "dist/apps/meta-viewer-service/main.js"]
+# Start the application with pm2-runtime (container-friendly)
+# pm2-runtime is designed for Docker containers and handles signals properly
+CMD ["pm2-runtime", "start", "dist/apps/meta-viewer-service/main.js", "-i", "2", "--name", "meta-viewer-service"]

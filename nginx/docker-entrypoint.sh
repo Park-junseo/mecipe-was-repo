@@ -5,18 +5,20 @@ set -e
 export DOMAIN_NAME=${DOMAIN_NAME:-localhost}
 export APP_PORT=${APP_PORT:-4000}
 export SOCKET_PORT=${SOCKET_PORT:-4100}
+export META_VIEWER_SERVICE_URL=${META_VIEWER_SERVICE_URL:-INSTANCE_B_IP:4100}
 
 echo "Configuring Nginx..."
 echo "  Domain: $DOMAIN_NAME"
 echo "  App Port: $APP_PORT"
 echo "  Socket Port: $SOCKET_PORT"
+echo "  Meta Viewer Service URL: $META_VIEWER_SERVICE_URL"
 
 # SSL 인증서 확인
 if [ -f "/etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem" ]; then
     echo "  SSL Certificate: Found ✓"
     echo "  Using HTTPS configuration"
     # HTTPS 설정 사용
-    envsubst '${DOMAIN_NAME} ${APP_PORT} ${SOCKET_PORT}' \
+    envsubst '${DOMAIN_NAME} ${APP_PORT} ${SOCKET_PORT} ${META_VIEWER_SERVICE_URL}' \
         < /etc/nginx/conf.d/default.conf.template \
         > /etc/nginx/conf.d/default.conf
 else
@@ -24,7 +26,7 @@ else
     echo "  Using HTTP-only configuration"
     echo "  Run './scripts/init-ssl.sh' to enable HTTPS"
     # HTTP만 사용
-    envsubst '${DOMAIN_NAME} ${APP_PORT} ${SOCKET_PORT}' \
+    envsubst '${DOMAIN_NAME} ${APP_PORT} ${SOCKET_PORT} ${META_VIEWER_SERVICE_URL}' \
         < /etc/nginx/conf.d/default-http-only.conf.template \
         > /etc/nginx/conf.d/default.conf
 fi

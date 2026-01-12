@@ -38,14 +38,22 @@ COPY libs/common/package.json ./libs/common/
 # Install production dependencies only
 RUN pnpm install --frozen-lockfile --prod
 
+# Install pm2 globally for easier access
+# api-gateway doesn't have pm2 in dependencies, so install it globally
+RUN npm install -g pm2
+
 # Copy built application (only dist, not node_modules)
 COPY --from=base /app/dist ./dist
 
 # Expose port
 EXPOSE 3000
 
-# Start the application
-CMD ["node", "dist/apps/api-gateway/main.js"]
+ENV NODE_ENV=production
+
+# Start the application with pm2-runtime (container-friendly)
+# pm2-runtime is designed for Docker containers and handles signals properly
+# api-gateway typically doesn't need clustering, but using pm2 for consistency
+CMD ["pm2-runtime", "start", "dist/apps/api-gateway/main.js", "--name", "api-gateway"]
 
 
 

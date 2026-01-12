@@ -1,4 +1,7 @@
 {
+  "GET /health": {
+    "type": "public"
+  },
   "GET /hello": {
     "type": "public"
   },

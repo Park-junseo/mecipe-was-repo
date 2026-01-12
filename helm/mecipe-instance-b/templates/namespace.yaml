@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: {{ .Release.Namespace }}
-  labels:
-    {{- include "mecipe-instance-b.labels" . | nindent 4 }}
-    name: instance-b
-    environment: {{ .Values.environment | default "production" }}
-

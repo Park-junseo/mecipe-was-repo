@@ -43,12 +43,17 @@ COPY nx.json tsconfig.base.json ./
 COPY apps/place-indexer-service/package.json ./apps/place-indexer-service/
 
 # Install production dependencies only
+# pm2 is in dependencies, so it will be installed
 RUN pnpm install --frozen-lockfile --prod
+
+# Install pm2 globally for easier access
+RUN npm install -g pm2
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
 
 ENV NODE_ENV=production
 
-# Start the application
-CMD ["node", "dist/apps/place-indexer-service/main.js"]
+# Start the application with pm2-runtime (container-friendly)
+# pm2-runtime is designed for Docker containers and handles signals properly
+CMD ["pm2-runtime", "start", "dist/apps/place-indexer-service/main.js", "-i", "1", "--name", "place-indexer-service"]

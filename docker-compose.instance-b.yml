@@ -1,0 +1,185 @@
+services:
+  # Meta Viewer Service
+  meta-viewer-service:
+    image: ${DOCKER_USERNAME:-local}/meta-viewer-service:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/meta-viewer-service/Dockerfile
+    container_name: meta-viewer-service
+    restart: unless-stopped
+    ports:
+      - "${SOCKET_PORT:-4100}:${SOCKET_PORT:-4100}"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=${SOCKET_PORT:-4100}
+      - SOCKET_PORT=${SOCKET_PORT:-4100}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - JWT_SECRET=${JWT_SECRET}
+    networks:
+      - instance-b-network
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:${SOCKET_PORT:-4100}/hello', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Place Indexer Service
+  place-indexer-service:
+    image: ${DOCKER_USERNAME:-local}/place-indexer-service:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/place-indexer-service/Dockerfile
+    container_name: place-indexer-service
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - KAFKA_BROKERS=${KAFKA_BROKERS:-${INSTANCE_A_IP:-localhost}:9092}
+      - ELASTICSEARCH_HOSTS=${ELASTICSEARCH_HOSTS:-http://elasticsearch:9200}
+      - ELASTICSEARCH_USERNAME=${ELASTICSEARCH_PRODUCER_USER_NAME:-producer_user}
+      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PRODUCER_USER_PASS}
+    networks:
+      - instance-b-network
+    depends_on:
+      elasticsearch:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Debezium
+  debezium:
+    image: debezium/connect:2.6
+    container_name: debezium
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Linux에서 host.docker.internal 지원
+    environment:
+      - BOOTSTRAP_SERVERS=${KAFKA_BROKERS}
+      - GROUP_ID=1
+      - CONFIG_STORAGE_TOPIC=my_connect_configs
+      - OFFSET_STORAGE_TOPIC=my_connect_offsets
+      - STATUS_STORAGE_TOPIC=my_connect_statuses
+      - CONFIG_STORAGE_REPLICATION_FACTOR=1
+      - OFFSET_STORAGE_REPLICATION_FACTOR=1
+      - STATUS_STORAGE_REPLICATION_FACTOR=1
+      - KEY_CONVERTER=org.apache.kafka.connect.json.JsonConverter
+      - VALUE_CONVERTER=org.apache.kafka.connect.json.JsonConverter
+      - INTERNAL_KEY_CONVERTER=org.apache.kafka.connect.json.JsonConverter
+      - INTERNAL_VALUE_CONVERTER=org.apache.kafka.connect.json.JsonConverter
+      - OFFSET_FLUSH_INTERVAL_MS=10000
+    ports:
+      - "8084:8083"  # 호스트 포트 8084, 컨테이너 내부 포트 8083 (인스턴스 A의 connect가 8083 사용)
+    networks:
+      - instance-b-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/connectors"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Elasticsearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTICSEARCH_VERSION:-8.11.0}
+    container_name: elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=${ELASTICSEARCH_SUPERUSER_PASSWORD}
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      - xpack.ml.enabled=false
+      - xpack.watcher.enabled=false
+      - xpack.graph.enabled=false
+      - xpack.license.self_generated.type=basic
+      - ES_JAVA_OPTS=-Xms256m -Xmx256m
+      - bootstrap.memory_lock=true
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - instance-b-network
+    healthcheck:
+      test: 
+        [
+          "CMD-SHELL",
+          "curl -s -u elastic:${ELASTICSEARCH_SUPERUSER_PASSWORD} http://localhost:9200/_cluster/health | grep -E '\"status\":\"(green|yellow)\"' || exit 1"
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Kibana
+  kibana:
+    image: docker.elastic.co/kibana/kibana:${ELASTICSEARCH_VERSION:-8.11.0}
+    container_name: kibana
+    restart: unless-stopped
+    depends_on:
+      elasticsearch:
+        condition: service_started
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_KIBANA_PASSWORD}
+      - xpack.security.enabled=true
+      - xpack.encryptedSavedObjects.encryptionKey=${KIBANA_ENCRYPTION_KEY:-a_minimum_32_character_long_secret_key}
+    ports:
+      - "5601:5601"
+    volumes:
+      - kibana-data:/usr/share/kibana/data
+    networks:
+      - instance-b-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    command: >
+      sh -c "
+        if [ -n \"$${REDIS_PASSWORD}\" ]; then
+          redis-server --requirepass $${REDIS_PASSWORD}
+        else
+          redis-server
+        fi
+      "
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - instance-b-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  instance-b-network:
+    driver: bridge
+
+volumes:
+  elasticsearch-data:
+  kibana-data:
+  redis-data:
+

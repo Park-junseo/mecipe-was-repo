@@ -1,0 +1,410 @@
+name: Deploy Minimal with Self-Hosted Runner (Docker Compose)
+
+on:
+  push:
+    branches: ["main"]
+    paths-ignore:
+      - 'helm/**'
+      - '.github/workflows/deploy-helm.yml'
+  workflow_dispatch:  # 수동 실행 가능
+
+jobs:
+  # 변경된 경로 확인
+  detect_changes:
+    runs-on: ubuntu-latest
+    outputs:
+      apps_changed: ${{ steps.filter.outputs.apps }}
+      infra_changed: ${{ steps.filter.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            apps:
+              - 'apps/**'
+            infra:
+              - 'infra/**'
+              - 'nginx/**'
+              - 'docker-compose*.yml'
+              - 'Dockerfile*'
+
+  # 🧪 1. 테스트 Job
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 20.x
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 9.0.0
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+
+    - name: Generate Prisma Client
+      run: pnpm --filter place-api-service exec prisma generate
+
+    - name: Run linter
+      run: pnpm lint
+
+    - name: Run tests
+      run: pnpm test
+
+    - name: Build applications
+      run: pnpm build
+
+  # 📦 2. Docker 이미지 빌드 및 푸시 (minimal 버전: place-indexer-service 제외)
+  build_and_push_docker:
+    needs: [test, detect_changes]
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' && 
+      github.ref == 'refs/heads/main' &&
+      (needs.detect_changes.outputs.apps_changed == 'true' || needs.detect_changes.outputs.infra_changed == 'true')
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and push place-api-service image
+      if: needs.detect_changes.outputs.apps_changed == 'true'
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: apps/place-api-service/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/place-api-service:latest
+          ${{ secrets.DOCKER_USERNAME }}/place-api-service:${{ github.sha }}
+        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/place-api-service:latest
+        cache-to: type=inline
+
+    - name: Build and push api-gateway image
+      if: needs.detect_changes.outputs.apps_changed == 'true'
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: apps/api-gateway/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/api-gateway:latest
+          ${{ secrets.DOCKER_USERNAME }}/api-gateway:${{ github.sha }}
+        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/api-gateway:latest
+        cache-to: type=inline
+
+    - name: Build and push meta-viewer-service image
+      if: needs.detect_changes.outputs.apps_changed == 'true'
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: apps/meta-viewer-service/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/meta-viewer-service:latest
+          ${{ secrets.DOCKER_USERNAME }}/meta-viewer-service:${{ github.sha }}
+        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/meta-viewer-service:latest
+        cache-to: type=inline
+
+    - name: Build and push Nginx image
+      if: needs.detect_changes.outputs.infra_changed == 'true'
+      uses: docker/build-push-action@v5
+      with:
+        context: ./nginx
+        file: ./nginx/Dockerfile
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/mecipe-nginx:latest
+          ${{ secrets.DOCKER_USERNAME }}/mecipe-nginx:${{ github.sha }}
+        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/mecipe-nginx:latest
+        cache-to: type=inline
+
+  # 🚀 3-1. 인스턴스 A 배포 (minimal 버전: Kafka 인프라 제외)
+  deploy_instance_a:
+    needs: [test, build_and_push_docker, detect_changes]
+    runs-on: [self-hosted, Linux, X64, instance-a]
+    if: |
+      always() &&
+      (needs.detect_changes.outputs.apps_changed == 'true' || needs.detect_changes.outputs.infra_changed == 'true')
+    steps:
+    - name: Cleanup workspace
+      run: |
+        echo "Cleaning up workspace..."
+        sudo chown -R $USER:$USER $GITHUB_WORKSPACE || true
+        sudo rm -rf $GITHUB_WORKSPACE/* || true
+        sudo rm -rf $GITHUB_WORKSPACE/.* 2>/dev/null || true
+    
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Create .env file for Instance A (minimal version)
+      run: |
+        echo "Creating .env file for Instance A (minimal version)..."
+        cat > .env << 'EOF'
+        # Docker
+        DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+        IMAGE_TAG=${{ github.sha }}
+        
+        # Application
+        NODE_ENV=production
+        PORT=${{ secrets.PORT || 4000 }}
+        SOCKET_PORT=${{ secrets.SOCKET_PORT || 4100 }}
+        
+        # Domain
+        DOMAIN_NAME=${{ secrets.DOMAIN_NAME }}
+        SSL_EMAIL=${{ secrets.SSL_EMAIL }}
+        
+        # Database (External PostgreSQL)
+        DATABASE_URL=postgresql://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@${{ secrets.POSTGRES_HOST }}:${{ secrets.POSTGRES_PORT }}/${{ secrets.POSTGRES_DB }}?schema=public
+        
+        # JWT
+        JWT_SECRET=${{ secrets.JWT_SECRET }}
+        JWT_PUBLIC_KEY=${{ secrets.JWT_PUBLIC_KEY }}
+
+        # LOGIN CRYPTO
+        SECRET_LOGIN_CRYPTO=${{ secrets.SECRET_LOGIN_CRYPTO }}
+
+        # API Key (optional)
+        API_KEY=${{ secrets.API_KEY }}
+        BUILD_API_KEY=${{ secrets.BUILD_API_KEY }}
+
+        # SECRET Key
+        COUPON_SECRET=${{ secrets.COUPON_SECRET }}
+        PRODUCT_SECRET=${{ secrets.PRODUCT_SECRET }}
+        
+        # Place API Service
+        PLACE_API_SERVICE_URL=http://place-api-service:4000
+        
+        # Meta Viewer Service (Instance B - external access)
+        # Set INSTANCE_B_IP in GitHub Secrets (e.g., 192.168.1.100)
+        INSTANCE_B_IP=${{ secrets.INSTANCE_B_IP || 'INSTANCE_B_IP' }}
+        SOCKET_PORT=${{ secrets.SOCKET_PORT || 4100 }}
+        META_VIEWER_SERVICE_URL=${INSTANCE_B_IP}:${SOCKET_PORT}
+        EOF
+        chmod 600 .env
+
+    - name: Pull latest images from Docker Hub
+      run: |
+        echo "Pulling latest Docker images from Docker Hub..."
+        docker compose -f docker-compose.minimal.instance-a.yml pull || echo "Pull failed, will build locally as fallback"
+
+    - name: Deploy applications
+      if: needs.detect_changes.outputs.apps_changed == 'true'
+      run: |
+        echo "Deploying applications..."
+        docker compose -f docker-compose.minimal.instance-a.yml up -d place-api-service api-gateway
+        echo "Waiting for applications to be healthy..."
+        sleep 30
+
+    - name: Setup SSL certificate (if needed)
+      if: needs.detect_changes.outputs.infra_changed == 'true'
+      run: |
+        echo "Checking SSL certificate status..."
+        
+        SSL_EXISTS=$(docker run --rm -v mecipe-certbot-conf:/etc/letsencrypt alpine sh -c "test -f /etc/letsencrypt/live/${{ secrets.DOMAIN_NAME }}/fullchain.pem && echo 'true' || echo 'false'" 2>/dev/null || echo "false")
+        
+        if [ "$SSL_EXISTS" = "true" ]; then
+          echo "✅ SSL certificate already exists"
+        else
+          echo "⚠️ SSL certificate not found - attempting to issue..."
+          
+          if nslookup ${{ secrets.DOMAIN_NAME }} | grep -q "Address"; then
+            echo "✅ DNS is configured"
+            
+            # Start nginx with HTTP only first
+            docker compose -f docker-compose.minimal.instance-a.yml up -d nginx
+            sleep 15
+            
+            if curl -f http://localhost/health 2>/dev/null; then
+              echo "✅ HTTP is working, attempting SSL certificate..."
+              
+              docker compose -f docker-compose.minimal.instance-a.yml stop nginx
+              
+              docker run --rm \
+                -v mecipe-certbot-conf:/etc/letsencrypt \
+                -v mecipe-certbot-www:/var/www/certbot \
+                -p 80:80 \
+                certbot/certbot certonly \
+                --standalone \
+                --email ${{ secrets.SSL_EMAIL }} \
+                --agree-tos \
+                --no-eff-email \
+                --non-interactive \
+                -d ${{ secrets.DOMAIN_NAME }}
+              
+              if [ $? -eq 0 ]; then
+                echo "✅ SSL certificate issued successfully!"
+                docker compose -f docker-compose.minimal.instance-a.yml start nginx
+              else
+                echo "⚠️ SSL issuance failed - starting nginx in HTTP-only mode"
+                docker compose -f docker-compose.minimal.instance-a.yml start nginx
+              fi
+            else
+              echo "⚠️ HTTP not working - skipping SSL setup"
+              docker compose -f docker-compose.minimal.instance-a.yml up -d nginx
+            fi
+          else
+            echo "⚠️ DNS not configured - skipping SSL setup"
+            docker compose -f docker-compose.minimal.instance-a.yml up -d nginx
+          fi
+        fi
+        
+        # Start certbot
+        docker compose -f docker-compose.minimal.instance-a.yml up -d certbot
+
+    - name: Run database migrations
+      if: needs.detect_changes.outputs.apps_changed == 'true'
+      run: |
+        echo "Running database migrations..."
+        docker compose -f docker-compose.minimal.instance-a.yml exec -T place-api-service sh -c "cd /app/apps/place-api-service && prisma migrate deploy --schema=./prisma/schema.prisma" || echo "Migration failed or no migrations to apply"
+
+    - name: Health check
+      run: |
+        echo "Performing health check..."
+        sleep 20
+        
+        if docker compose -f docker-compose.minimal.instance-a.yml ps | grep -q "Up"; then
+          echo "✅ Services are running"
+          
+          if curl -f http://localhost/health 2>/dev/null; then
+            echo "✅ Health check passed"
+          else
+            echo "⚠️ Health endpoint not responding yet"
+          fi
+        else
+          echo "❌ Some services failed to start"
+          docker compose -f docker-compose.minimal.instance-a.yml logs --tail=50
+          exit 1
+        fi
+
+    - name: Cleanup old images
+      run: |
+        echo "Cleaning up old Docker images..."
+        docker image prune -f
+    
+    - name: Fix workspace permissions
+      if: always()
+      run: |
+        echo "Fixing workspace permissions..."
+        sudo chown -R $USER:$USER $GITHUB_WORKSPACE || true
+
+  # 🚀 3-2. 인스턴스 B 배포 (minimal 버전: Elasticsearch, Kibana, Debezium, place-indexer-service 제외)
+  deploy_instance_b:
+    needs: [test, build_and_push_docker, detect_changes, deploy_instance_a]
+    runs-on: [self-hosted, Linux, X64, instance-b]
+    if: |
+      always() &&
+      (needs.detect_changes.outputs.apps_changed == 'true' || needs.detect_changes.outputs.infra_changed == 'true') &&
+      (needs.deploy_instance_a.result == 'success' || needs.deploy_instance_a.result == 'skipped')
+    steps:
+    - name: Cleanup workspace
+      run: |
+        echo "Cleaning up workspace..."
+        sudo chown -R $USER:$USER $GITHUB_WORKSPACE || true
+        sudo rm -rf $GITHUB_WORKSPACE/* || true
+        sudo rm -rf $GITHUB_WORKSPACE/.* 2>/dev/null || true
+    
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Login to DockerHub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Create .env file for Instance B (minimal version)
+      run: |
+        echo "Creating .env file for Instance B (minimal version)..."
+        cat > .env << 'EOF'
+        # Docker
+        DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+        IMAGE_TAG=${{ github.sha }}
+        
+        # Application
+        NODE_ENV=production
+        PORT=${{ secrets.PORT || 4000 }}
+        SOCKET_PORT=${{ secrets.SOCKET_PORT || 4100 }}
+        
+        # JWT
+        JWT_SECRET=${{ secrets.JWT_SECRET }}
+
+        # Redis
+        REDIS_URL=${REDIS_URL:-redis://redis:6379}
+        REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+        EOF
+        chmod 600 .env
+
+    - name: Pull latest images from Docker Hub
+      run: |
+        echo "Pulling latest Docker images from Docker Hub..."
+        docker compose -f docker-compose.minimal.instance-b.yml pull || echo "Pull failed, will build locally as fallback"
+
+    - name: Deploy Redis
+      if: needs.detect_changes.outputs.infra_changed == 'true'
+      run: |
+        echo "Deploying Redis..."
+        docker compose -f docker-compose.minimal.instance-b.yml up -d redis
+        echo "Waiting for Redis to be healthy..."
+        timeout 60 bash -c 'until docker compose -f docker-compose.minimal.instance-b.yml ps redis | grep -q "healthy"; do sleep 2; done' || true
+        sleep 5
+
+    - name: Deploy applications
+      if: needs.detect_changes.outputs.apps_changed == 'true'
+      run: |
+        echo "Deploying applications..."
+        docker compose -f docker-compose.minimal.instance-b.yml up -d meta-viewer-service
+        echo "Waiting for applications to start..."
+        sleep 30
+
+    - name: Health check
+      run: |
+        echo "Performing health check..."
+        sleep 20
+        
+        if docker compose -f docker-compose.minimal.instance-b.yml ps | grep -q "Up"; then
+          echo "✅ Services are running"
+          
+          # Check Redis
+          if docker compose -f docker-compose.minimal.instance-b.yml exec -T redis redis-cli ping 2>/dev/null | grep -q "PONG"; then
+            echo "✅ Redis is healthy"
+          else
+            echo "⚠️ Redis not responding yet"
+          fi
+        else
+          echo "❌ Some services failed to start"
+          docker compose -f docker-compose.minimal.instance-b.yml logs --tail=50
+          exit 1
+        fi
+
+    - name: Cleanup old images
+      run: |
+        echo "Cleaning up old Docker images..."
+        docker image prune -f
+    
+    - name: Fix workspace permissions
+      if: always()
+      run: |
+        echo "Fixing workspace permissions..."
+        sudo chown -R $USER:$USER $GITHUB_WORKSPACE || true

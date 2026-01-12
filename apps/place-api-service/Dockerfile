@@ -53,7 +53,11 @@ COPY libs/common/package.json ./libs/common/
 # Install production dependencies only
 # This installs root dependencies (@nestjs/common, @nestjs/core, etc.)
 # and place-api-service dependencies (express, etc.)
+# pm2 is in dependencies, so it will be installed
 RUN pnpm install --frozen-lockfile --prod
+
+# Install pm2 globally for easier access
+RUN npm install -g pm2
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
@@ -68,5 +72,7 @@ COPY --from=builder /app/apps/place-api-service/prisma/basic ./apps/place-api-se
 
 ENV NODE_ENV=production
 
-# Run migrations and start the application
-CMD ["sh", "-c", "set -e && echo 'Running Prisma migrate deploy...' && prisma migrate deploy --schema=./apps/place-api-service/prisma/schema.prisma && echo 'Starting application...' && node dist/apps/place-api-service/main.js"]
+# Run migrations and start the application with pm2-runtime (container-friendly)
+# pm2-runtime is designed for Docker containers and handles signals properly
+# -i 2: Start 2 instances (clustering mode)
+CMD ["sh", "-c", "set -e && echo 'Running Prisma migrate deploy...' && prisma migrate deploy --schema=./apps/place-api-service/prisma/schema.prisma && echo 'Starting application with PM2...' && pm2-runtime start dist/apps/place-api-service/main.js -i 2 --name place-api-service"]

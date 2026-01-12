@@ -1,0 +1,115 @@
+services:
+  # Place API Service
+  place-api-service:
+    image: ${DOCKER_USERNAME:-local}/place-api-service:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/place-api-service/Dockerfile
+    container_name: place-api-service
+    restart: unless-stopped
+    expose:
+      - "${PORT:-4000}"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=${PORT:-4000}
+      - DATABASE_URL=${DATABASE_URL}
+      - ELASTICSEARCH_HOSTS=${ELASTICSEARCH_HOSTS:-http://${INSTANCE_B_IP:-elasticsearch-instance-b}:9200}
+      - ELASTICSEARCH_USERNAME=${ELASTICSEARCH_APP_USER_NAME:-app_user}
+      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_APP_USER_PASS}
+      - JWT_SECRET=${JWT_SECRET}
+      - SECRET_LOGIN_CRYPTO=${SECRET_LOGIN_CRYPTO}
+      - API_KEY=${API_KEY:-}
+      - BUILD_API_KEY=${BUILD_API_KEY:-}
+      - COUPON_SECRET=${COUPON_SECRET}
+      - PRODUCT_SECRET=${PRODUCT_SECRET}
+    volumes:
+      - ./apps/place-api-service/media:/app/media
+    networks:
+      - instance-a-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:${PORT:-4000}/hello', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # API Gateway
+  api-gateway:
+    image: ${DOCKER_USERNAME:-local}/api-gateway:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: apps/api-gateway/Dockerfile
+    container_name: api-gateway
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=3000
+      - PLACE_API_SERVICE_URL=${PLACE_API_SERVICE_URL:-http://place-api-service:4000}
+      - JWT_PUBLIC_KEY=${JWT_PUBLIC_KEY}
+    networks:
+      - instance-a-network
+    depends_on:
+      place-api-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Nginx 리버스 프록시
+  nginx:
+    image: ${DOCKER_USERNAME:-local}/mecipe-nginx:latest
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: mecipe-nginx
+    restart: unless-stopped
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME}
+      - APP_PORT=3000
+      - SOCKET_PORT=${SOCKET_PORT:-4100}
+      - META_VIEWER_SERVICE_URL=${META_VIEWER_SERVICE_URL:-${INSTANCE_B_IP:-meta-viewer-service}:4100}
+    ports:
+      - "80:80"
+      # 포트 443은 SSL 인증서가 있을 때만 노출
+      # 로컬 배포: SSL 없이 HTTP만 사용하므로 포트 443 주석 처리
+      # 프로덕션: SSL 인증서 설정 후 아래 주석 해제
+      # - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - certbot-conf:/etc/letsencrypt:ro
+      - certbot-www:/var/www/certbot:ro
+      - ./apps/place-api-service/media:/var/www/media:ro
+    networks:
+      - instance-a-network
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      place-api-service:
+        condition: service_healthy
+    command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
+
+  # Certbot (Let's Encrypt SSL 인증서)
+  certbot:
+    image: certbot/certbot
+    container_name: mecipe-certbot
+    restart: unless-stopped
+    volumes:
+      - certbot-conf:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+networks:
+  instance-a-network:
+    driver: bridge
+
+volumes:
+  certbot-conf:
+    name: mecipe-certbot-conf
+  certbot-www:
+    name: mecipe-certbot-www
+
