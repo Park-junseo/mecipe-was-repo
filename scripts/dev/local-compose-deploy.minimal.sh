@@ -43,9 +43,8 @@ source "$ENV_FILE" 2>/dev/null || {
 set +a
 
 # 필수 환경 변수 확인 (minimal 버전: Elasticsearch, Kafka 관련 제외)
+# PostgreSQL은 로컬에서 실행되므로 POSTGRES_HOST는 선택사항 (기본값: postgres)
 REQUIRED_VARS=(
-    "POSTGRES_HOST"
-    "POSTGRES_PORT"
     "POSTGRES_USER"
     "POSTGRES_PASSWORD"
     "POSTGRES_DB"
@@ -86,10 +85,10 @@ SOCKET_PORT=${SOCKET_PORT:-4100}
 DOMAIN_NAME=localhost
 SSL_EMAIL=${SSL_EMAIL:-test@localhost}
 
-# Database
-DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}?schema=public
-POSTGRES_HOST=${POSTGRES_HOST}
-POSTGRES_PORT=${POSTGRES_PORT}
+# Database (로컬 PostgreSQL 사용)
+# minimal 버전에서는 로컬 PostgreSQL 컨테이너 사용
+POSTGRES_HOST=${POSTGRES_HOST:-db-place}
+POSTGRES_PORT=${POSTGRES_PORT:-5432}
 POSTGRES_USER=${POSTGRES_USER}
 POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 POSTGRES_DB=${POSTGRES_DB}
@@ -241,6 +240,27 @@ log_info "✅ Redis 배포 완료"
 # ============================================
 log_info "🚀 인스턴스 A 배포 시작..."
 
+# PostgreSQL 배포
+log_info "📦 PostgreSQL 배포..."
+docker compose -f docker-compose.minimal.instance-a.yml up -d db-place || {
+    log_error "PostgreSQL 배포 실패"
+    exit 1
+}
+
+log_info "⏳ PostgreSQL이 준비될 때까지 대기..."
+timeout 60 bash -c 'until docker compose -f docker-compose.minimal.instance-a.yml ps db-place | grep -q "healthy"; do sleep 2; done' || {
+    log_warn "PostgreSQL health check 타임아웃, 계속 진행..."
+}
+sleep 5
+
+# PostgreSQL wal_level 확인 (Debezium용)
+log_info "🔍 PostgreSQL 설정 확인 (wal_level=logical for Debezium)..."
+docker compose -f docker-compose.minimal.instance-a.yml exec -T db-place psql -U ${POSTGRES_USER:-mecipe_user} -d ${POSTGRES_DB:-mecipe_db} -c "SHOW wal_level;" 2>/dev/null || {
+    log_warn "PostgreSQL 설정 확인 실패, 계속 진행..."
+}
+
+log_info "✅ PostgreSQL 배포 완료"
+
 # 애플리케이션 배포
 log_info "📦 애플리케이션 배포..."
 docker compose -f docker-compose.minimal.instance-a.yml up -d place-api-service api-gateway || {
@@ -292,6 +312,14 @@ sleep 20
 # 인스턴스 A 헬스 체크
 if docker compose -f docker-compose.minimal.instance-a.yml ps | grep -q "Up"; then
     log_info "✅ 인스턴스 A 서비스 실행 중"
+    
+    # PostgreSQL 헬스 체크
+    if docker compose -f docker-compose.minimal.instance-a.yml exec -T db-place pg_isready -U ${POSTGRES_USER:-mecipe_user} 2>/dev/null | grep -q "accepting connections"; then
+        log_info "✅ PostgreSQL 헬스 체크 통과"
+    else
+        log_warn "⚠️ PostgreSQL 응답 없음"
+    fi
+    
     if curl -f http://localhost/health 2>/dev/null; then
         log_info "✅ 인스턴스 A 헬스 체크 통과"
     else
@@ -325,8 +353,10 @@ log_info ""
 log_info "접속 정보:"
 log_info "  - API Gateway: http://localhost"
 log_info "  - Meta Viewer Service: http://localhost:${SOCKET_PORT:-4100}"
+log_info "  - PostgreSQL: localhost:${POSTGRES_PORT:-5432}"
 log_info ""
 log_info "⚠️  Minimal 버전: Kafka, Debezium, Elasticsearch, Kibana, place-indexer-service 제외됨"
+log_info "📝 PostgreSQL은 wal_level=logical로 설정되어 Debezium 사용 가능"
 log_info ""
 log_info "서비스 상태 확인:"
 log_info "  docker compose -f docker-compose.minimal.instance-a.yml ps"
