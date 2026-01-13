@@ -245,6 +245,7 @@ export class RedisCacheService implements OnModuleDestroy {
 
   /**
    * 룸의 모든 클라이언트의 특정 타입 메시지 조회 (JOIN_EVENT용)
+   * SCAN을 사용하여 메모리 효율성 개선
    */
   private async getRoomMessagesByType(
     roomId: string,
@@ -254,7 +255,18 @@ export class RedisCacheService implements OnModuleDestroy {
     // RECORD_EVERY 모드는 'messages' suffix가 있음
     const suffix = cacheType & CacheTypeFlag.RECORD_EVERY ? 'messages' : undefined;
     const basePattern = this.getCacheKey(roomId, '*', type, suffix);
-    const keys = await this.redis.keys(basePattern);
+    
+    // SCAN을 사용하여 메모리 효율적으로 키 조회
+    const keys: string[] = [];
+    let cursor = 0;
+    do {
+      const result = await this.redis.scan(cursor, {
+        MATCH: basePattern,
+        COUNT: 100, // 한 번에 최대 100개 키 조회
+      });
+      cursor = result.cursor;
+      keys.push(...result.keys);
+    } while (cursor !== 0);
 
     if (keys.length === 0) {
       return [];
@@ -333,13 +345,30 @@ export class RedisCacheService implements OnModuleDestroy {
 
   /**
    * 클라이언트의 모든 캐시 정리
+   * SCAN을 사용하여 메모리 효율성 개선
    */
   async clearMessageCache(clientId: string, roomId: string): Promise<void> {
     const pattern = this.getCacheKeyPattern(roomId, clientId, '*');
-    const keys = await this.redis.keys(pattern);
+    
+    // SCAN을 사용하여 메모리 효율적으로 키 조회
+    const keys: string[] = [];
+    let cursor = 0;
+    do {
+      const result = await this.redis.scan(cursor, {
+        MATCH: pattern,
+        COUNT: 100, // 한 번에 최대 100개 키 조회
+      });
+      cursor = result.cursor;
+      keys.push(...result.keys);
+    } while (cursor !== 0);
 
     if (keys.length > 0) {
-      await this.redis.del(keys);
+      // 배치로 삭제 (한 번에 너무 많이 삭제하지 않도록)
+      const batchSize = 100;
+      for (let i = 0; i < keys.length; i += batchSize) {
+        const batch = keys.slice(i, i + batchSize);
+        await this.redis.del(batch);
+      }
       this.logger.debug(
         `[Redis Cache] Cleared ${keys.length} cache entries for client '${clientId}' in room '${roomId}'`,
       );
@@ -379,6 +408,8 @@ export class RedisCacheService implements OnModuleDestroy {
    */
   async onModuleDestroy(): Promise<void> {
     try {
+      // 이벤트 리스너 제거
+      this.redis.removeAllListeners();
       await this.redis.quit();
       this.logger.log('[Redis Cache] Redis connection closed');
     } catch (error: any) {

@@ -26,3 +26,4 @@ experimental/**/*.db
 .vscode/
 .nuxt
 dev.db
+ecosystem.config.test.js
