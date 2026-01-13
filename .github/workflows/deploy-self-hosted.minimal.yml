@@ -168,15 +168,22 @@ jobs:
         
         # Application
         NODE_ENV=production
-        PORT=${{ secrets.PORT || 4000 }}
-        SOCKET_PORT=${{ secrets.SOCKET_PORT || 4100 }}
+        PORT=${{ env.PORT || 4000 }}
+        SOCKET_PORT=${{ env.SOCKET_PORT || 4100 }}
         
         # Domain
-        DOMAIN_NAME=${{ secrets.DOMAIN_NAME }}
+        DOMAIN_NAME=${{ env.DOMAIN_NAME }}
         SSL_EMAIL=${{ secrets.SSL_EMAIL }}
         
-        # Database (External PostgreSQL)
-        DATABASE_URL=postgresql://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@${{ secrets.POSTGRES_HOST }}:${{ secrets.POSTGRES_PORT }}/${{ secrets.POSTGRES_DB }}?schema=public
+        # Database (Local PostgreSQL container)
+        # minimal 버전에서는 로컬 PostgreSQL 컨테이너 사용
+        POSTGRES_HOST=db-place
+        POSTGRES_PORT=${{ secrets.POSTGRES_PORT || 5432 }}
+        POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+        POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+        POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+        # DATABASE_URL이 명시적으로 설정되지 않으면 로컬 PostgreSQL 사용
+        DATABASE_URL=postgresql://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@db-place:5432/${{ secrets.POSTGRES_DB }}?schema=public
         
         # JWT
         JWT_SECRET=${{ secrets.JWT_SECRET }}
@@ -198,8 +205,8 @@ jobs:
         
         # Meta Viewer Service (Instance B - external access)
         # Set INSTANCE_B_IP in GitHub Secrets (e.g., 192.168.1.100)
-        INSTANCE_B_IP=${{ secrets.INSTANCE_B_IP || 'INSTANCE_B_IP' }}
-        SOCKET_PORT=${{ secrets.SOCKET_PORT || 4100 }}
+        INSTANCE_B_IP=${{ env.INSTANCE_B_IP || 'INSTANCE_B_IP' }}
+        SOCKET_PORT=${{ env.SOCKET_PORT || 4100 }}
         META_VIEWER_SERVICE_URL=${INSTANCE_B_IP}:${SOCKET_PORT}
         EOF
         chmod 600 .env
@@ -208,6 +215,19 @@ jobs:
       run: |
         echo "Pulling latest Docker images from Docker Hub..."
         docker compose -f docker-compose.minimal.instance-a.yml pull || echo "Pull failed, will build locally as fallback"
+
+    - name: Deploy PostgreSQL
+      if: needs.detect_changes.outputs.infra_changed == 'true'
+      run: |
+        echo "Deploying PostgreSQL..."
+        docker compose -f docker-compose.minimal.instance-a.yml up -d db-place
+        echo "Waiting for PostgreSQL to be healthy..."
+        timeout 60 bash -c 'until docker compose -f docker-compose.minimal.instance-a.yml ps db-place | grep -q "healthy"; do sleep 2; done' || echo "PostgreSQL health check timeout, continuing..."
+        sleep 5
+        
+        # PostgreSQL wal_level 확인 (Debezium용)
+        echo "Checking PostgreSQL configuration (wal_level=logical for Debezium)..."
+        docker compose -f docker-compose.minimal.instance-a.yml exec -T db-place psql -U ${{ secrets.POSTGRES_USER }} -d ${{ secrets.POSTGRES_DB }} -c "SHOW wal_level;" 2>/dev/null || echo "PostgreSQL configuration check failed, continuing..."
 
     - name: Deploy applications
       if: needs.detect_changes.outputs.apps_changed == 'true'
@@ -286,6 +306,13 @@ jobs:
         
         if docker compose -f docker-compose.minimal.instance-a.yml ps | grep -q "Up"; then
           echo "✅ Services are running"
+          
+          # PostgreSQL 헬스 체크
+          if docker compose -f docker-compose.minimal.instance-a.yml exec -T db-place pg_isready -U ${{ secrets.POSTGRES_USER }} 2>/dev/null | grep -q "accepting connections"; then
+            echo "✅ PostgreSQL health check passed"
+          else
+            echo "⚠️ PostgreSQL not responding yet"
+          fi
           
           if curl -f http://localhost/health 2>/dev/null; then
             echo "✅ Health check passed"
