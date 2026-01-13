@@ -26,6 +26,8 @@ Dockerfile
 scripts/**/*.dev.*
 scripts/**/*.dev/
 
+ecosystem.config.test.js
+
 # prisma
 prisma/factories
 prisma/basic

@@ -142,9 +142,6 @@ export class MetaViewersRedisService implements OnModuleDestroy {
       // 방에서 클라이언트 제거
       const currentRoom = await this.roomService.handleClientDisconnect(client);
 
-      // 연결 해제된 클라이언트 제거
-      this.connectedClients.delete(clientId);
-
       // 메시지 캐시 정리
       if (currentRoom) {
         await this.cacheService.clearMessageCache(clientId, currentRoom);
@@ -154,13 +151,16 @@ export class MetaViewersRedisService implements OnModuleDestroy {
       this.logger.log(
         `[Meta Viewers Redis] Client disconnected: ${clientId} (room: ${currentRoom || 'none'}, duration: ${duration}ms)`,
       );
-      this.logger.log(
-        `[Meta Viewers Redis] Current connected clients: ${this.connectedClients.size}`,
-      );
     } catch (error: any) {
       this.logger.error(
         `[Meta Viewers Redis] Error handling disconnect for client '${clientId}': ${error.message}`,
         error.stack,
+      );
+    } finally {
+      // finally 블록에서 항상 제거하여 메모리 누수 방지
+      this.connectedClients.delete(clientId);
+      this.logger.log(
+        `[Meta Viewers Redis] Current connected clients: ${this.connectedClients.size}`,
       );
     }
   }

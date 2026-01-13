@@ -49,4 +49,4 @@ ENV NODE_ENV=production
 
 # Start the application with pm2-runtime (container-friendly)
 # pm2-runtime is designed for Docker containers and handles signals properly
-CMD ["pm2-runtime", "start", "dist/apps/meta-viewer-service/main.js", "-i", "2", "--name", "meta-viewer-service"]
+CMD ["pm2-runtime", "start", "dist/apps/meta-viewer-service/main.js", "-i", "3", "--name", "meta-viewer-service"]

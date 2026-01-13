@@ -323,18 +323,26 @@ export class RedisBroadcastSchedulerService implements OnModuleDestroy {
    * 브로드캐스트 스케줄러 중지
    */
   stop(): void {
-    if (this.broadcastInterval) {
-      clearInterval(this.broadcastInterval);
+    try {
+      if (this.broadcastInterval) {
+        clearInterval(this.broadcastInterval);
+        this.broadcastInterval = null;
+      }
+
+      this.releaseLock().catch(() => {
+        // 무시
+      });
+
+      this.isLeader = false;
+      this.isRunning = false;
+      this.logger.log('⏹️ [Broadcast Scheduler] Stopped');
+    } catch (error: any) {
+      this.logger.error(`[Broadcast Scheduler] Error stopping scheduler: ${error.message}`, error.stack);
+      // 에러가 발생해도 상태는 초기화
       this.broadcastInterval = null;
+      this.isLeader = false;
+      this.isRunning = false;
     }
-
-    this.releaseLock().catch(() => {
-      // 무시
-    });
-
-    this.isLeader = false;
-    this.isRunning = false;
-    this.logger.log('⏹️ [Broadcast Scheduler] Stopped');
   }
 
   /**
@@ -461,6 +469,8 @@ export class RedisBroadcastSchedulerService implements OnModuleDestroy {
   async onModuleDestroy(): Promise<void> {
     this.stop();
     try {
+      // 이벤트 리스너 제거
+      this.redis.removeAllListeners();
       await this.redis.quit();
     } catch (error: any) {
       this.logger.error(`[Broadcast Scheduler] Error closing Redis connection: ${error.message}`, error.stack);

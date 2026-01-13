@@ -22,7 +22,7 @@ import * as fs from 'fs';
 import { spawn } from 'child_process';
 
 const META_VIEWER_SERVICE_NAME = 'meta-viewer-service';
-const DEFAULT_SOCKET_PORT = 4100;
+const DEFAULT_SOCKET_PORT = 4300;
 const DEFAULT_REDIS_PORT = 6379;
 
 interface DevEnvironment {
@@ -235,7 +235,7 @@ async function startMetaViewerService(
       }
       
       // PM2 ecosystem 파일 생성 (환경 변수 포함)
-      const ecosystemPath = path.join(serviceRoot, 'ecosystem.config.js');
+      const ecosystemPath = path.join(serviceRoot, 'ecosystem.config.test.js');
       const envString = Object.entries(env)
         .map(([key, value]) => `    ${JSON.stringify(key)}: ${JSON.stringify(value)}`)
         .join(',\n');
@@ -326,7 +326,7 @@ async function cleanup(env: DevEnvironment | null): Promise<void> {
   try {
     // ecosystem 파일 삭제
     const serviceRoot = path.resolve(__dirname, '../..');
-    const ecosystemPath = path.join(serviceRoot, 'ecosystem.config.js');
+    const ecosystemPath = path.join(serviceRoot, 'ecosystem.config.test.js');
     if (fs.existsSync(ecosystemPath)) {
       fs.unlinkSync(ecosystemPath);
       console.log('   ✅ Ecosystem file removed');

@@ -958,6 +958,8 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
+      // 이벤트 리스너 제거
+      this.redis.removeAllListeners();
       await this.redis.quit();
       this.logger.log('[Redis Room] Redis connection closed');
     } catch (error: any) {
