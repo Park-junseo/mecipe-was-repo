@@ -258,7 +258,7 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
     success: boolean;
     clientId: string;
     roomId: string;
-    clientsInRoom: { socketId: string; joinAt: string }[];
+    clientsInRoom: { socketId: string; joinAt: string; sessionToken: string | null }[];
     message: string;
   }> {
     const startTime = Date.now();

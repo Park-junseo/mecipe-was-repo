@@ -235,7 +235,7 @@ async function startMetaViewerService(
       }
       
       // PM2 ecosystem 파일 생성 (환경 변수 포함)
-      const ecosystemPath = path.join(serviceRoot, 'ecosystem.config.test.js');
+      const ecosystemPath = path.join(__dirname, 'ecosystem.config.js');
       const envString = Object.entries(env)
         .map(([key, value]) => `    ${JSON.stringify(key)}: ${JSON.stringify(value)}`)
         .join(',\n');
@@ -283,7 +283,9 @@ ${envString}
       // PM2 시작 (ecosystem 파일 사용)
       console.log('   Starting PM2...');
       console.log(`   Using ecosystem file: ${ecosystemPath}`);
-      execSync(`pm2 start ${ecosystemPath}`, {
+      // PM2는 ecosystem 파일을 사용할 때 파일 경로를 직접 지정하거나
+      // --only 옵션으로 특정 앱만 시작할 수 있습니다
+      execSync(`pm2 start ${ecosystemPath} --only ${META_VIEWER_SERVICE_NAME}`, {
         cwd: projectRoot,
         env,
         stdio: 'inherit',
@@ -325,8 +327,7 @@ async function cleanup(env: DevEnvironment | null): Promise<void> {
   
   try {
     // ecosystem 파일 삭제
-    const serviceRoot = path.resolve(__dirname, '../..');
-    const ecosystemPath = path.join(serviceRoot, 'ecosystem.config.test.js');
+    const ecosystemPath = path.join(__dirname, 'ecosystem.config.js');
     if (fs.existsSync(ecosystemPath)) {
       fs.unlinkSync(ecosystemPath);
       console.log('   ✅ Ecosystem file removed');
