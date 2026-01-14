@@ -181,7 +181,7 @@ jobs:
         POSTGRES_PORT=${{ secrets.POSTGRES_PORT || 5432 }}
         POSTGRES_USER=${{ secrets.POSTGRES_USER }}
         POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-        POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+        POSTGRES_DB=${{ env.POSTGRES_DB }}
         # DATABASE_URL이 명시적으로 설정되지 않으면 로컬 PostgreSQL 사용
         DATABASE_URL=postgresql://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@db-place:5432/${{ secrets.POSTGRES_DB }}?schema=public
         
@@ -217,13 +217,27 @@ jobs:
         docker compose -f docker-compose.minimal.instance-a.yml pull || echo "Pull failed, will build locally as fallback"
 
     - name: Deploy PostgreSQL
-      if: needs.detect_changes.outputs.infra_changed == 'true'
       run: |
-        echo "Deploying PostgreSQL..."
-        docker compose -f docker-compose.minimal.instance-a.yml up -d db-place
-        echo "Waiting for PostgreSQL to be healthy..."
-        timeout 60 bash -c 'until docker compose -f docker-compose.minimal.instance-a.yml ps db-place | grep -q "healthy"; do sleep 2; done' || echo "PostgreSQL health check timeout, continuing..."
-        sleep 5
+        echo "Checking PostgreSQL status..."
+        
+        # PostgreSQL 컨테이너 상태 확인
+        POSTGRES_STATUS=$(docker compose -f docker-compose.minimal.instance-a.yml ps db-place 2>/dev/null | grep -E "Up|healthy|unhealthy" | head -1 || echo "not_running")
+        
+        if echo "$POSTGRES_STATUS" | grep -q "healthy"; then
+          echo "✅ PostgreSQL is already running and healthy. Skipping deployment."
+        else
+          echo "PostgreSQL is not healthy or not running. Deploying/restarting..."
+          
+          # 기존 컨테이너가 있으면 중지 및 제거 (비밀번호 변경 등 설정 업데이트 반영)
+          docker compose -f docker-compose.minimal.instance-a.yml stop db-place 2>/dev/null || true
+          docker compose -f docker-compose.minimal.instance-a.yml rm -f db-place 2>/dev/null || true
+          
+          # PostgreSQL 컨테이너 시작
+          docker compose -f docker-compose.minimal.instance-a.yml up -d db-place
+          echo "Waiting for PostgreSQL to be healthy..."
+          timeout 120 bash -c 'until docker compose -f docker-compose.minimal.instance-a.yml ps db-place | grep -q "healthy"; do sleep 2; done' || echo "PostgreSQL health check timeout, continuing..."
+          sleep 5
+        fi
         
         # PostgreSQL wal_level 확인 (Debezium용)
         echo "Checking PostgreSQL configuration (wal_level=logical for Debezium)..."
