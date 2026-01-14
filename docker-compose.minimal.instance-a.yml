@@ -2,7 +2,7 @@ services:
   # PostgreSQL Database
   db-place:
     image: postgres:15-alpine
-    container_name: postgres-instance-a
+    container_name: db-place
     restart: unless-stopped
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-mecipe_db}
@@ -39,7 +39,7 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV:-production}
       - PORT=${PORT:-4000}
-      - DATABASE_URL=${DATABASE_URL:-postgresql://${POSTGRES_USER:-mecipe_user}:${POSTGRES_PASSWORD}@db-place:5432/${POSTGRES_DB:-mecipe_db}?schema=public}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db-place:5432/${POSTGRES_DB:-mecipe_db}?schema=public}
       - ELASTICSEARCH_HOSTS=${ELASTICSEARCH_HOSTS:-http://${INSTANCE_B_IP:-elasticsearch-instance-b}:9200}
       - ELASTICSEARCH_USERNAME=${ELASTICSEARCH_APP_USER_NAME:-app_user}
       - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_APP_USER_PASS}
