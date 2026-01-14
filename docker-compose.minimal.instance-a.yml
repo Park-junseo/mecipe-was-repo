@@ -108,7 +108,7 @@ services:
       # 포트 443은 SSL 인증서가 있을 때만 노출
       # 로컬 배포: SSL 없이 HTTP만 사용하므로 포트 443 주석 처리
       # 프로덕션: SSL 인증서 설정 후 아래 주석 해제
-      # - "443:443"
+      - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - certbot-conf:/etc/letsencrypt:ro
