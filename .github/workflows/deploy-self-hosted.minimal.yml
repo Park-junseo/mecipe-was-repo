@@ -444,13 +444,27 @@ jobs:
         docker compose -f docker-compose.minimal.instance-b.yml pull || echo "Pull failed, will build locally as fallback"
 
     - name: Deploy Redis
-      if: needs.detect_changes.outputs.infra_changed == 'true'
       run: |
-        echo "Deploying Redis..."
-        docker compose -f docker-compose.minimal.instance-b.yml up -d redis
-        echo "Waiting for Redis to be healthy..."
-        timeout 60 bash -c 'until docker compose -f docker-compose.minimal.instance-b.yml ps redis | grep -q "healthy"; do sleep 2; done' || true
-        sleep 5
+        echo "Checking Redis status..."
+        
+        # Redis 컨테이너 상태 확인
+        REDIS_STATUS=$(docker compose -f docker-compose.minimal.instance-b.yml ps redis 2>/dev/null | grep -E "Up|healthy|unhealthy" | head -1 || echo "not_running")
+        
+        if echo "$REDIS_STATUS" | grep -q "healthy"; then
+          echo "✅ Redis is already running and healthy. Skipping deployment."
+        else
+          echo "Redis is not healthy or not running. Deploying/restarting..."
+          
+          # 기존 컨테이너가 있으면 중지 및 제거
+          docker compose -f docker-compose.minimal.instance-b.yml stop redis 2>/dev/null || true
+          docker compose -f docker-compose.minimal.instance-b.yml rm -f redis 2>/dev/null || true
+          
+          # Redis 컨테이너 시작
+          docker compose -f docker-compose.minimal.instance-b.yml up -d redis
+          echo "Waiting for Redis to be healthy..."
+          timeout 120 bash -c 'until docker compose -f docker-compose.minimal.instance-b.yml ps redis | grep -q "healthy"; do sleep 2; done' || echo "Redis health check timeout, continuing..."
+          sleep 5
+        fi
 
     - name: Deploy applications
       if: github.event_name == 'workflow_dispatch' || needs.detect_changes.outputs.apps_changed == 'true'
@@ -468,11 +482,36 @@ jobs:
         if docker compose -f docker-compose.minimal.instance-b.yml ps | grep -q "Up"; then
           echo "✅ Services are running"
           
-          # Check Redis
-          if docker compose -f docker-compose.minimal.instance-b.yml exec -T redis redis-cli ping 2>/dev/null | grep -q "PONG"; then
-            echo "✅ Redis is healthy"
+          # Redis 헬스 체크
+          if docker compose -f docker-compose.minimal.instance-b.yml ps redis | grep -q "healthy"; then
+            echo "✅ Redis container is healthy"
+            
+            # Redis 연결 테스트 (비밀번호가 있는 경우 처리)
+            if [ -n "${{ secrets.REDIS_PASSWORD }}" ]; then
+              if docker compose -f docker-compose.minimal.instance-b.yml exec -T redis redis-cli -a "${{ secrets.REDIS_PASSWORD }}" ping 2>/dev/null | grep -q "PONG"; then
+                echo "✅ Redis connection test passed (with password)"
+              else
+                echo "⚠️ Redis connection test failed (with password)"
+              fi
+            else
+              if docker compose -f docker-compose.minimal.instance-b.yml exec -T redis redis-cli ping 2>/dev/null | grep -q "PONG"; then
+                echo "✅ Redis connection test passed (no password)"
+              else
+                echo "⚠️ Redis connection test failed (no password)"
+              fi
+            fi
           else
-            echo "⚠️ Redis not responding yet"
+            echo "⚠️ Redis container is not healthy"
+            docker compose -f docker-compose.minimal.instance-b.yml ps redis
+            docker compose -f docker-compose.minimal.instance-b.yml logs redis --tail=20
+          fi
+          
+          # Meta Viewer Service 헬스 체크
+          if docker compose -f docker-compose.minimal.instance-b.yml ps meta-viewer-service | grep -q "healthy"; then
+            echo "✅ Meta Viewer Service is healthy"
+          else
+            echo "⚠️ Meta Viewer Service is not healthy"
+            docker compose -f docker-compose.minimal.instance-b.yml logs meta-viewer-service --tail=20
           fi
         else
           echo "❌ Some services failed to start"
