@@ -5,14 +5,16 @@
     "build",
     "node_modules",
     ".nx",
-    "coverage"
+    "coverage",
+    "**/prisma/**/runtime/**",
+    "**/prisma/**/index-browser.d.ts",
+    "**/prisma/**/library.d.ts"
   ],
   "overrides": [
     {
       "files": ["*.ts", "*.tsx"],
       "parser": "@typescript-eslint/parser",
       "parserOptions": {
-        "project": ["tsconfig.base.json"],
         "ecmaVersion": 2020,
         "sourceType": "module"
       },
@@ -21,6 +23,10 @@
     },
     {
       "files": ["*.js", "*.jsx"],
+      "parserOptions": {
+        "ecmaVersion": 2020,
+        "sourceType": "module"
+      },
       "rules": {}
     }
   ]
