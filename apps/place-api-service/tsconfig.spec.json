@@ -15,5 +15,8 @@
         "test/**/*.ts",
         "src/**/*.service.mock.ts",
         "src/util/__mocks__/**/*"
+    ],
+    "exclude": [
+        "prisma/**"
     ]
 }
