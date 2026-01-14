@@ -15,11 +15,48 @@ jobs:
     outputs:
       apps_changed: ${{ steps.filter.outputs.apps }}
       infra_changed: ${{ steps.filter.outputs.infra }}
+      last_successful_sha: ${{ steps.last_success.outputs.sha }}
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # 전체 히스토리 필요 (base 비교를 위해)
+      
+      - name: Get last successful commit SHA
+        id: last_success
+        uses: actions/github-script@v6
+        with:
+          script: |
+            try {
+              const { data: runs } = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: context.workflow,
+                status: 'success',
+                per_page: 1
+              });
+              
+              if (runs.workflow_runs.length > 0) {
+                const lastSuccessSha = runs.workflow_runs[0].head_sha;
+                core.setOutput('sha', lastSuccessSha);
+                core.info(`Last successful commit SHA: ${lastSuccessSha}`);
+                return lastSuccessSha;
+              } else {
+                // 첫 배포인 경우 현재 커밋의 이전 커밋 사용
+                core.setOutput('sha', context.sha);
+                core.info(`No previous successful run found. Using current commit: ${context.sha}`);
+                return context.sha;
+              }
+            } catch (error) {
+              core.warning(`Failed to get last successful commit: ${error.message}`);
+              // 실패 시 현재 커밋 사용 (안전한 폴백)
+              core.setOutput('sha', context.sha);
+              return context.sha;
+            }
+      
       - uses: dorny/paths-filter@v2
         id: filter
         with:
+          base: ${{ steps.last_success.outputs.sha }}
           filters: |
             apps:
               - 'apps/**'
@@ -66,9 +103,11 @@ jobs:
     needs: [test, detect_changes]
     runs-on: ubuntu-latest
     if: |
-      github.event_name == 'push' && 
-      github.ref == 'refs/heads/main' &&
-      (needs.detect_changes.outputs.apps_changed == 'true' || needs.detect_changes.outputs.infra_changed == 'true')
+      always() &&
+      (github.event_name == 'workflow_dispatch' || 
+       (github.event_name == 'push' && 
+        github.ref == 'refs/heads/main' &&
+        (needs.detect_changes.outputs.apps_changed == 'true' || needs.detect_changes.outputs.infra_changed == 'true')))
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
@@ -83,7 +122,7 @@ jobs:
         password: ${{ secrets.DOCKER_PASSWORD }}
 
     - name: Build and push place-api-service image
-      if: needs.detect_changes.outputs.apps_changed == 'true'
+      if: github.event_name == 'workflow_dispatch' || needs.detect_changes.outputs.apps_changed == 'true'
       uses: docker/build-push-action@v5
       with:
         context: .
@@ -96,7 +135,7 @@ jobs:
         cache-to: type=inline
 
     - name: Build and push api-gateway image
-      if: needs.detect_changes.outputs.apps_changed == 'true'
+      if: github.event_name == 'workflow_dispatch' || needs.detect_changes.outputs.apps_changed == 'true'
       uses: docker/build-push-action@v5
       with:
         context: .
@@ -109,7 +148,7 @@ jobs:
         cache-to: type=inline
 
     - name: Build and push meta-viewer-service image
-      if: needs.detect_changes.outputs.apps_changed == 'true'
+      if: github.event_name == 'workflow_dispatch' || needs.detect_changes.outputs.apps_changed == 'true'
       uses: docker/build-push-action@v5
       with:
         context: .
@@ -122,7 +161,7 @@ jobs:
         cache-to: type=inline
 
     - name: Build and push Nginx image
-      if: needs.detect_changes.outputs.infra_changed == 'true'
+      if: github.event_name == 'workflow_dispatch' || needs.detect_changes.outputs.infra_changed == 'true'
       uses: docker/build-push-action@v5
       with:
         context: ./nginx
@@ -140,7 +179,8 @@ jobs:
     runs-on: [self-hosted, Linux, X64, instance-a]
     if: |
       always() &&
-      (needs.detect_changes.outputs.apps_changed == 'true' || needs.detect_changes.outputs.infra_changed == 'true')
+      (github.event_name == 'workflow_dispatch' || 
+       (needs.detect_changes.outputs.apps_changed == 'true' || needs.detect_changes.outputs.infra_changed == 'true'))
     steps:
     - name: Cleanup workspace
       run: |
@@ -244,7 +284,7 @@ jobs:
         docker compose -f docker-compose.minimal.instance-a.yml exec -T db-place psql -U ${{ secrets.POSTGRES_USER }} -d ${{ secrets.POSTGRES_DB }} -c "SHOW wal_level;" 2>/dev/null || echo "PostgreSQL configuration check failed, continuing..."
 
     - name: Deploy applications
-      if: needs.detect_changes.outputs.apps_changed == 'true'
+      if: github.event_name == 'workflow_dispatch' || needs.detect_changes.outputs.apps_changed == 'true'
       run: |
         echo "Deploying applications..."
         docker compose -f docker-compose.minimal.instance-a.yml up -d place-api-service api-gateway
@@ -252,7 +292,7 @@ jobs:
         sleep 30
 
     - name: Setup SSL certificate (if needed)
-      if: needs.detect_changes.outputs.infra_changed == 'true'
+      if: github.event_name == 'workflow_dispatch' || needs.detect_changes.outputs.infra_changed == 'true'
       run: |
         echo "Checking SSL certificate status..."
         
@@ -308,7 +348,7 @@ jobs:
         docker compose -f docker-compose.minimal.instance-a.yml up -d certbot
 
     - name: Run database migrations
-      if: needs.detect_changes.outputs.apps_changed == 'true'
+      if: github.event_name == 'workflow_dispatch' || needs.detect_changes.outputs.apps_changed == 'true'
       run: |
         echo "Running database migrations..."
         docker compose -f docker-compose.minimal.instance-a.yml exec -T place-api-service sh -c "cd /app/apps/place-api-service && prisma migrate deploy --schema=./prisma/schema.prisma" || echo "Migration failed or no migrations to apply"
@@ -356,7 +396,8 @@ jobs:
     runs-on: [self-hosted, Linux, X64, instance-b]
     if: |
       always() &&
-      (needs.detect_changes.outputs.apps_changed == 'true' || needs.detect_changes.outputs.infra_changed == 'true') &&
+      (github.event_name == 'workflow_dispatch' || 
+       (needs.detect_changes.outputs.apps_changed == 'true' || needs.detect_changes.outputs.infra_changed == 'true')) &&
       (needs.deploy_instance_a.result == 'success' || needs.deploy_instance_a.result == 'skipped')
     steps:
     - name: Cleanup workspace
@@ -412,7 +453,7 @@ jobs:
         sleep 5
 
     - name: Deploy applications
-      if: needs.detect_changes.outputs.apps_changed == 'true'
+      if: github.event_name == 'workflow_dispatch' || needs.detect_changes.outputs.apps_changed == 'true'
       run: |
         echo "Deploying applications..."
         docker compose -f docker-compose.minimal.instance-b.yml up -d meta-viewer-service
