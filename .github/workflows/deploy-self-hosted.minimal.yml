@@ -181,7 +181,7 @@ jobs:
         POSTGRES_PORT=${{ secrets.POSTGRES_PORT || 5432 }}
         POSTGRES_USER=${{ secrets.POSTGRES_USER }}
         POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-        POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+        POSTGRES_DB=${{ env.POSTGRES_DB }}
         # DATABASE_URL이 명시적으로 설정되지 않으면 로컬 PostgreSQL 사용
         DATABASE_URL=postgresql://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@db-place:5432/${{ secrets.POSTGRES_DB }}?schema=public
         
