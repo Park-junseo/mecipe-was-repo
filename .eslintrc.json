@@ -15,7 +15,6 @@
       "files": ["*.ts", "*.tsx"],
       "parser": "@typescript-eslint/parser",
       "parserOptions": {
-        "project": ["tsconfig.base.json"],
         "ecmaVersion": 2020,
         "sourceType": "module"
       },
@@ -24,6 +23,10 @@
     },
     {
       "files": ["*.js", "*.jsx"],
+      "parserOptions": {
+        "ecmaVersion": 2020,
+        "sourceType": "module"
+      },
       "rules": {}
     }
   ]

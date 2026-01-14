@@ -4,9 +4,9 @@
   "private": true,
   "description": "Virtual Cafe WAS Monorepo",
   "scripts": {
-    "build": "nx run-many --target=build --all",
-    "test": "nx run-many --target=test --all",
-    "lint": "nx run-many --target=lint --all",
+    "build": "nx run-many --target=build --all --exclude=mecipe-was,load-tests",
+    "test": "nx run-many --target=test --all --exclude=mecipe-was,load-tests",
+    "lint": "nx run-many --target=lint --all --exclude=mecipe-was,load-tests",
     "build:all": "nx run-many --target=build --all",
     "test:all": "nx run-many --target=test --all",
     "lint:all": "nx run-many --target=lint --all",
