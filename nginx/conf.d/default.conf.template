@@ -8,6 +8,11 @@ server {
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
+
+    # 나머지 모든 요청은 HTTPS로 리다이렉트
+    location / {
+        return 301 https://$host$request_uri;
+    }
 }
 
 # HTTPS 서버
