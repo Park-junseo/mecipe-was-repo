@@ -5,7 +5,10 @@
     "build",
     "node_modules",
     ".nx",
-    "coverage"
+    "coverage",
+    "**/prisma/**/runtime/**",
+    "**/prisma/**/index-browser.d.ts",
+    "**/prisma/**/library.d.ts"
   ],
   "overrides": [
     {
