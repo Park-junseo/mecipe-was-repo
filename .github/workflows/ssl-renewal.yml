@@ -15,34 +15,29 @@ on:
 jobs:
   check-ssl:
     name: Check SSL Certificate Status
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, instance-a]
     
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
       - name: Check SSL certificate expiry
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USERNAME }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          port: ${{ secrets.SERVER_PORT || 22 }}
-          script: |
-            cd /app/mecipe-was
-            
-            # SSL 인증서 만료일 확인
-            echo "Checking SSL certificate expiry..."
-            docker compose run --rm certbot certificates
-            
-            # 갱신 테스트 (실제로 갱신하지 않음)
-            echo "Testing certificate renewal..."
-            docker compose run --rm certbot renew --dry-run
-            
-            # 결과 출력
-            if [ $? -eq 0 ]; then
-              echo "✅ SSL certificate is valid and renewal test passed"
-            else
-              echo "❌ SSL certificate renewal test failed"
-              exit 1
-            fi
+        run: |
+          echo "Checking SSL certificate expiry..."
+          docker compose -f docker-compose.minimal.instance-a.yml run --rm certbot certificates
+      
+      - name: Test certificate renewal (dry-run)
+        run: |
+          echo "Testing certificate renewal..."
+          docker compose -f docker-compose.minimal.instance-a.yml run --rm certbot renew --dry-run
+          
+          # 결과 출력
+          if [ $? -eq 0 ]; then
+            echo "✅ SSL certificate is valid and renewal test passed"
+          else
+            echo "❌ SSL certificate renewal test failed"
+            exit 1
+          fi
 
       - name: Notify on failure
         if: failure()
