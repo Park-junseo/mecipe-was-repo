@@ -33,9 +33,21 @@ jobs:
       - name: Ensure nginx is running
         run: |
           echo "Ensuring nginx is running for webroot mode..."
-          # nginx가 실행 중이어야 webroot 모드가 작동함
-          docker compose -f docker-compose.minimal.instance-a.yml up -d nginx || echo "Nginx is already running"
-          sleep 3
+          # nginx가 이미 실행 중인지 확인
+          if docker compose -f docker-compose.minimal.instance-a.yml ps nginx | grep -q "Up"; then
+            echo "✅ Nginx is already running"
+          else
+            echo "⚠️ Nginx is not running. Starting nginx (without building)..."
+            # --no-build 플래그로 빌드 없이 시작 (이미지가 이미 존재해야 함)
+            docker compose -f docker-compose.minimal.instance-a.yml up -d --no-build nginx 2>/dev/null || \
+            docker compose -f docker-compose.minimal.instance-a.yml up -d nginx || {
+              echo "❌ Failed to start nginx. Please ensure nginx image exists."
+              echo "💡 Tip: Run the deployment workflow first to build and deploy images."
+              exit 1
+            }
+            sleep 3
+          fi
+          
           # nginx가 정상적으로 응답하는지 확인
           if curl -f http://localhost/health 2>/dev/null; then
             echo "✅ Nginx is running and responding"
