@@ -138,6 +138,7 @@ export class MetaViewersRedisGateway
     @MessageBody() data: { roomId: string; sessionToken?: string },
     @ConnectedSocket() client: Socket,
   ) {
+    console.log(`[Gateway] joinRoom event received from client '${client.id}' for room '${data.roomId}'`);
     return this.metaViewersRedisService.joinRoom(data, client);
   }
 
