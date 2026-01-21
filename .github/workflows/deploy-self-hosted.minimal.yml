@@ -42,17 +42,21 @@ jobs:
                 core.info(`Last successful commit SHA: ${lastSuccessSha}`);
                 return lastSuccessSha;
               } else {
-                // 첫 배포인 경우: HEAD~1 사용 (이전 커밋과 비교)
-                // 단, 커밋이 1개뿐이면 HEAD 사용
-                core.setOutput('sha', 'HEAD~1');
-                core.info(`No previous successful run found. Using HEAD~1 for comparison.`);
-                return 'HEAD~1';
+                // 첫 배포인 경우:
+                // - push 이벤트면 직전 커밋 SHA(github.event.before)를 base로 사용
+                // - 그 외(workflow_dispatch 등)는 현재 커밋 SHA를 base로 사용 (변경 감지 = false가 될 수 있으나 실패하진 않음)
+                const beforeSha = context.payload?.before;
+                const isValidBeforeSha = typeof beforeSha === 'string' && beforeSha.length === 40 && !/^0+$/.test(beforeSha);
+                const fallbackSha = isValidBeforeSha ? beforeSha : context.sha;
+                core.setOutput('sha', fallbackSha);
+                core.info(`No previous successful run found. Using base SHA: ${fallbackSha}`);
+                return fallbackSha;
               }
             } catch (error) {
               core.warning(`Failed to get last successful commit: ${error.message}`);
-              // 실패 시 HEAD~1 사용 (안전한 폴백)
-              core.setOutput('sha', 'HEAD~1');
-              return 'HEAD~1';
+              // 실패 시 현재 커밋 SHA 사용 (안전한 폴백: 변경 감지 실패 대신 스킵)
+              core.setOutput('sha', context.sha);
+              return context.sha;
             }
       
       - name: Debug change detection
@@ -60,6 +64,10 @@ jobs:
           echo "Base commit: ${{ steps.last_success.outputs.sha }}"
           echo "Current commit: ${{ github.sha }}"
           echo "Checking docker-compose files..."
+          if [ "${{ steps.last_success.outputs.sha }}" = "${{ github.sha }}" ]; then
+            echo "Base equals current commit; skipping git diff."
+            exit 0
+          fi
           git diff --name-only ${{ steps.last_success.outputs.sha }}..HEAD | grep -E 'docker-compose.*\.yml' || echo "No docker-compose files changed"
       
       - uses: dorny/paths-filter@v2
