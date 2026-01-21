@@ -90,6 +90,46 @@ export class MetaViewersRedisGateway
   }
 
   async handleConnection(client: Socket, ...args: any[]) {
+    // handleConnection 호출 확인 (환경 변수와 무관하게 항상 로그)
+    console.log(`[Gateway] handleConnection called - clientId: ${client.id}`);
+    
+    // Socket.IO onAny를 사용한 이벤트 로깅 (socket.use() 대신)
+    // socket.use()는 NestJS Gateway와 함께 사용할 때 제대로 작동하지 않을 수 있음
+    const enableSocketLogging = process.env.ENABLE_SOCKET_LOGGING === 'true';
+    
+    if (enableSocketLogging) {
+      const clientId = client.id;
+      const timestamp = () => new Date().toISOString();
+      
+      // onAny는 모든 이벤트를 확실하게 캡처함
+      client.onAny((eventName, ...eventArgs) => {
+        try {
+          const data = eventArgs.length > 0 ? eventArgs[0] : null;
+          const hasCallback = eventArgs.length > 0 && typeof eventArgs[eventArgs.length - 1] === 'function';
+          const dataStr = data 
+            ? JSON.stringify(data).substring(0, 500)
+            : 'no data';
+          
+          console.log(
+            `[Socket Log] 📥 [${timestamp()}] Client: ${clientId} | Event: ${eventName} | Data: ${dataStr}${hasCallback ? ' | Has ACK callback' : ''}`
+          );
+        } catch (error) {
+          console.log(`[Socket Log] 📥 [${timestamp()}] Client: ${clientId} | Event: ${eventName} | [Unable to log data]`);
+        }
+      });
+
+      // 연결/종료 로깅
+      console.log(
+        `[Socket Log] ✅ CONNECT [${timestamp()}] Client: ${clientId} | IP: ${client.handshake.address} | Rooms: ${Array.from(client.rooms).join(', ')}`
+      );
+      
+      client.on('disconnect', (reason) => {
+        console.log(
+          `[Socket Log] ❌ DISCONNECT [${timestamp()}] Client: ${clientId} | Reason: ${reason}`
+        );
+      });
+    }
+    
     await this.metaViewersRedisService.handleConnection(client, ...args);
   }
 
