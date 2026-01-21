@@ -1,4 +1,5 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { Server, Socket } from 'socket.io';
 import { RedisBroadcastSchedulerService } from './services/redis-broadcast-scheduler.service';
 import {
@@ -21,6 +22,8 @@ export class MetaViewersRedisService implements OnModuleDestroy {
   private readonly logger = new Logger(MetaViewersRedisService.name);
   // 연결된 소켓들을 저장할 Map (로컬 인스턴스만)
   private connectedClients = new Map<string, Socket>();
+  // Socket.IO 서버 인스턴스 (Cron 메서드에서 접근하기 위해 저장)
+  private server: Server | null = null;
 
   constructor(
     private readonly schedulerService: RedisBroadcastSchedulerService,
@@ -33,6 +36,9 @@ export class MetaViewersRedisService implements OnModuleDestroy {
     const port = Number(process.env.SOCKET_PORT) || 4100;
     this.logger.log(`[Meta Viewers Redis] Socket.IO server initialized on port ${port}`);
     this.logger.log(`[Meta Viewers Redis] Server path: ${server.path()}`);
+
+    // 서버 인스턴스 저장 (Cron 메서드에서 접근하기 위해)
+    this.server = server;
 
     // 브로드캐스트 스케줄러 설정 및 시작
     this.schedulerService.setServer(server);
@@ -54,6 +60,35 @@ export class MetaViewersRedisService implements OnModuleDestroy {
         error.stack,
       );
     });
+
+    this.logger.log('[Meta Viewers Redis] Periodic client cleanup scheduled (30s interval via @Cron)');
+  }
+
+  /**
+   * 연결이 끊어진 클라이언트 정리 (30초마다 실행)
+   * NestJS Schedule의 @Cron 데코레이터 사용
+   */
+  @Cron('*/30 * * * * *') // 30초마다
+  cleanupDisconnectedClients(): void {
+    if (!this.server) {
+      return; // 서버가 아직 초기화되지 않았으면 스킵
+    }
+
+    let cleanedCount = 0;
+    for (const [clientId, client] of this.connectedClients.entries()) {
+      // Socket.IO 서버에서 실제 연결 상태 확인
+      const socket = this.server.sockets.sockets.get(clientId);
+      if (!socket || !socket.connected || !client.connected) {
+        this.connectedClients.delete(clientId);
+        cleanedCount++;
+        this.logger.debug(`[Meta Viewers Redis] Cleaned up disconnected client: ${clientId}`);
+      }
+    }
+    if (cleanedCount > 0) {
+      this.logger.log(
+        `[Meta Viewers Redis] Cleaned up ${cleanedCount} disconnected clients (total: ${this.connectedClients.size})`,
+      );
+    }
   }
 
   /**
@@ -168,8 +203,20 @@ export class MetaViewersRedisService implements OnModuleDestroy {
   async handleConnection(client: Socket, ...args: any[]) {
     const clientId = client.id;
     
+    // 연결 상태 확인
+    if (!client.connected) {
+      this.logger.warn(`[Meta Viewers Redis] Client '${clientId}' is not connected, skipping connection handler`);
+      return;
+    }
+    
     // 새로 연결된 클라이언트 추가
     this.connectedClients.set(clientId, client);
+    
+    // 연결 끊김 이벤트 리스너 추가 (메모리 누수 방지)
+    client.on('disconnect', () => {
+      this.connectedClients.delete(clientId);
+      this.logger.debug(`[Meta Viewers Redis] Removed disconnected client from map: ${clientId}`);
+    });
 
     // 클라이언트 연결 시 세션 토큰 확인 (auth 또는 query에서)
     const providedToken = (client.handshake.auth as any)?.sessionToken || (client.handshake.query as any)?.sessionToken;
@@ -191,8 +238,22 @@ export class MetaViewersRedisService implements OnModuleDestroy {
         );
       } else {
         this.logger.log(
-          `[Meta Viewers Redis] Client connected with existing session token - No previous room to restore`,
+          `[Meta Viewers Redis] Client connected with existing session token - No previous room to restore (token may be expired or invalid)`,
         );
+        // 토큰이 유효하지 않으면 새 토큰 생성
+        sessionToken = await this.roomService.createSessionToken(clientId);
+        this.logger.log(
+          `[Meta Viewers Redis] Created new session token: ${sessionToken.substring(0, 16)}...`,
+        );
+        // 클라이언트에 토큰 만료 알림
+        client.emit(ServerToClientListenerType.SESSION_TOKEN, {
+          sessionToken,
+          socketId: clientId,
+          restored: false,
+          roomId: null,
+          reason: 'TOKEN_EXPIRED',
+        });
+        return; // 새 토큰을 이미 전송했으므로 아래 코드 스킵
       }
     } else {
       // 새 세션 토큰 생성
@@ -222,6 +283,8 @@ export class MetaViewersRedisService implements OnModuleDestroy {
 
   onModuleDestroy() {
     this.schedulerService.stop();
+    this.connectedClients.clear();
+    this.server = null;
     this.logger.log('[Meta Viewers Redis] Service destroyed');
   }
 
@@ -283,9 +346,65 @@ export class MetaViewersRedisService implements OnModuleDestroy {
   /**
    * 헬스체크 처리
    * 클라이언트의 모든 관련 Redis 키 TTL 갱신
+   * Redis에 룸 정보가 있지만 Socket.IO 룸에 없는 경우 자동 재입장
    */
   async handleHeartbeat(client: Socket): Promise<{ success: boolean; message: string }> {
     const clientId = client.id;
+    
+    // 연결 상태 확인
+    if (!client.connected) {
+      this.logger.warn(`[Meta Viewers Redis] Client '${clientId}' is not connected during heartbeat`);
+      return { success: false, message: 'Client not connected' };
+    }
+    
+    // Redis에 룸 정보가 있는지 확인
+    const currentRoom = await this.roomService.getClientRoom(clientId);
+    
+    if (currentRoom) {
+      // Redis에 룸 정보가 있으면 Socket.IO 룸에 있는지 확인
+      // Socket.IO의 rooms는 Set<string>이므로 직접 확인 가능
+      const isInSocketIORoom = client.rooms.has(currentRoom);
+      
+      if (!isInSocketIORoom) {
+        // Redis에 룸 정보가 있지만 Socket.IO 룸에 없으면 자동 재입장
+        this.logger.log(
+          `[Meta Viewers Redis] Client '${clientId}' has room '${currentRoom}' in Redis but not in Socket.IO room. Auto-rejoining...`,
+        );
+        
+        const sessionToken = await this.roomService.getSessionTokenBySocketId(clientId);
+        
+        try {
+          // Socket.IO 룸에 먼저 입장
+          client.join(currentRoom);
+          
+          // Redis 상태는 이미 있으므로 USER_JOINED 메시지만 브로드캐스트
+          // (실제 joinRoom은 USER_JOINED 메시지를 큐에 추가하므로, 여기서는 직접 큐에 추가)
+          const joinMessage: ClientMessage = {
+            type: RoomDataMessageType.USER_JOINED,
+            timestamp: Date.now(),
+            data: {
+              socketId: clientId,
+              sessionToken: sessionToken || '',
+              roomId: currentRoom,
+              timestamp: new Date().toISOString(),
+              autoRejoined: true, // 자동 재입장 플래그
+            },
+            clientId: clientId,
+          };
+          
+          await this.queueService.enqueueData(currentRoom, joinMessage);
+          
+          this.logger.log(
+            `[Meta Viewers Redis] Client '${clientId}' auto-rejoined room '${currentRoom}' via heartbeat`,
+          );
+        } catch (error: any) {
+          this.logger.error(
+            `[Meta Viewers Redis] Failed to auto-rejoin client '${clientId}' to room '${currentRoom}': ${error.message}`,
+          );
+        }
+      }
+    }
+    
     return await this.roomService.handleHeartbeat(clientId);
   }
 
