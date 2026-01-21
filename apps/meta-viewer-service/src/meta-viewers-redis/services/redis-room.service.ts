@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Inject, forwardRef } from '@nestjs/common';
+import { Cron } from '@nestjs/schedule';
 import { Socket } from 'socket.io';
 import { createClient, RedisClientType } from 'redis';
 import { ServerToClientListenerType } from '../interface/socket-event-type';
@@ -30,7 +31,6 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
   // - sessionTokenTtl: 세션 복원을 위해 roomTtl보다 길게 (클라이언트 재연결 대기 시간)
   private readonly sessionTokenTtl = 600; // 10분 (초) - 세션 토큰 TTL (재연결 시 복원 가능 시간)
   private readonly heartbeatTimeout = 60; // 60초 - 헬스체크 타임아웃 (30초 헬스체크 + 여유시간)
-  private cleanupInterval: NodeJS.Timeout | null = null;
 
   constructor(
     @Inject(forwardRef(() => RedisQueueService))
@@ -748,20 +748,11 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * 모듈 초기화 시 주기적 정리 작업 시작
+   * 모듈 초기화 시 로그만 출력
+   * 실제 정리 작업은 @Cron 데코레이터로 스케줄링됨
    */
   async onModuleInit(): Promise<void> {
-    // 60초마다 유효하지 않은 클라이언트 정리
-    this.cleanupInterval = setInterval(() => {
-      this.cleanupInactiveClients().catch((error) => {
-        this.logger.error(
-          `[Redis Room] Error during periodic cleanup: ${error.message}`,
-          error.stack,
-        );
-      });
-    }, 60000); // 60초
-
-    this.logger.log('[Redis Room] Periodic cleanup started (60s interval)');
+    this.logger.log('[Redis Room] Periodic cleanup scheduled (60s interval via @Cron)');
   }
 
   /**
@@ -832,9 +823,11 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * 주기적으로 비활성 클라이언트 정리 (60초마다 실행)
+   * NestJS Schedule의 @Cron 데코레이터 사용
    * 헬스체크를 받지 않은 클라이언트 제거 후, 각 룸의 현재 멤버 목록을 브로드캐스트
    */
-  private async cleanupInactiveClients(): Promise<void> {
+  @Cron('*/60 * * * * *') // 60초마다
+  async cleanupInactiveClients(): Promise<void> {
     const startTime = Date.now();
     this.logger.debug('[Redis Room] Starting periodic cleanup of inactive clients...');
 
@@ -865,9 +858,10 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
               : 0;
 
           const timeSinceLastActivity = Date.now() - lastActivity;
+          const safetyMargin = 10 * 1000; // 10초 여유 (헬스체크 지연 대비)
 
-          // 헬스체크 타임아웃(60초) 이상 비활성이면 제거
-          if (timeSinceLastActivity > this.heartbeatTimeout * 1000) {
+          // 헬스체크 타임아웃(60초) + 여유시간 이상 비활성이면 제거
+          if (timeSinceLastActivity > (this.heartbeatTimeout * 1000 + safetyMargin)) {
             inactiveClients.push(clientId);
           }
         }
@@ -950,13 +944,7 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
    * Redis 연결 종료
    */
   async onModuleDestroy(): Promise<void> {
-    // 주기적 정리 작업 중지
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
-      this.cleanupInterval = null;
-      this.logger.log('[Redis Room] Periodic cleanup stopped');
-    }
-
+    // @Cron 데코레이터로 스케줄링된 작업은 NestJS가 자동으로 중지함
     try {
       // 이벤트 리스너 제거
       this.redis.removeAllListeners();

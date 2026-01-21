@@ -8,7 +8,8 @@ import { createClient, RedisClientType } from 'redis';
 
 /**
  * Redis 기반 브로드캐스트 스케줄러 서비스
- * 12ms 간격으로 활성 룸의 메시지를 브로드캐스트
+ * 기본 16ms 간격(60fps)으로 활성 룸의 메시지를 브로드캐스트
+ * BROADCAST_INTERVAL_MS 환경 변수로 간격 조정 가능
  * 분산 락을 사용하여 하나의 레플리카만 스케줄러 실행 (Redis 부하 감소)
  */
 @Injectable()
@@ -17,7 +18,11 @@ export class RedisBroadcastSchedulerService implements OnModuleDestroy {
   private broadcastInterval: NodeJS.Timeout | null = null;
   private server: Server | null = null;
   private isRunning = false;
-  private readonly broadcastIntervalMs = 12; // 12ms = ~83fps
+  // 브로드캐스트 간격 (환경 변수로 설정 가능, 기본값 16ms = 60fps)
+  // 12ms = ~83fps (과도할 수 있음)
+  // 16ms = 60fps (권장: 일반적인 실시간 애플리케이션 표준)
+  // 33ms = 30fps (보수적: CPU 부하 최소화)
+  private readonly broadcastIntervalMs = Number(process.env.BROADCAST_INTERVAL_MS) || 16; // 16ms = 60fps
   private readonly redis: RedisClientType;
   private readonly lockKey = 'meta-viewer-service:broadcast-scheduler:lock';
   private readonly lockTtl = 30; // 30초 (스케줄러가 죽으면 자동 해제)
@@ -282,9 +287,15 @@ export class RedisBroadcastSchedulerService implements OnModuleDestroy {
       }
     }, this.broadcastIntervalMs);
 
+    const fps = Math.round(1000 / this.broadcastIntervalMs);
     this.logger.log(
-      `[Broadcast Scheduler] Started (interval: ${this.broadcastIntervalMs}ms, ~${Math.round(1000 / this.broadcastIntervalMs)}fps)`,
+      `[Broadcast Scheduler] Started (interval: ${this.broadcastIntervalMs}ms, ~${fps}fps)`,
     );
+    if (this.broadcastIntervalMs < 16) {
+      this.logger.warn(
+        `[Broadcast Scheduler] Very short interval (${this.broadcastIntervalMs}ms) may cause high CPU usage. Consider using 16ms (60fps) or higher.`,
+      );
+    }
   }
 
   /**
@@ -393,7 +404,7 @@ export class RedisBroadcastSchedulerService implements OnModuleDestroy {
   }
 
   /**
-   * 브로드캐스트 처리 (12ms마다 실행, 리더만 실행)
+   * 브로드캐스트 처리 (기본 16ms마다 실행, 리더만 실행)
    * 최적화: 병렬 처리 및 배치 작업
    */
   private async processBroadcast(): Promise<void> {
