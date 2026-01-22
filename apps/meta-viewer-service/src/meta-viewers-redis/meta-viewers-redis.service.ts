@@ -82,7 +82,6 @@ export class MetaViewersRedisService implements OnModuleDestroy {
       if (!socket || !socket.connected || !client.connected) {
         this.connectedClients.delete(clientId);
         cleanedCount++;
-        this.logger.debug(`[Meta Viewers Redis] Cleaned up disconnected client: ${clientId}`);
       }
     }
     if (cleanedCount > 0) {
@@ -216,7 +215,6 @@ export class MetaViewersRedisService implements OnModuleDestroy {
     // 연결 끊김 이벤트 리스너 추가 (메모리 누수 방지)
     client.on('disconnect', () => {
       this.connectedClients.delete(clientId);
-      this.logger.debug(`[Meta Viewers Redis] Removed disconnected client from map: ${clientId}`);
     });
 
     // 클라이언트 연결 시 세션 토큰 확인 (auth 또는 query에서)
@@ -277,9 +275,6 @@ export class MetaViewersRedisService implements OnModuleDestroy {
     this.logger.log(
       `[Meta Viewers Redis] Current connected clients: ${this.connectedClients.size}`,
     );
-    this.logger.debug(
-      `[Meta Viewers Redis] Client info - IP: ${client.handshake.address}, User-Agent: ${client.handshake.headers['user-agent']}`,
-    );
   }
 
   onModuleDestroy() {
@@ -322,9 +317,13 @@ export class MetaViewersRedisService implements OnModuleDestroy {
       );
 
       const duration = Date.now() - startTime;
-      this.logger.debug(
-        `[Meta Viewers Redis] Data queued for room '${currentRoom}' (type: ${data.type}, clientId: ${clientId}, duration: ${duration}ms)`,
-      );
+      
+      // 느린 데이터 큐잉은 경고
+      if (duration > 1000) {
+        this.logger.warn(
+          `[Meta Viewers Redis] Data queued slow for room '${currentRoom}' (type: ${data.type}, clientId: ${clientId}, duration: ${duration}ms)`,
+        );
+      }
 
       return {
         success: true,
@@ -448,36 +447,22 @@ export class MetaViewersRedisService implements OnModuleDestroy {
   async joinRoom(data: { roomId: string; sessionToken?: string }, client: Socket) {
     const startTime = Date.now();
     const clientId = client.id;
-    const instanceId = process.env.NODE_APP_INSTANCE || process.env.INSTANCE_ID || process.pid;
-
-    this.logger.log(`[Meta Viewers Redis] joinRoom called - clientId: ${clientId}, roomId: ${data?.roomId || 'undefined'}, Instance: ${instanceId}`);
 
     try {
       // 세션 토큰은 데이터에서 제공되거나 소켓에서 가져옴
-      this.logger.debug(`[Meta Viewers Redis] Getting session token for client '${clientId}'...`);
-      
       let sessionToken: string | null | undefined;
       
       if (data.sessionToken) {
         sessionToken = data.sessionToken;
-        this.logger.debug(`[Meta Viewers Redis] Session token from data: ${sessionToken.substring(0, 16)}...`);
       } else {
-        this.logger.debug(`[Meta Viewers Redis] Calling getSessionTokenBySocketId for client '${clientId}'...`);
         sessionToken = await this.roomService.getSessionTokenBySocketId(clientId);
-        this.logger.debug(`[Meta Viewers Redis] getSessionTokenBySocketId completed: ${sessionToken ? 'found' : 'not found'}`);
         
         if (!sessionToken) {
           sessionToken = (client.handshake.auth as any)?.sessionToken || (client.handshake.query as any)?.sessionToken;
-          this.logger.debug(`[Meta Viewers Redis] Session token from handshake: ${sessionToken ? 'found' : 'not found'}`);
         }
       }
       
-      this.logger.debug(`[Meta Viewers Redis] Final session token: ${sessionToken ? 'found' : 'not found'}`);
-      this.logger.debug(`[Meta Viewers Redis] Calling roomService.joinRoom for client '${clientId}' in room '${data.roomId}'...`);
-      
       const result = await this.roomService.joinRoom(client, data.roomId, sessionToken || undefined);
-      
-      this.logger.debug(`[Meta Viewers Redis] roomService.joinRoom completed for client '${clientId}' in room '${data.roomId}'`);
 
       // 조인 이벤트 캐시 메시지 풀 전송
       const cachedMessages = await this.cacheService.getJoinEventMessages(data.roomId);
@@ -501,6 +486,11 @@ export class MetaViewersRedisService implements OnModuleDestroy {
         ? `[Meta Viewers Redis] Client '${clientId}' (session token) joined room '${data.roomId}'`
         : `[Meta Viewers Redis] Client '${clientId}' joined room '${data.roomId}'`;
       this.logger.log(`${logMessage} (duration: ${duration}ms)`);
+
+      // 느린 joinRoom은 경고
+      if (duration > 2000) {
+        this.logger.warn(`[Meta Viewers Redis] joinRoom slow for client '${clientId}' in room '${data.roomId}': ${duration}ms`);
+      }
 
       return result;
     } catch (error: any) {

@@ -118,7 +118,7 @@ export class RedisQueueService implements OnModuleDestroy {
       // Consumer Group이 이미 존재하면 무시
       if (error.message?.includes('BUSYGROUP')) {
         this.initializedGroups.add(streamKey);
-        this.logger.debug(`[Redis Queue] Consumer group already exists for ${streamKey}`);
+        // Consumer Group이 이미 존재하는 것은 정상적인 상황이므로 로그 없음
       } else {
         this.logger.error(`[Redis Queue] Failed to create consumer group for ${streamKey}: ${error.message}`, error.stack);
         throw error;
@@ -138,20 +138,23 @@ export class RedisQueueService implements OnModuleDestroy {
     const startTime = Date.now();
     const timeoutMs = 5000; // 5초 타임아웃
 
-    // Redis 연결 상태 확인
-    const isOpen = this.redis.isOpen;
-    const isReady = this.redis.isReady;
-    this.logger.debug(`[Redis Queue] enqueueData called - roomId: ${roomId}, redis.isOpen: ${isOpen}, redis.isReady: ${isReady}`);
-
     try {
       // 타임아웃 래퍼: Promise.race를 사용하여 최대 5초 대기
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
+          const isOpenOnTimeout = this.redis.isOpen;
+          const isReadyOnTimeout = this.redis.isReady;
+          this.logger.warn(
+            `[Redis Queue] enqueueData timeout for room '${roomId}' after ${timeoutMs}ms (isOpen: ${isOpenOnTimeout}, isReady: ${isReadyOnTimeout})`,
+          );
           reject(new Error(`enqueueData timeout for room '${roomId}' after ${timeoutMs}ms`));
         }, timeoutMs);
       });
 
-      this.logger.debug(`[Redis Queue] Calling xAdd for room '${roomId}'...`);
+      const xAddStartTime = Date.now();
+      
+      // 최적화: TRIM을 별도로 실행하여 XADD 성능 향상
+      // XADD만 먼저 실행하고, TRIM은 비동기로 처리
       const xAddPromise = this.redis.xAdd(
         streamKey,
         '*',
@@ -161,25 +164,43 @@ export class RedisQueueService implements OnModuleDestroy {
           clientId: data.clientId,
           type: data.type,
         },
-        {
-          TRIM: {
-            strategy: 'MAXLEN',
-            strategyModifier: '~',
-            threshold: this.streamMaxLength,
-          },
-        },
-      );
+      ).then(async (messageId) => {
+        const xAddDuration = Date.now() - xAddStartTime;
+        
+        // XADD가 느리면 경고
+        if (xAddDuration > 1000) {
+          this.logger.warn(
+            `[Redis Queue] xAdd slow for room '${roomId}': ${xAddDuration}ms (messageId: ${messageId})`,
+          );
+        }
+        
+        // TRIM을 비동기로 실행 (실패해도 무시)
+        this.redis
+          .xTrim(streamKey, 'MAXLEN', this.streamMaxLength)
+          .catch((trimError) => {
+            // TRIM 실패는 경고만 (XADD는 이미 성공)
+            this.logger.warn(
+              `[Redis Queue] Failed to trim stream '${streamKey}': ${trimError.message}`,
+            );
+          });
+        
+        return messageId;
+      }).catch((error) => {
+        const xAddDuration = Date.now() - xAddStartTime;
+        this.logger.error(
+          `[Redis Queue] xAdd failed for room '${roomId}' (duration: ${xAddDuration}ms): ${error.message}`,
+          error.stack,
+        );
+        throw error;
+      });
 
       const messageId = await Promise.race([xAddPromise, timeoutPromise]);
-      this.logger.debug(`[Redis Queue] xAdd completed for room '${roomId}' - messageId: ${messageId}`);
 
       const duration = Date.now() - startTime;
-      this.logger.debug(
-        `[Redis Queue] Enqueued message to room '${roomId}' (type: ${data.type}, clientId: ${data.clientId}, duration: ${duration}ms, messageId: ${messageId})`,
-      );
       
+      // 전체 작업이 느리면 경고
       if (duration > 1000) {
-        this.logger.warn(`[Redis Queue] enqueueData took ${duration}ms for room '${roomId}' (slow)`);
+        this.logger.warn(`[Redis Queue] enqueueData slow for room '${roomId}': ${duration}ms (type: ${data.type})`);
       }
     } catch (error: any) {
       const duration = Date.now() - startTime;
@@ -256,9 +277,13 @@ export class RedisQueueService implements OnModuleDestroy {
       }
 
       const duration = Date.now() - startTime;
-      this.logger.debug(
-        `[Redis Queue] Dequeued ${clientMessages.length} messages from room '${roomId}' (duration: ${duration}ms)`,
-      );
+      
+      // 느린 dequeue는 경고
+      if (duration > 1000) {
+        this.logger.warn(
+          `[Redis Queue] dequeueAllData slow for room '${roomId}': ${duration}ms (${clientMessages.length} messages)`,
+        );
+      }
 
       return clientMessages;
     } catch (error: any) {
@@ -368,7 +393,6 @@ export class RedisQueueService implements OnModuleDestroy {
    * 빈 방의 큐 정리 (Stream 자동 정리)
    */
   async cleanupEmptyRooms(activeRooms: string[]): Promise<void> {
-    this.logger.debug(`[Redis Queue] Cleanup check for ${activeRooms.length} active rooms`);
     // Redis Stream은 MAXLEN으로 자동 정리되므로 추가 작업 불필요
   }
 
