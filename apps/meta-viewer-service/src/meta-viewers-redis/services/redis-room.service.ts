@@ -341,6 +341,7 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
 
       // 브로드캐스트 큐에 USER_JOINED 메시지 추가 (메시지 순서 보장)
       // 명시적 이벤트 대신 브로드캐스트 메시지로 처리하여 순서 보장
+      this.logger.debug(`[Redis Room] Creating USER_JOINED message for client '${clientId}' in room '${roomId}'...`);
       const joinMessage: ClientMessage = {
         type: RoomDataMessageType.USER_JOINED,
         timestamp: timestamp,
@@ -354,6 +355,7 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
       };
 
       // RedisQueueService를 통해 큐에 메시지 추가
+      this.logger.debug(`[Redis Room] About to call enqueueData for client '${clientId}' in room '${roomId}'...`);
       try {
         await this.queueService.enqueueData(roomId, joinMessage);
         this.logger.debug(
@@ -365,20 +367,24 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
           `[Redis Room] Failed to enqueue USER_JOINED message for client '${clientId}' in room '${roomId}': ${error.message}`,
         );
       }
+      this.logger.debug(`[Redis Room] After enqueueData for client '${clientId}' in room '${roomId}'`);
 
+      this.logger.debug(`[Redis Room] About to calculate duration and return result for client '${clientId}' in room '${roomId}'...`);
       const duration = Date.now() - startTime;
       const logMessage = sessionToken
         ? `[Redis Room] Client '${clientId}' (session token) joined room '${roomId}'`
         : `[Redis Room] Client '${clientId}' joined room '${roomId}'`;
       this.logger.log(`${logMessage} (${clientsInRoom.length} clients, duration: ${duration}ms)`);
 
-      return {
+      const result = {
         success: true,
         clientId: clientId,
         roomId: roomId,
         clientsInRoom: clientsInRoom,
         message: `Room '${roomId}' joined.`,
       };
+      this.logger.debug(`[Redis Room] Returning result for client '${clientId}' in room '${roomId}'`);
+      return result;
     } catch (error: any) {
       this.logger.error(
         `[Redis Room] Failed to join room '${roomId}' for client '${clientId}': ${error.message}`,
