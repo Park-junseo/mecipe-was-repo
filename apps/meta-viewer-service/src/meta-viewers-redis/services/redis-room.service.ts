@@ -327,8 +327,15 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
         this.redis.expire(`room:${roomId}:info`, this.roomTtl),
       ]);
 
-      // 룸의 모든 클라이언트 목록 조회
-      const clientsInRoom = await this.getRoomClients(roomId);
+      // 룸의 모든 클라이언트 목록 조회 (타임아웃 적용, 실패해도 계속 진행)
+      let clientsInRoom: { socketId: string; sessionToken: string; joinAt: string }[] = [];
+      try {
+        clientsInRoom = await this.getRoomClients(roomId);
+      } catch (error: any) {
+        // getRoomClients 실패해도 joinRoom은 성공으로 처리
+        this.logger.warn(`[Redis Room] Failed to get room clients for '${roomId}': ${error.message}, continuing with empty list`);
+        clientsInRoom = [];
+      }
 
       // 브로드캐스트 큐에 USER_JOINED 메시지 추가 (메시지 순서 보장)
       // 명시적 이벤트 대신 브로드캐스트 메시지로 처리하여 순서 보장
@@ -664,8 +671,10 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * 특정 방의 클라이언트 목록 조회
+   * 최적화: sessionToken 조회를 배치로 처리하여 Redis 호출 최소화 및 타임아웃 적용
    */
   async getRoomClients(roomId: string): Promise<{ socketId: string; sessionToken: string; joinAt: string }[]> {
+    const startTime = Date.now();
     try {
       const clientIds = await this.redis.sMembers(`room:${roomId}:clients`);
 
@@ -673,20 +682,53 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
         return [];
       }
 
-      // 병렬로 클라이언트 정보 조회
-      const clientInfoPromises = clientIds.map(async (clientId) => {
-        const info = await this.redis.hGetAll(`client:${clientId}:info`);
+      // 배치로 sessionToken 조회 (한 번에 여러 개 조회, 타임아웃 적용)
+      const sessionTokenPromises = clientIds.map(clientId => 
+        this.redis.get(`socket:${clientId}:sessionToken`).catch(() => null)
+      );
+      
+      // 배치로 클라이언트 정보 조회
+      const clientInfoPromises = clientIds.map(clientId => 
+        this.redis.hGetAll(`client:${clientId}:info`).catch(() => ({}))
+      );
+
+      // 타임아웃 설정 (2초) - 배포 환경에서 Redis 지연 대비
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(`getRoomClients timeout for room '${roomId}' after 2 seconds`));
+        }, 2000);
+      });
+
+      // 모든 배치 작업을 병렬로 실행하되 타임아웃 적용
+      const [sessionTokens, clientInfos] = await Promise.race([
+        Promise.all([
+          Promise.all(sessionTokenPromises),
+          Promise.all(clientInfoPromises),
+        ]),
+        timeoutPromise,
+      ]);
+
+      // 결과 조합
+      const result = clientIds.map((clientId, index) => {
+        const info = clientInfos[index] || {};
+        const joinAt = 'joinAt' in info && typeof info.joinAt === 'string' ? info.joinAt : new Date().toISOString();
         return {
           socketId: clientId,
-          sessionToken: await this.getSessionTokenBySocketId(clientId) || '',
-          joinAt: info.joinAt || new Date().toISOString(),
+          sessionToken: sessionTokens[index] || '',
+          joinAt: joinAt,
         };
       });
 
-      return await Promise.all(clientInfoPromises);
+      const duration = Date.now() - startTime;
+      if (duration > 1000) {
+        this.logger.warn(`[Redis Room] getRoomClients took ${duration}ms for room '${roomId}' (${clientIds.length} clients)`);
+      }
+      
+      return result;
     } catch (error: any) {
+      const duration = Date.now() - startTime;
       this.logger.error(
-        `[Redis Room] Failed to get clients for room '${roomId}': ${error.message}`,
+        `[Redis Room] Failed to get clients for room '${roomId}' (duration: ${duration}ms): ${error.message}`,
         error.stack,
       );
       return [];
