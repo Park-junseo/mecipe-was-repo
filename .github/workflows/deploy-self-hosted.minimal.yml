@@ -13,21 +13,23 @@ jobs:
   # 변경된 경로 확인
   detect_changes:
     runs-on: ubuntu-latest
+    continue-on-error: true  # 실패해도 계속 진행
     outputs:
-      apps_changed: ${{ steps.filter.outputs.apps }}
-      infra_changed: ${{ steps.filter.outputs.infra }}
+      apps_changed: ${{ steps.force_changes.outputs.apps }}
+      infra_changed: ${{ steps.force_changes.outputs.infra }}
       last_successful_sha: ${{ steps.last_success.outputs.sha }}
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0  # 전체 히스토리 필요 (base 비교를 위해)
       
-      - name: Get last successful commit SHA
+      - name: Get base commit SHA for comparison
         id: last_success
         uses: actions/github-script@v6
         with:
           script: |
             try {
+              // 마지막 성공한 워크플로우 실행의 커밋 SHA 찾기
               const { data: runs } = await github.rest.actions.listWorkflowRuns({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -36,42 +38,73 @@ jobs:
                 per_page: 1
               });
               
+              let baseSha;
+              
               if (runs.workflow_runs.length > 0) {
-                const lastSuccessSha = runs.workflow_runs[0].head_sha;
-                core.setOutput('sha', lastSuccessSha);
-                core.info(`Last successful commit SHA: ${lastSuccessSha}`);
-                return lastSuccessSha;
+                // 마지막 성공한 배포의 커밋 SHA 사용
+                baseSha = runs.workflow_runs[0].head_sha;
+                core.info(`Last successful deployment commit SHA: ${baseSha}`);
               } else {
-                // 첫 배포인 경우:
-                // - push 이벤트면 직전 커밋 SHA(github.event.before)를 base로 사용
-                // - 그 외(workflow_dispatch 등)는 현재 커밋 SHA를 base로 사용 (변경 감지 = false가 될 수 있으나 실패하진 않음)
-                const beforeSha = context.payload?.before;
-                const isValidBeforeSha = typeof beforeSha === 'string' && beforeSha.length === 40 && !/^0+$/.test(beforeSha);
-                const fallbackSha = isValidBeforeSha ? beforeSha : context.sha;
-                core.setOutput('sha', fallbackSha);
-                core.info(`No previous successful run found. Using base SHA: ${fallbackSha}`);
-                return fallbackSha;
+                // 첫 배포인 경우: push 이벤트면 before SHA, 아니면 HEAD~1
+                if (context.eventName === 'push' && context.payload.before && context.payload.before !== '0000000000000000000000000000000000000000') {
+                  baseSha = context.payload.before;
+                  core.info(`First deployment - using push event before SHA: ${baseSha}`);
+                } else {
+                  // workflow_dispatch 등: HEAD~1 사용
+                  const { execSync } = require('child_process');
+                  try {
+                    baseSha = execSync('git rev-parse HEAD~1', { encoding: 'utf-8' }).trim();
+                    core.info(`First deployment - using HEAD~1: ${baseSha}`);
+                  } catch {
+                    baseSha = context.sha;
+                    core.warning(`Could not get HEAD~1, using current SHA: ${baseSha}`);
+                  }
+                }
               }
+              
+              core.info(`Base commit SHA: ${baseSha}`);
+              core.info(`Current commit SHA: ${context.sha}`);
+              
+              if (baseSha === context.sha) {
+                core.warning(`⚠️ Base SHA equals current SHA - this might be a re-run of the same commit`);
+              }
+              
+              core.setOutput('sha', baseSha);
+              return baseSha;
             } catch (error) {
-              core.warning(`Failed to get last successful commit: ${error.message}`);
-              // 실패 시 현재 커밋 SHA 사용 (안전한 폴백: 변경 감지 실패 대신 스킵)
-              core.setOutput('sha', context.sha);
-              return context.sha;
+              core.warning(`Failed to get base commit SHA: ${error.message}`);
+              // 실패 시 push 이벤트면 before SHA, 아니면 HEAD~1
+              let fallbackSha;
+              if (context.eventName === 'push' && context.payload.before && context.payload.before !== '0000000000000000000000000000000000000000') {
+                fallbackSha = context.payload.before;
+              } else {
+                fallbackSha = context.sha;
+              }
+              core.setOutput('sha', fallbackSha);
+              return fallbackSha;
             }
       
       - name: Debug change detection
         run: |
           echo "Base commit: ${{ steps.last_success.outputs.sha }}"
           echo "Current commit: ${{ github.sha }}"
+          echo "Event: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
           echo "Checking docker-compose files..."
           if [ "${{ steps.last_success.outputs.sha }}" = "${{ github.sha }}" ]; then
-            echo "Base equals current commit; skipping git diff."
-            exit 0
+            echo "⚠️ Base equals current commit; this might be the first run or no changes detected."
+            echo "For first run or manual trigger, we'll assume changes exist."
+          else
+            echo "Changed files:"
+            git diff --name-only ${{ steps.last_success.outputs.sha }}..HEAD || echo "Git diff failed"
+            git diff --name-only ${{ steps.last_success.outputs.sha }}..HEAD | grep -E 'docker-compose.*\.yml' || echo "No docker-compose files changed"
+            echo "Changed files in apps/:"
+            git diff --name-only ${{ steps.last_success.outputs.sha }}..HEAD | grep -E '^apps/' || echo "No apps files changed"
           fi
-          git diff --name-only ${{ steps.last_success.outputs.sha }}..HEAD | grep -E 'docker-compose.*\.yml' || echo "No docker-compose files changed"
       
       - uses: dorny/paths-filter@v2
         id: filter
+        continue-on-error: true  # 실패해도 계속 진행
         with:
           base: ${{ steps.last_success.outputs.sha }}
           filters: |
@@ -82,6 +115,34 @@ jobs:
               - 'nginx/**'
               - 'docker-compose*.yml'
               - 'Dockerfile*'
+      
+      - name: Determine final change detection results
+        id: force_changes
+        run: |
+          BASE_SHA="${{ steps.last_success.outputs.sha }}"
+          CURRENT_SHA="${{ github.sha }}"
+          
+          # base와 current가 같으면 (같은 커밋 재배포) filter 결과 사용
+          # 다르면 filter 결과 사용
+          if [ "$BASE_SHA" = "$CURRENT_SHA" ]; then
+            echo "Base equals current - using filter results (might be re-run)"
+            echo "apps=${{ steps.filter.outputs.apps }}" >> $GITHUB_OUTPUT
+            echo "infra=${{ steps.filter.outputs.infra }}" >> $GITHUB_OUTPUT
+          else
+            echo "Base differs from current - using filter results"
+            echo "apps=${{ steps.filter.outputs.apps }}" >> $GITHUB_OUTPUT
+            echo "infra=${{ steps.filter.outputs.infra }}" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Output change detection results
+        run: |
+          echo "Base SHA: ${{ steps.last_success.outputs.sha }}"
+          echo "Current SHA: ${{ github.sha }}"
+          echo "Filter apps_changed: ${{ steps.filter.outputs.apps }}"
+          echo "Filter infra_changed: ${{ steps.filter.outputs.infra }}"
+          echo "Final apps_changed: ${{ steps.force_changes.outputs.apps }}"
+          echo "Final infra_changed: ${{ steps.force_changes.outputs.infra }}"
+          echo "filter step result: ${{ steps.filter.outcome }}"
 
   # 🧪 1. 테스트 Job
   test:
@@ -121,11 +182,23 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       always() &&
+      (needs.test.result == 'success' || needs.test.result == 'skipped') &&
       (github.event_name == 'workflow_dispatch' || 
        (github.event_name == 'push' && 
         github.ref == 'refs/heads/main' &&
-        (needs.detect_changes.outputs.apps_changed == 'true' || needs.detect_changes.outputs.infra_changed == 'true')))
+        (needs.detect_changes.outputs.apps_changed == 'true' || 
+         needs.detect_changes.outputs.infra_changed == 'true' ||
+         needs.detect_changes.result == 'failure')))  # detect_changes 실패 시에도 실행 (안전장치)
     steps:
+    - name: Debug build conditions
+      run: |
+        echo "Event: ${{ github.event_name }}"
+        echo "Ref: ${{ github.ref }}"
+        echo "apps_changed: ${{ needs.detect_changes.outputs.apps_changed }}"
+        echo "infra_changed: ${{ needs.detect_changes.outputs.infra_changed }}"
+        echo "detect_changes result: ${{ needs.detect_changes.result }}"
+        echo "test result: ${{ needs.test.result }}"
+    
     - name: Checkout code
       uses: actions/checkout@v3
 
