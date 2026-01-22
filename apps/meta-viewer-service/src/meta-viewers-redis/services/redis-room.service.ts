@@ -328,9 +328,11 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
       ]);
 
       // 룸의 모든 클라이언트 목록 조회 (타임아웃 적용, 실패해도 계속 진행)
+      this.logger.debug(`[Redis Room] About to call getRoomClients for room '${roomId}'...`);
       let clientsInRoom: { socketId: string; sessionToken: string; joinAt: string }[] = [];
       try {
         clientsInRoom = await this.getRoomClients(roomId);
+        this.logger.debug(`[Redis Room] getRoomClients returned ${clientsInRoom.length} clients for room '${roomId}'`);
       } catch (error: any) {
         // getRoomClients 실패해도 joinRoom은 성공으로 처리
         this.logger.warn(`[Redis Room] Failed to get room clients for '${roomId}': ${error.message}, continuing with empty list`);
@@ -675,19 +677,25 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
    */
   async getRoomClients(roomId: string): Promise<{ socketId: string; sessionToken: string; joinAt: string }[]> {
     const startTime = Date.now();
+    this.logger.debug(`[Redis Room] getRoomClients called for room '${roomId}'`);
     try {
+      this.logger.debug(`[Redis Room] Calling sMembers for room:${roomId}:clients...`);
       const clientIds = await this.redis.sMembers(`room:${roomId}:clients`);
+      this.logger.debug(`[Redis Room] sMembers completed: found ${clientIds.length} clients`);
 
       if (clientIds.length === 0) {
+        this.logger.debug(`[Redis Room] No clients in room '${roomId}', returning empty array`);
         return [];
       }
 
       // 배치로 sessionToken 조회 (한 번에 여러 개 조회, 타임아웃 적용)
+      this.logger.debug(`[Redis Room] Starting batch sessionToken retrieval for ${clientIds.length} clients...`);
       const sessionTokenPromises = clientIds.map(clientId => 
         this.redis.get(`socket:${clientId}:sessionToken`).catch(() => null)
       );
       
       // 배치로 클라이언트 정보 조회
+      this.logger.debug(`[Redis Room] Starting batch client info retrieval for ${clientIds.length} clients...`);
       const clientInfoPromises = clientIds.map(clientId => 
         this.redis.hGetAll(`client:${clientId}:info`).catch(() => ({}))
       );
@@ -699,6 +707,7 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
         }, 2000);
       });
 
+      this.logger.debug(`[Redis Room] Waiting for batch operations to complete (timeout: 2s)...`);
       // 모든 배치 작업을 병렬로 실행하되 타임아웃 적용
       const [sessionTokens, clientInfos] = await Promise.race([
         Promise.all([
@@ -707,8 +716,10 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
         ]),
         timeoutPromise,
       ]);
+      this.logger.debug(`[Redis Room] Batch operations completed for room '${roomId}'`);
 
       // 결과 조합
+      this.logger.debug(`[Redis Room] Combining results for ${clientIds.length} clients...`);
       const result = clientIds.map((clientId, index) => {
         const info = clientInfos[index] || {};
         const joinAt = 'joinAt' in info && typeof info.joinAt === 'string' ? info.joinAt : new Date().toISOString();
@@ -720,6 +731,7 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
       });
 
       const duration = Date.now() - startTime;
+      this.logger.debug(`[Redis Room] getRoomClients completed for room '${roomId}': ${result.length} clients (duration: ${duration}ms)`);
       if (duration > 1000) {
         this.logger.warn(`[Redis Room] getRoomClients took ${duration}ms for room '${roomId}' (${clientIds.length} clients)`);
       }
