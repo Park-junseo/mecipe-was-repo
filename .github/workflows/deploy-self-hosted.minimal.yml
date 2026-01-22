@@ -188,7 +188,7 @@ jobs:
         github.ref == 'refs/heads/main' &&
         (needs.detect_changes.outputs.apps_changed == 'true' || 
          needs.detect_changes.outputs.infra_changed == 'true' ||
-         needs.detect_changes.result == 'failure')))  # detect_changes 실패 시에도 실행 (안전장치)
+         needs.detect_changes.result == 'failure')))
     steps:
     - name: Debug build conditions
       run: |
