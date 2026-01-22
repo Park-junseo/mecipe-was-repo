@@ -133,7 +133,6 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
       // 소켓 ID → 세션 토큰 매핑 저장 (역방향 조회용)
       await this.redis.set(`socket:${socketId}:sessionToken`, token, { EX: this.sessionTokenTtl });
 
-      this.logger.debug(`[Redis Room] Created session token for socketId '${socketId}'`);
       return token;
     } catch (error: any) {
       this.logger.error(
@@ -236,11 +235,8 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
    * 소켓 ID로 세션 토큰 조회
    */
   async getSessionTokenBySocketId(socketId: string): Promise<string | null> {
-    this.logger.debug(`[Redis Room] getSessionTokenBySocketId called for socketId '${socketId}'`);
     try {
-      this.logger.debug(`[Redis Room] Calling Redis GET for socket:${socketId}:sessionToken...`);
       const result = await this.redis.get(`socket:${socketId}:sessionToken`);
-      this.logger.debug(`[Redis Room] Redis GET completed for socketId '${socketId}': ${result ? 'found' : 'not found'}`);
       return result;
     } catch (error: any) {
       this.logger.error(
@@ -270,8 +266,6 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
     const joinAt = new Date().toISOString();
     const timestamp = Date.now();
 
-    this.logger.debug(`[Redis Room] joinRoom called - clientId: ${clientId}, roomId: ${roomId}, sessionToken: ${sessionToken ? 'provided' : 'not provided'}`);
-
     try {
       // 클라이언트 연결 상태 확인
       if (!client.connected) {
@@ -281,9 +275,7 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
       }
 
       // 기존 방에서 제거 (현재 룸 확인 후 제거)
-      this.logger.debug(`[Redis Room] Checking current room for client '${clientId}'...`);
       const currentRoom = await this.getClientRoom(clientId);
-      this.logger.debug(`[Redis Room] Current room for client '${clientId}': ${currentRoom || 'none'}`);
       if (currentRoom && currentRoom !== roomId) {
         // 다른 룸에 있으면 제거
         await this.removeClientFromRoom(clientId, currentRoom);
@@ -328,11 +320,9 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
       ]);
 
       // 룸의 모든 클라이언트 목록 조회 (타임아웃 적용, 실패해도 계속 진행)
-      this.logger.debug(`[Redis Room] About to call getRoomClients for room '${roomId}'...`);
       let clientsInRoom: { socketId: string; sessionToken: string; joinAt: string }[] = [];
       try {
         clientsInRoom = await this.getRoomClients(roomId);
-        this.logger.debug(`[Redis Room] getRoomClients returned ${clientsInRoom.length} clients for room '${roomId}'`);
       } catch (error: any) {
         // getRoomClients 실패해도 joinRoom은 성공으로 처리
         this.logger.warn(`[Redis Room] Failed to get room clients for '${roomId}': ${error.message}, continuing with empty list`);
@@ -340,8 +330,6 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
       }
 
       // 브로드캐스트 큐에 USER_JOINED 메시지 추가 (메시지 순서 보장)
-      // 명시적 이벤트 대신 브로드캐스트 메시지로 처리하여 순서 보장
-      this.logger.debug(`[Redis Room] Creating USER_JOINED message for client '${clientId}' in room '${roomId}'...`);
       const joinMessage: ClientMessage = {
         type: RoomDataMessageType.USER_JOINED,
         timestamp: timestamp,
@@ -355,36 +343,33 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
       };
 
       // RedisQueueService를 통해 큐에 메시지 추가
-      this.logger.debug(`[Redis Room] About to call enqueueData for client '${clientId}' in room '${roomId}'...`);
       try {
         await this.queueService.enqueueData(roomId, joinMessage);
-        this.logger.debug(
-          `[Redis Room] Enqueued USER_JOINED message for client '${clientId}' in room '${roomId}'`,
-        );
       } catch (error: any) {
-        // 큐 추가 실패는 로그만 남기고 계속 진행 (루 입장은 성공)
+        // 큐 추가 실패는 경고만 (루 입장은 성공)
         this.logger.warn(
           `[Redis Room] Failed to enqueue USER_JOINED message for client '${clientId}' in room '${roomId}': ${error.message}`,
         );
       }
-      this.logger.debug(`[Redis Room] After enqueueData for client '${clientId}' in room '${roomId}'`);
 
-      this.logger.debug(`[Redis Room] About to calculate duration and return result for client '${clientId}' in room '${roomId}'...`);
       const duration = Date.now() - startTime;
       const logMessage = sessionToken
         ? `[Redis Room] Client '${clientId}' (session token) joined room '${roomId}'`
         : `[Redis Room] Client '${clientId}' joined room '${roomId}'`;
       this.logger.log(`${logMessage} (${clientsInRoom.length} clients, duration: ${duration}ms)`);
 
-      const result = {
+      // 느린 joinRoom은 경고
+      if (duration > 1000) {
+        this.logger.warn(`[Redis Room] joinRoom slow for client '${clientId}' in room '${roomId}': ${duration}ms`);
+      }
+
+      return {
         success: true,
         clientId: clientId,
         roomId: roomId,
         clientsInRoom: clientsInRoom,
         message: `Room '${roomId}' joined.`,
       };
-      this.logger.debug(`[Redis Room] Returning result for client '${clientId}' in room '${roomId}'`);
-      return result;
     } catch (error: any) {
       this.logger.error(
         `[Redis Room] Failed to join room '${roomId}' for client '${clientId}': ${error.message}`,
@@ -435,11 +420,8 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
       // RedisQueueService를 통해 큐에 메시지 추가
       try {
         await this.queueService.enqueueData(currentRoomId, leaveMessage);
-        this.logger.debug(
-          `[Redis Room] Enqueued USER_LEFT message for client '${clientId}' in room '${currentRoomId}'`,
-        );
       } catch (error: any) {
-        // 큐 추가 실패는 로그만 남기고 계속 진행 (루 퇴장은 성공)
+        // 큐 추가 실패는 경고만 (루 퇴장은 성공)
         this.logger.warn(
           `[Redis Room] Failed to enqueue USER_LEFT message for client '${clientId}' in room '${currentRoomId}': ${error.message}`,
         );
@@ -525,11 +507,8 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
       // RedisQueueService를 통해 큐에 메시지 추가
       try {
         await this.queueService.enqueueData(currentRoom, disconnectMessage);
-        this.logger.debug(
-          `[Redis Room] Enqueued USER_DISCONNECTED message for client '${clientId}' in room '${currentRoom}'`,
-        );
       } catch (error: any) {
-        // 큐 추가 실패는 로그만 남기고 계속 진행 (연결 해제는 성공)
+        // 큐 추가 실패는 경고만 (연결 해제는 성공)
         this.logger.warn(
           `[Redis Room] Failed to enqueue USER_DISCONNECTED message for client '${clientId}' in room '${currentRoom}': ${error.message}`,
         );
@@ -683,25 +662,19 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
    */
   async getRoomClients(roomId: string): Promise<{ socketId: string; sessionToken: string; joinAt: string }[]> {
     const startTime = Date.now();
-    this.logger.debug(`[Redis Room] getRoomClients called for room '${roomId}'`);
     try {
-      this.logger.debug(`[Redis Room] Calling sMembers for room:${roomId}:clients...`);
       const clientIds = await this.redis.sMembers(`room:${roomId}:clients`);
-      this.logger.debug(`[Redis Room] sMembers completed: found ${clientIds.length} clients`);
 
       if (clientIds.length === 0) {
-        this.logger.debug(`[Redis Room] No clients in room '${roomId}', returning empty array`);
         return [];
       }
 
       // 배치로 sessionToken 조회 (한 번에 여러 개 조회, 타임아웃 적용)
-      this.logger.debug(`[Redis Room] Starting batch sessionToken retrieval for ${clientIds.length} clients...`);
       const sessionTokenPromises = clientIds.map(clientId => 
         this.redis.get(`socket:${clientId}:sessionToken`).catch(() => null)
       );
       
       // 배치로 클라이언트 정보 조회
-      this.logger.debug(`[Redis Room] Starting batch client info retrieval for ${clientIds.length} clients...`);
       const clientInfoPromises = clientIds.map(clientId => 
         this.redis.hGetAll(`client:${clientId}:info`).catch(() => ({}))
       );
@@ -712,8 +685,7 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
           reject(new Error(`getRoomClients timeout for room '${roomId}' after 2 seconds`));
         }, 2000);
       });
-
-      this.logger.debug(`[Redis Room] Waiting for batch operations to complete (timeout: 2s)...`);
+      
       // 모든 배치 작업을 병렬로 실행하되 타임아웃 적용
       const [sessionTokens, clientInfos] = await Promise.race([
         Promise.all([
@@ -722,10 +694,8 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
         ]),
         timeoutPromise,
       ]);
-      this.logger.debug(`[Redis Room] Batch operations completed for room '${roomId}'`);
 
       // 결과 조합
-      this.logger.debug(`[Redis Room] Combining results for ${clientIds.length} clients...`);
       const result = clientIds.map((clientId, index) => {
         const info = clientInfos[index] || {};
         const joinAt = 'joinAt' in info && typeof info.joinAt === 'string' ? info.joinAt : new Date().toISOString();
@@ -737,9 +707,8 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
       });
 
       const duration = Date.now() - startTime;
-      this.logger.debug(`[Redis Room] getRoomClients completed for room '${roomId}': ${result.length} clients (duration: ${duration}ms)`);
       if (duration > 1000) {
-        this.logger.warn(`[Redis Room] getRoomClients took ${duration}ms for room '${roomId}' (${clientIds.length} clients)`);
+        this.logger.warn(`[Redis Room] getRoomClients slow for room '${roomId}': ${duration}ms (${clientIds.length} clients)`);
       }
       
       return result;
@@ -885,7 +854,7 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
 
       await Promise.all(promises);
 
-      this.logger.debug(`[Redis Room] Heartbeat received from client '${clientId}' (room: ${currentRoom || 'none'})`);
+      // 헬스체크는 정상 동작이므로 로그 없음 (문제 발생 시에만 로그)
       return { success: true, message: 'Heartbeat processed' };
     } catch (error: any) {
       this.logger.error(
@@ -904,7 +873,6 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
   @Cron('*/60 * * * * *') // 60초마다
   async cleanupInactiveClients(): Promise<void> {
     const startTime = Date.now();
-    this.logger.debug('[Redis Room] Starting periodic cleanup of inactive clients...');
 
     try {
       // 모든 활성 룸 목록 조회
@@ -986,10 +954,6 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
             },
             clientId: 'system', // 시스템 메시지
           });
-
-          this.logger.debug(
-            `[Redis Room] Enqueued READ_ROOM_MEMBER for room '${roomId}' with ${currentClients.length} members`,
-          );
         } catch (error: any) {
           this.logger.warn(
             `[Redis Room] Failed to broadcast room members for room '${roomId}': ${error.message}`,
@@ -1002,10 +966,11 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
         this.logger.log(
           `[Redis Room] Periodic cleanup completed: ${totalCleaned} inactive clients removed, ${roomsToBroadcast.size} rooms broadcasted (duration: ${duration}ms)`,
         );
-      } else {
-        this.logger.debug(
-          `[Redis Room] Periodic cleanup completed: no inactive clients found, ${roomsToBroadcast.size} rooms broadcasted (duration: ${duration}ms)`,
-        );
+      }
+      
+      // 느린 cleanup은 경고
+      if (duration > 5000) {
+        this.logger.warn(`[Redis Room] cleanupInactiveClients slow: ${duration}ms`);
       }
     } catch (error: any) {
       this.logger.error(
