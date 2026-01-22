@@ -34,8 +34,9 @@ export class MetaViewersRedisService implements OnModuleDestroy {
 
   afterInit(server: Server) {
     const port = Number(process.env.SOCKET_PORT) || 4100;
-    this.logger.log(`[Meta Viewers Redis] Socket.IO server initialized on port ${port}`);
-    this.logger.log(`[Meta Viewers Redis] Server path: ${server.path()}`);
+    const instanceId = process.env.NODE_APP_INSTANCE || process.env.INSTANCE_ID || process.pid;
+    this.logger.log(`[Meta Viewers Redis] Socket.IO server initialized on port ${port} (Instance: ${instanceId}, PID: ${process.pid})`);
+    this.logger.log(`[Meta Viewers Redis] Server path: ${server.path()} (Instance: ${instanceId})`);
 
     // 서버 인스턴스 저장 (Cron 메서드에서 접근하기 위해)
     this.server = server;
@@ -447,16 +448,36 @@ export class MetaViewersRedisService implements OnModuleDestroy {
   async joinRoom(data: { roomId: string; sessionToken?: string }, client: Socket) {
     const startTime = Date.now();
     const clientId = client.id;
+    const instanceId = process.env.NODE_APP_INSTANCE || process.env.INSTANCE_ID || process.pid;
+
+    this.logger.log(`[Meta Viewers Redis] joinRoom called - clientId: ${clientId}, roomId: ${data?.roomId || 'undefined'}, Instance: ${instanceId}`);
 
     try {
       // 세션 토큰은 데이터에서 제공되거나 소켓에서 가져옴
-      const sessionToken =
-        data.sessionToken ||
-        (await this.roomService.getSessionTokenBySocketId(clientId)) ||
-        (client.handshake.auth as any)?.sessionToken ||
-        (client.handshake.query as any)?.sessionToken;
-
+      this.logger.debug(`[Meta Viewers Redis] Getting session token for client '${clientId}'...`);
+      
+      let sessionToken: string | null | undefined;
+      
+      if (data.sessionToken) {
+        sessionToken = data.sessionToken;
+        this.logger.debug(`[Meta Viewers Redis] Session token from data: ${sessionToken.substring(0, 16)}...`);
+      } else {
+        this.logger.debug(`[Meta Viewers Redis] Calling getSessionTokenBySocketId for client '${clientId}'...`);
+        sessionToken = await this.roomService.getSessionTokenBySocketId(clientId);
+        this.logger.debug(`[Meta Viewers Redis] getSessionTokenBySocketId completed: ${sessionToken ? 'found' : 'not found'}`);
+        
+        if (!sessionToken) {
+          sessionToken = (client.handshake.auth as any)?.sessionToken || (client.handshake.query as any)?.sessionToken;
+          this.logger.debug(`[Meta Viewers Redis] Session token from handshake: ${sessionToken ? 'found' : 'not found'}`);
+        }
+      }
+      
+      this.logger.debug(`[Meta Viewers Redis] Final session token: ${sessionToken ? 'found' : 'not found'}`);
+      this.logger.debug(`[Meta Viewers Redis] Calling roomService.joinRoom for client '${clientId}' in room '${data.roomId}'...`);
+      
       const result = await this.roomService.joinRoom(client, data.roomId, sessionToken || undefined);
+      
+      this.logger.debug(`[Meta Viewers Redis] roomService.joinRoom completed for client '${clientId}' in room '${data.roomId}'`);
 
       // 조인 이벤트 캐시 메시지 풀 전송
       const cachedMessages = await this.cacheService.getJoinEventMessages(data.roomId);
