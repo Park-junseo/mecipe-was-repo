@@ -236,8 +236,12 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
    * 소켓 ID로 세션 토큰 조회
    */
   async getSessionTokenBySocketId(socketId: string): Promise<string | null> {
+    this.logger.debug(`[Redis Room] getSessionTokenBySocketId called for socketId '${socketId}'`);
     try {
-      return await this.redis.get(`socket:${socketId}:sessionToken`);
+      this.logger.debug(`[Redis Room] Calling Redis GET for socket:${socketId}:sessionToken...`);
+      const result = await this.redis.get(`socket:${socketId}:sessionToken`);
+      this.logger.debug(`[Redis Room] Redis GET completed for socketId '${socketId}': ${result ? 'found' : 'not found'}`);
+      return result;
     } catch (error: any) {
       this.logger.error(
         `[Redis Room] Failed to get session token for socketId '${socketId}': ${error.message}`,
@@ -266,9 +270,20 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
     const joinAt = new Date().toISOString();
     const timestamp = Date.now();
 
+    this.logger.debug(`[Redis Room] joinRoom called - clientId: ${clientId}, roomId: ${roomId}, sessionToken: ${sessionToken ? 'provided' : 'not provided'}`);
+
     try {
+      // 클라이언트 연결 상태 확인
+      if (!client.connected) {
+        const errorMsg = `[Redis Room] Client '${clientId}' is not connected`;
+        this.logger.error(errorMsg);
+        throw new Error(errorMsg);
+      }
+
       // 기존 방에서 제거 (현재 룸 확인 후 제거)
+      this.logger.debug(`[Redis Room] Checking current room for client '${clientId}'...`);
       const currentRoom = await this.getClientRoom(clientId);
+      this.logger.debug(`[Redis Room] Current room for client '${clientId}': ${currentRoom || 'none'}`);
       if (currentRoom && currentRoom !== roomId) {
         // 다른 룸에 있으면 제거
         await this.removeClientFromRoom(clientId, currentRoom);

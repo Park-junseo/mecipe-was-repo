@@ -41,7 +41,9 @@ class MetaViewerClient {
   }
 
   connect(): void {
-    this.socket = io(this.serverUrl, {
+    // Socket.IO v4.5+ 권장 방식: 단일 객체로 전달
+    this.socket = io({
+      url: this.serverUrl,
       path: '/meta-viewers',
       auth: this.sessionToken ? { sessionToken: this.sessionToken } : {},
       reconnection: true,
