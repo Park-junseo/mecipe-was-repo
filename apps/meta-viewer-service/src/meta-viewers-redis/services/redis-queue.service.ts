@@ -138,6 +138,11 @@ export class RedisQueueService implements OnModuleDestroy {
     const startTime = Date.now();
     const timeoutMs = 5000; // 5초 타임아웃
 
+    // Redis 연결 상태 확인
+    const isOpen = this.redis.isOpen;
+    const isReady = this.redis.isReady;
+    this.logger.debug(`[Redis Queue] enqueueData called - roomId: ${roomId}, redis.isOpen: ${isOpen}, redis.isReady: ${isReady}`);
+
     try {
       // 타임아웃 래퍼: Promise.race를 사용하여 최대 5초 대기
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -146,6 +151,7 @@ export class RedisQueueService implements OnModuleDestroy {
         }, timeoutMs);
       });
 
+      this.logger.debug(`[Redis Queue] Calling xAdd for room '${roomId}'...`);
       const xAddPromise = this.redis.xAdd(
         streamKey,
         '*',
@@ -165,6 +171,7 @@ export class RedisQueueService implements OnModuleDestroy {
       );
 
       const messageId = await Promise.race([xAddPromise, timeoutPromise]);
+      this.logger.debug(`[Redis Queue] xAdd completed for room '${roomId}' - messageId: ${messageId}`);
 
       const duration = Date.now() - startTime;
       this.logger.debug(
@@ -176,8 +183,11 @@ export class RedisQueueService implements OnModuleDestroy {
       }
     } catch (error: any) {
       const duration = Date.now() - startTime;
+      const isOpenAfter = this.redis.isOpen;
+      const isReadyAfter = this.redis.isReady;
+      
       this.logger.error(
-        `[Redis Queue] Failed to enqueue data for room '${roomId}' (duration: ${duration}ms): ${error.message}`,
+        `[Redis Queue] Failed to enqueue data for room '${roomId}' (duration: ${duration}ms, isOpen: ${isOpenAfter}, isReady: ${isReadyAfter}): ${error.message}`,
         error.stack,
       );
       throw error;
