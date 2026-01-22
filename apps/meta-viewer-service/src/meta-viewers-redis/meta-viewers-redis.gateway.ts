@@ -57,11 +57,15 @@ export class MetaViewersRedisGateway
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`[Gateway] Attempting to connect to Redis adapter (attempt ${attempt}/${maxRetries})...`);
+        const instanceId = process.env.NODE_APP_INSTANCE || process.env.INSTANCE_ID || process.pid;
+        console.log(`[Gateway] Attempting to connect to Redis adapter (attempt ${attempt}/${maxRetries}, Instance: ${instanceId})...`);
         const adapter = await createRedisAdapter();
         server.adapter(adapter);
         this.metaViewersRedisService.afterInit(server);
-        console.log('[Gateway] ✅ Redis adapter initialized successfully');
+        console.log(`[Gateway] ✅ Redis adapter initialized successfully (Instance: ${instanceId})`);
+        console.log(`[Gateway] Server ready to accept connections (Instance: ${instanceId}, PID: ${process.pid})`);
+        // 서버 인스턴스 저장 (joinRoom에서 확인하기 위해)
+        (this as any).server = server;
         return;
       } catch (error: any) {
         const errorMessage = error.message || String(error);
@@ -76,14 +80,11 @@ export class MetaViewersRedisGateway
           await new Promise((resolve) => setTimeout(resolve, delay));
         } else {
           console.error('[Gateway] ❌ Redis adapter initialization failed after all retries');
-          console.error('[Gateway] The application will continue but Socket.IO replica set features may not work');
           console.error('[Gateway] Please check if Redis is running and accessible at the configured URL');
           console.error(`[Gateway] Redis URL: ${redisUrl ? redisUrl.replace(/:[^:@]+@/, ':****@') : 'NOT SET'}`);
-          // 개발 환경에서는 에러를 throw하여 명확하게 실패 표시
-          // 운영 환경에서는 계속 진행 (liveness probe가 처리)
-          if (isDevelopment) {
-            throw new Error(`Redis adapter initialization failed: ${errorMessage}`);
-          }
+          // Redis Adapter는 필수이므로 초기화 실패 시 서버를 시작하지 않음
+          // PM2 클러스터 모드에서 일부 인스턴스만 성공하는 것을 방지
+          throw new Error(`Redis adapter initialization failed after ${maxRetries} attempts: ${errorMessage}`);
         }
       }
     }
@@ -91,7 +92,8 @@ export class MetaViewersRedisGateway
 
   async handleConnection(client: Socket, ...args: any[]) {
     // handleConnection 호출 확인 (환경 변수와 무관하게 항상 로그)
-    console.log(`[Gateway] handleConnection called - clientId: ${client.id}`);
+    const instanceId = process.env.NODE_APP_INSTANCE || process.env.INSTANCE_ID || process.pid;
+    console.log(`[Gateway] handleConnection called - clientId: ${client.id} (Instance: ${instanceId}, PID: ${process.pid})`);
     
     // Socket.IO onAny를 사용한 이벤트 로깅 (socket.use() 대신)
     // socket.use()는 NestJS Gateway와 함께 사용할 때 제대로 작동하지 않을 수 있음
@@ -174,12 +176,58 @@ export class MetaViewersRedisGateway
    * @emit 'userJoined'
    */
   @SubscribeMessage(ClientToServerListenerType.USER_JOINED)
-  joinRoom(
+  async joinRoom(
     @MessageBody() data: { roomId: string; sessionToken?: string },
     @ConnectedSocket() client: Socket,
   ) {
-    console.log(`[Gateway] joinRoom event received from client '${client.id}' for room '${data.roomId}'`);
-    return this.metaViewersRedisService.joinRoom(data, client);
+    const clientId = client.id;
+    const roomId = data?.roomId;
+    const instanceId = process.env.NODE_APP_INSTANCE || process.env.INSTANCE_ID || process.pid;
+    
+    console.log(`[Gateway] joinRoom event received from client '${clientId}' for room '${roomId}' (Instance: ${instanceId})`);
+    
+    // 서비스 인스턴스 확인
+    if (!this.metaViewersRedisService) {
+      const errorMsg = `[Gateway] metaViewersRedisService is null or undefined (Instance: ${instanceId})`;
+      console.error(errorMsg);
+      return { success: false, message: 'Service not available', error: errorMsg };
+    }
+    
+    // Redis Adapter 상태 확인
+    const server = (this as any).server;
+    if (!server || !server.adapter) {
+      const errorMsg = `[Gateway] Socket.IO server or adapter not initialized (Instance: ${instanceId})`;
+      console.error(errorMsg);
+      return { success: false, message: 'Server not ready', error: errorMsg };
+    }
+    
+    try {
+      console.log(`[Gateway] Calling metaViewersRedisService.joinRoom for client '${clientId}' in room '${roomId}' (Instance: ${instanceId})`);
+      const result = await this.metaViewersRedisService.joinRoom(data, client);
+      console.log(`[Gateway] joinRoom completed successfully for client '${clientId}' in room '${roomId}' (Instance: ${instanceId})`);
+      return result;
+    } catch (error: any) {
+      const errorMsg = `[Gateway] joinRoom failed for client '${clientId}' in room '${roomId}': ${error?.message || String(error)}`;
+      console.error(errorMsg);
+      console.error(`[Gateway] Error stack:`, error?.stack);
+      
+      // 클라이언트에 에러 전송
+      try {
+        client.emit('error', {
+          type: 'JOIN_ROOM_ERROR',
+          message: error?.message || 'Unknown error',
+          roomId: roomId,
+        });
+      } catch (emitError) {
+        console.error(`[Gateway] Failed to emit error to client '${clientId}':`, emitError);
+      }
+      
+      return {
+        success: false,
+        message: `Failed to join room: ${error?.message || 'Unknown error'}`,
+        error: errorMsg,
+      };
+    }
   }
 
   /**
