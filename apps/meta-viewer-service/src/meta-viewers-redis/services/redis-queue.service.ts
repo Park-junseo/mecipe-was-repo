@@ -147,11 +147,21 @@ export class RedisQueueService implements OnModuleDestroy {
       // 타임아웃 래퍼: Promise.race를 사용하여 최대 5초 대기
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
+          // 타임아웃 발생 시 Redis 연결 상태 재확인
+          const isOpenOnTimeout = this.redis.isOpen;
+          const isReadyOnTimeout = this.redis.isReady;
+          this.logger.warn(
+            `[Redis Queue] enqueueData timeout - roomId: ${roomId}, isOpen: ${isOpenOnTimeout}, isReady: ${isReadyOnTimeout}`,
+          );
           reject(new Error(`enqueueData timeout for room '${roomId}' after ${timeoutMs}ms`));
         }, timeoutMs);
       });
 
-      this.logger.debug(`[Redis Queue] Calling xAdd for room '${roomId}'...`);
+      this.logger.debug(`[Redis Queue] Calling xAdd for room '${roomId}' (streamKey: ${streamKey})...`);
+      const xAddStartTime = Date.now();
+      
+      // 최적화: TRIM을 별도로 실행하여 XADD 성능 향상
+      // XADD만 먼저 실행하고, TRIM은 비동기로 처리
       const xAddPromise = this.redis.xAdd(
         streamKey,
         '*',
@@ -161,17 +171,32 @@ export class RedisQueueService implements OnModuleDestroy {
           clientId: data.clientId,
           type: data.type,
         },
-        {
-          TRIM: {
-            strategy: 'MAXLEN',
-            strategyModifier: '~',
-            threshold: this.streamMaxLength,
-          },
-        },
-      );
+      ).then(async (messageId) => {
+        const xAddDuration = Date.now() - xAddStartTime;
+        this.logger.debug(`[Redis Queue] xAdd completed for room '${roomId}' - messageId: ${messageId} (xAdd duration: ${xAddDuration}ms)`);
+        
+        // TRIM을 비동기로 실행 (실패해도 무시)
+        // xTrim(key, strategy, threshold) - approximate는 기본값으로 사용
+        this.redis
+          .xTrim(streamKey, 'MAXLEN', this.streamMaxLength)
+          .catch((trimError) => {
+            // TRIM 실패는 로그만 남기고 무시 (XADD는 이미 성공)
+            this.logger.warn(
+              `[Redis Queue] Failed to trim stream '${streamKey}': ${trimError.message}`,
+            );
+          });
+        
+        return messageId;
+      }).catch((error) => {
+        const xAddDuration = Date.now() - xAddStartTime;
+        this.logger.error(
+          `[Redis Queue] xAdd failed for room '${roomId}' (xAdd duration: ${xAddDuration}ms): ${error.message}`,
+          error.stack,
+        );
+        throw error;
+      });
 
       const messageId = await Promise.race([xAddPromise, timeoutPromise]);
-      this.logger.debug(`[Redis Queue] xAdd completed for room '${roomId}' - messageId: ${messageId}`);
 
       const duration = Date.now() - startTime;
       this.logger.debug(
