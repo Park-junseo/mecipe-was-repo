@@ -7,6 +7,7 @@ import {
   OnGatewayDisconnect,
   OnGatewayInit,
 } from '@nestjs/websockets';
+import { Logger } from '@nestjs/common';
 import { MetaViewersRedisService } from './meta-viewers-redis.service';
 import { Server, Socket } from 'socket.io';
 import { ClientToServerListenerType } from './interface/socket-event-type';
@@ -26,6 +27,8 @@ import { createRedisAdapter } from './redis-adapter.config';
 export class MetaViewersRedisGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
+  private readonly logger = new Logger(MetaViewersRedisGateway.name);
+
   constructor(private readonly metaViewersRedisService: MetaViewersRedisService) {}
 
   /**
@@ -44,44 +47,36 @@ export class MetaViewersRedisGateway
     if (isDevelopment && process.env.NODE_APP_INSTANCE !== undefined) {
       const instanceId = parseInt(process.env.NODE_APP_INSTANCE, 10) || 0;
       const staggerDelay = instanceId * 500; // 인스턴스당 500ms 지연
-      console.log(`[Gateway] Staggering connection attempt for instance ${instanceId} (${staggerDelay}ms delay)`);
       await new Promise((resolve) => setTimeout(resolve, staggerDelay));
     }
 
-    // 환경 변수 확인 (디버깅용)
     const redisUrl = process.env.REDIS_URL;
-    console.log(`[Gateway] Environment check - REDIS_URL: ${redisUrl ? redisUrl.replace(/:[^:@]+@/, ':****@') : 'NOT SET'}`);
-    console.log(`[Gateway] Process PID: ${process.pid}, INSTANCE_ID: ${process.env.INSTANCE_ID || 'NOT SET'}`);
-    console.log(`[Gateway] NODE_APP_INSTANCE: ${process.env.NODE_APP_INSTANCE || 'NOT SET'}`);
-    console.log(`[Gateway] Mode: ${isDevelopment ? 'development' : 'production'}, Max retries: ${maxRetries}`);
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const instanceId = process.env.NODE_APP_INSTANCE || process.env.INSTANCE_ID || process.pid;
-        console.log(`[Gateway] Attempting to connect to Redis adapter (attempt ${attempt}/${maxRetries}, Instance: ${instanceId})...`);
+        this.logger.log(`[Gateway] Attempting to connect to Redis adapter (attempt ${attempt}/${maxRetries}, Instance: ${instanceId})...`);
         const adapter = await createRedisAdapter();
         server.adapter(adapter);
         this.metaViewersRedisService.afterInit(server);
-        console.log(`[Gateway] ✅ Redis adapter initialized successfully (Instance: ${instanceId})`);
-        console.log(`[Gateway] Server ready to accept connections (Instance: ${instanceId}, PID: ${process.pid})`);
+        this.logger.log(`[Gateway] Redis adapter initialized successfully (Instance: ${instanceId})`);
         // 서버 인스턴스 저장 (joinRoom에서 확인하기 위해)
         (this as any).server = server;
         return;
       } catch (error: any) {
         const errorMessage = error.message || String(error);
-        console.error(
+        this.logger.error(
           `[Gateway] Failed to initialize Redis adapter (attempt ${attempt}/${maxRetries}): ${errorMessage}`,
         );
 
         if (attempt < maxRetries) {
           // 재시도 지연 (개발 환경에서는 짧게)
           const delay = baseRetryDelay * attempt; // 2초, 4초, 6초 (개발) 또는 5초, 10초, 15초 (운영)
-          console.log(`[Gateway] Retrying in ${delay}ms...`);
+          this.logger.warn(`[Gateway] Retrying in ${delay}ms...`);
           await new Promise((resolve) => setTimeout(resolve, delay));
         } else {
-          console.error('[Gateway] ❌ Redis adapter initialization failed after all retries');
-          console.error('[Gateway] Please check if Redis is running and accessible at the configured URL');
-          console.error(`[Gateway] Redis URL: ${redisUrl ? redisUrl.replace(/:[^:@]+@/, ':****@') : 'NOT SET'}`);
+          this.logger.error('[Gateway] Redis adapter initialization failed after all retries');
+          this.logger.error(`[Gateway] Redis URL: ${redisUrl ? redisUrl.replace(/:[^:@]+@/, ':****@') : 'NOT SET'}`);
           // Redis Adapter는 필수이므로 초기화 실패 시 서버를 시작하지 않음
           // PM2 클러스터 모드에서 일부 인스턴스만 성공하는 것을 방지
           throw new Error(`Redis adapter initialization failed after ${maxRetries} attempts: ${errorMessage}`);
@@ -91,12 +86,7 @@ export class MetaViewersRedisGateway
   }
 
   async handleConnection(client: Socket, ...args: any[]) {
-    // handleConnection 호출 확인 (환경 변수와 무관하게 항상 로그)
-    const instanceId = process.env.NODE_APP_INSTANCE || process.env.INSTANCE_ID || process.pid;
-    console.log(`[Gateway] handleConnection called - clientId: ${client.id} (Instance: ${instanceId}, PID: ${process.pid})`);
-    
-    // Socket.IO onAny를 사용한 이벤트 로깅 (socket.use() 대신)
-    // socket.use()는 NestJS Gateway와 함께 사용할 때 제대로 작동하지 않을 수 있음
+    // Socket.IO onAny를 사용한 이벤트 로깅 (디버깅용, 환경 변수로 제어)
     const enableSocketLogging = process.env.ENABLE_SOCKET_LOGGING === 'true';
     
     if (enableSocketLogging) {
@@ -112,22 +102,22 @@ export class MetaViewersRedisGateway
             ? JSON.stringify(data).substring(0, 500)
             : 'no data';
           
-          console.log(
-            `[Socket Log] 📥 [${timestamp()}] Client: ${clientId} | Event: ${eventName} | Data: ${dataStr}${hasCallback ? ' | Has ACK callback' : ''}`
+          this.logger.debug(
+            `[Socket Log] Client: ${clientId} | Event: ${eventName} | Data: ${dataStr}${hasCallback ? ' | Has ACK callback' : ''}`
           );
         } catch (error) {
-          console.log(`[Socket Log] 📥 [${timestamp()}] Client: ${clientId} | Event: ${eventName} | [Unable to log data]`);
+          this.logger.debug(`[Socket Log] Client: ${clientId} | Event: ${eventName} | [Unable to log data]`);
         }
       });
 
       // 연결/종료 로깅
-      console.log(
-        `[Socket Log] ✅ CONNECT [${timestamp()}] Client: ${clientId} | IP: ${client.handshake.address} | Rooms: ${Array.from(client.rooms).join(', ')}`
+      this.logger.debug(
+        `[Socket Log] CONNECT Client: ${clientId} | IP: ${client.handshake.address} | Rooms: ${Array.from(client.rooms).join(', ')}`
       );
       
       client.on('disconnect', (reason) => {
-        console.log(
-          `[Socket Log] ❌ DISCONNECT [${timestamp()}] Client: ${clientId} | Reason: ${reason}`
+        this.logger.debug(
+          `[Socket Log] DISCONNECT Client: ${clientId} | Reason: ${reason}`
         );
       });
     }
@@ -182,34 +172,28 @@ export class MetaViewersRedisGateway
   ) {
     const clientId = client.id;
     const roomId = data?.roomId;
-    const instanceId = process.env.NODE_APP_INSTANCE || process.env.INSTANCE_ID || process.pid;
-    
-    console.log(`[Gateway] joinRoom event received from client '${clientId}' for room '${roomId}' (Instance: ${instanceId})`);
     
     // 서비스 인스턴스 확인
     if (!this.metaViewersRedisService) {
-      const errorMsg = `[Gateway] metaViewersRedisService is null or undefined (Instance: ${instanceId})`;
-      console.error(errorMsg);
+      const errorMsg = `[Gateway] metaViewersRedisService is null or undefined`;
+      this.logger.error(errorMsg);
       return { success: false, message: 'Service not available', error: errorMsg };
     }
     
     // Redis Adapter 상태 확인
     const server = (this as any).server;
     if (!server || !server.adapter) {
-      const errorMsg = `[Gateway] Socket.IO server or adapter not initialized (Instance: ${instanceId})`;
-      console.error(errorMsg);
+      const errorMsg = `[Gateway] Socket.IO server or adapter not initialized`;
+      this.logger.error(errorMsg);
       return { success: false, message: 'Server not ready', error: errorMsg };
     }
     
     try {
-      console.log(`[Gateway] Calling metaViewersRedisService.joinRoom for client '${clientId}' in room '${roomId}' (Instance: ${instanceId})`);
       const result = await this.metaViewersRedisService.joinRoom(data, client);
-      console.log(`[Gateway] joinRoom completed successfully for client '${clientId}' in room '${roomId}' (Instance: ${instanceId})`);
       return result;
     } catch (error: any) {
       const errorMsg = `[Gateway] joinRoom failed for client '${clientId}' in room '${roomId}': ${error?.message || String(error)}`;
-      console.error(errorMsg);
-      console.error(`[Gateway] Error stack:`, error?.stack);
+      this.logger.error(errorMsg, error?.stack);
       
       // 클라이언트에 에러 전송
       try {
@@ -219,7 +203,7 @@ export class MetaViewersRedisGateway
           roomId: roomId,
         });
       } catch (emitError) {
-        console.error(`[Gateway] Failed to emit error to client '${clientId}':`, emitError);
+        this.logger.error(`[Gateway] Failed to emit error to client '${clientId}':`, emitError);
       }
       
       return {
