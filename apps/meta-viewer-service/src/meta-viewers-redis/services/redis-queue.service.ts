@@ -129,13 +129,24 @@ export class RedisQueueService implements OnModuleDestroy {
   /**
    * 방별 데이터 큐에 데이터 추가
    * 최적화: 파이프라인 사용 가능하지만 단일 메시지이므로 현재 구조 유지
+   * 타임아웃: Redis 명령 실행 타임아웃 없음으로 인한 무한 대기 방지 (5초 타임아웃)
+   * - Redis 서버 부하/블로킹 시 명령이 매우 느리게 실행될 수 있음
+   * - 타임아웃 없으면 joinRoom이 완료되지 않아 ACK 미전송
    */
   async enqueueData(roomId: string, data: ClientMessage): Promise<void> {
     const streamKey = `room:${roomId}:queue`;
     const startTime = Date.now();
+    const timeoutMs = 5000; // 5초 타임아웃
 
     try {
-      const messageId = await this.redis.xAdd(
+      // 타임아웃 래퍼: Promise.race를 사용하여 최대 5초 대기
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(`enqueueData timeout for room '${roomId}' after ${timeoutMs}ms`));
+        }, timeoutMs);
+      });
+
+      const xAddPromise = this.redis.xAdd(
         streamKey,
         '*',
         {
@@ -153,13 +164,20 @@ export class RedisQueueService implements OnModuleDestroy {
         },
       );
 
+      const messageId = await Promise.race([xAddPromise, timeoutPromise]);
+
       const duration = Date.now() - startTime;
       this.logger.debug(
         `[Redis Queue] Enqueued message to room '${roomId}' (type: ${data.type}, clientId: ${data.clientId}, duration: ${duration}ms, messageId: ${messageId})`,
       );
+      
+      if (duration > 1000) {
+        this.logger.warn(`[Redis Queue] enqueueData took ${duration}ms for room '${roomId}' (slow)`);
+      }
     } catch (error: any) {
+      const duration = Date.now() - startTime;
       this.logger.error(
-        `[Redis Queue] Failed to enqueue data for room '${roomId}': ${error.message}`,
+        `[Redis Queue] Failed to enqueue data for room '${roomId}' (duration: ${duration}ms): ${error.message}`,
         error.stack,
       );
       throw error;
