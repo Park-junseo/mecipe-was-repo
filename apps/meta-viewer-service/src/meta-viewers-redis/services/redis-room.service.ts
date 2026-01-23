@@ -329,7 +329,7 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
         clientsInRoom = [];
       }
 
-      // 브로드캐스트 큐에 USER_JOINED 메시지 추가 (메시지 순서 보장)
+      // 브로드캐스트 큐에 USER_JOINED 메시지 추가 (비동기 처리 - joinRoom 응답 시간 단축)
       const joinMessage: ClientMessage = {
         type: RoomDataMessageType.USER_JOINED,
         timestamp: timestamp,
@@ -342,15 +342,14 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
         clientId: clientId,
       };
 
-      // RedisQueueService를 통해 큐에 메시지 추가
-      try {
-        await this.queueService.enqueueData(roomId, joinMessage);
-      } catch (error: any) {
-        // 큐 추가 실패는 경고만 (루 입장은 성공)
+      // RedisQueueService를 통해 큐에 메시지 추가 (비동기 - 완료를 기다리지 않음)
+      // enqueueData 실패해도 joinRoom은 성공으로 처리 (메시지는 나중에 브로드캐스트됨)
+      this.queueService.enqueueData(roomId, joinMessage).catch((error: any) => {
+        // 큐 추가 실패는 경고만 (룸 입장은 이미 성공)
         this.logger.warn(
           `[Redis Room] Failed to enqueue USER_JOINED message for client '${clientId}' in room '${roomId}': ${error.message}`,
         );
-      }
+      });
 
       const duration = Date.now() - startTime;
       const logMessage = sessionToken
@@ -417,15 +416,13 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
         clientId: clientId,
       };
 
-      // RedisQueueService를 통해 큐에 메시지 추가
-      try {
-        await this.queueService.enqueueData(currentRoomId, leaveMessage);
-      } catch (error: any) {
-        // 큐 추가 실패는 경고만 (루 퇴장은 성공)
+      // RedisQueueService를 통해 큐에 메시지 추가 (비동기 처리)
+      this.queueService.enqueueData(currentRoomId, leaveMessage).catch((error: any) => {
+        // 큐 추가 실패는 경고만 (루 퇴장은 이미 성공)
         this.logger.warn(
           `[Redis Room] Failed to enqueue USER_LEFT message for client '${clientId}' in room '${currentRoomId}': ${error.message}`,
         );
-      }
+      });
 
       await this.removeClientFromRoom(clientId, currentRoomId, sessionToken);
 
@@ -504,15 +501,13 @@ export class RedisRoomService implements OnModuleInit, OnModuleDestroy {
         clientId: clientId,
       };
 
-      // RedisQueueService를 통해 큐에 메시지 추가
-      try {
-        await this.queueService.enqueueData(currentRoom, disconnectMessage);
-      } catch (error: any) {
-        // 큐 추가 실패는 경고만 (연결 해제는 성공)
+      // RedisQueueService를 통해 큐에 메시지 추가 (비동기 처리)
+      this.queueService.enqueueData(currentRoom, disconnectMessage).catch((error: any) => {
+        // 큐 추가 실패는 경고만 (연결 해제는 이미 성공)
         this.logger.warn(
           `[Redis Room] Failed to enqueue USER_DISCONNECTED message for client '${clientId}' in room '${currentRoom}': ${error.message}`,
         );
-      }
+      });
 
       await this.removeClientFromRoom(clientId, currentRoom);
 
