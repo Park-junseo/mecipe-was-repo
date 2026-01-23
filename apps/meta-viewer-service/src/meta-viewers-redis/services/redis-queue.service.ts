@@ -127,25 +127,63 @@ export class RedisQueueService implements OnModuleDestroy {
   }
 
   /**
-   * 방별 데이터 큐에 데이터 추가
+   * 방별 데이터 큐에 데이터 추가 (재시도 로직 + 중복 방지 포함)
    * 최적화: 파이프라인 사용 가능하지만 단일 메시지이므로 현재 구조 유지
    * 타임아웃: Redis 명령 실행 타임아웃 없음으로 인한 무한 대기 방지 (5초 타임아웃)
+   * 재시도: 실패 시 지수 백오프로 최대 3회 재시도하여 확정적 저장 보장
+   * 중복 방지: 타임아웃 후 재시도 전에 메시지가 이미 저장되었는지 확인
    * - Redis 서버 부하/블로킹 시 명령이 매우 느리게 실행될 수 있음
    * - 타임아웃 없으면 joinRoom이 완료되지 않아 ACK 미전송
    */
-  async enqueueData(roomId: string, data: ClientMessage): Promise<void> {
+  async enqueueData(roomId: string, data: ClientMessage, retryCount = 0, messageIdempotencyKey?: string): Promise<void> {
     const streamKey = `room:${roomId}:queue`;
     const startTime = Date.now();
     const timeoutMs = 5000; // 5초 타임아웃
+    const maxRetries = 3; // 최대 3회 재시도
+    const baseRetryDelay = 100; // 기본 재시도 지연 (100ms)
+
+    // 멱등성 키 생성 (재시도 시 중복 방지용)
+    // clientId + timestamp + type으로 고유 키 생성
+    const idempotencyKey = messageIdempotencyKey || `${data.clientId}-${data.timestamp}-${data.type}`;
 
     try {
+      // 재시도 시: 타임아웃으로 실패했지만 실제로는 저장되었을 수 있으므로 확인
+      if (retryCount > 0) {
+        try {
+          // 최근 메시지들을 확인하여 중복 체크 (최근 100개만 확인)
+          const recentMessages = await this.redis.xRevRange(streamKey, '+', '-', { COUNT: 100 });
+          
+          for (const msg of recentMessages) {
+            try {
+              const msgData = JSON.parse(msg.message.data) as ClientMessage;
+              const msgKey = `${msgData.clientId}-${msgData.timestamp}-${msgData.type}`;
+              
+              // 같은 멱등성 키를 가진 메시지가 있으면 이미 저장된 것으로 간주
+              if (msgKey === idempotencyKey) {
+                this.logger.warn(
+                  `[Redis Queue] Message already exists in stream (duplicate detected, skipping retry) - room: ${roomId}, key: ${idempotencyKey}`,
+                );
+                return; // 이미 저장되었으므로 성공으로 처리
+              }
+            } catch {
+              // 파싱 실패는 무시하고 계속
+            }
+          }
+        } catch (checkError: any) {
+          // 중복 체크 실패는 로그만 남기고 재시도 계속 진행
+          this.logger.warn(
+            `[Redis Queue] Failed to check for duplicate message (will retry anyway): ${checkError.message}`,
+          );
+        }
+      }
+
       // 타임아웃 래퍼: Promise.race를 사용하여 최대 5초 대기
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
           const isOpenOnTimeout = this.redis.isOpen;
           const isReadyOnTimeout = this.redis.isReady;
           this.logger.warn(
-            `[Redis Queue] enqueueData timeout for room '${roomId}' after ${timeoutMs}ms (isOpen: ${isOpenOnTimeout}, isReady: ${isReadyOnTimeout})`,
+            `[Redis Queue] enqueueData timeout for room '${roomId}' after ${timeoutMs}ms (attempt ${retryCount + 1}/${maxRetries + 1}, isOpen: ${isOpenOnTimeout}, isReady: ${isReadyOnTimeout})`,
           );
           reject(new Error(`enqueueData timeout for room '${roomId}' after ${timeoutMs}ms`));
         }, timeoutMs);
@@ -163,6 +201,7 @@ export class RedisQueueService implements OnModuleDestroy {
           timestamp: data.timestamp.toString(),
           clientId: data.clientId,
           type: data.type,
+          idempotencyKey: idempotencyKey, // 멱등성 키를 메시지에 포함
         },
       ).then(async (messageId) => {
         const xAddDuration = Date.now() - xAddStartTime;
@@ -170,7 +209,7 @@ export class RedisQueueService implements OnModuleDestroy {
         // XADD가 느리면 경고
         if (xAddDuration > 1000) {
           this.logger.warn(
-            `[Redis Queue] xAdd slow for room '${roomId}': ${xAddDuration}ms (messageId: ${messageId})`,
+            `[Redis Queue] xAdd slow for room '${roomId}': ${xAddDuration}ms (messageId: ${messageId}, attempt ${retryCount + 1})`,
           );
         }
         
@@ -188,7 +227,7 @@ export class RedisQueueService implements OnModuleDestroy {
       }).catch((error) => {
         const xAddDuration = Date.now() - xAddStartTime;
         this.logger.error(
-          `[Redis Queue] xAdd failed for room '${roomId}' (duration: ${xAddDuration}ms): ${error.message}`,
+          `[Redis Queue] xAdd failed for room '${roomId}' (duration: ${xAddDuration}ms, attempt ${retryCount + 1}): ${error.message}`,
           error.stack,
         );
         throw error;
@@ -200,15 +239,30 @@ export class RedisQueueService implements OnModuleDestroy {
       
       // 전체 작업이 느리면 경고
       if (duration > 1000) {
-        this.logger.warn(`[Redis Queue] enqueueData slow for room '${roomId}': ${duration}ms (type: ${data.type})`);
+        this.logger.warn(`[Redis Queue] enqueueData slow for room '${roomId}': ${duration}ms (type: ${data.type}, attempt ${retryCount + 1})`);
       }
     } catch (error: any) {
       const duration = Date.now() - startTime;
       const isOpenAfter = this.redis.isOpen;
       const isReadyAfter = this.redis.isReady;
       
+      // 재시도 가능한 경우 재시도
+      if (retryCount < maxRetries) {
+        const retryDelay = baseRetryDelay * Math.pow(2, retryCount); // 지수 백오프: 100ms, 200ms, 400ms
+        this.logger.warn(
+          `[Redis Queue] Retrying enqueueData for room '${roomId}' (attempt ${retryCount + 1}/${maxRetries}, delay: ${retryDelay}ms): ${error.message}`,
+        );
+        
+        // 재시도 전 지연
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+        
+        // 재시도 (멱등성 키 전달)
+        return this.enqueueData(roomId, data, retryCount + 1, idempotencyKey);
+      }
+      
+      // 최대 재시도 횟수 초과
       this.logger.error(
-        `[Redis Queue] Failed to enqueue data for room '${roomId}' (duration: ${duration}ms, isOpen: ${isOpenAfter}, isReady: ${isReadyAfter}): ${error.message}`,
+        `[Redis Queue] Failed to enqueue data for room '${roomId}' after ${maxRetries + 1} attempts (duration: ${duration}ms, isOpen: ${isOpenAfter}, isReady: ${isReadyAfter}): ${error.message}`,
         error.stack,
       );
       throw error;
